@@ -1,0 +1,17 @@
+{
+  "name": "@suku-examples/hello",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/main.ts",
+    "build": "bun build src/main.ts --target node --outdir dist",
+    "start:node": "bun run build && node dist/main.js"
+  },
+  "dependencies": {
+    "@suku/core": "workspace:*",
+    "@suku/di": "workspace:*",
+    "@suku/platform-bun": "workspace:*",
+    "@suku/platform-node": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}
