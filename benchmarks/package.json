@@ -1,0 +1,13 @@
+{
+  "name": "@suku-benchmarks/http",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node --experimental-strip-types run.ts"
+  },
+  "dependencies": {
+    "@suku/core": "workspace:*",
+    "@suku/platform-bun": "workspace:*",
+    "@suku/platform-node": "workspace:*"
+  }
+}
