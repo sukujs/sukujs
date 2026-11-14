@@ -15,10 +15,13 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "size": "bun scripts/size.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run build && bun run size",
+    "check": "bun run version:check && bun run lint && bun run typecheck && bun run test && bun run build && bun run size",
     "test:node": "bun run --filter '@suku/crypto' build && node --experimental-strip-types --test 'packages/*/test/*.node-test.ts'",
     "docs:dev": "bun run --cwd apps/docs dev",
-    "docs:build": "bun run --cwd apps/docs build"
+    "docs:build": "bun run --cwd apps/docs build",
+    "version:check": "bun scripts/version.ts check",
+    "version:set": "bun scripts/version.ts set",
+    "version:bump": "bun scripts/version.ts bump"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
