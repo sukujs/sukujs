@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "suku-docs",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-11-14",
+  "observability": {
+    "enabled": true,
+  },
+}
