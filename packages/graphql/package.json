@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/graphql",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Class-based GraphQL resolvers for Suku, with constructor injection and typed arguments. Built on GraphQL Yoga.",
   "keywords": [
     "suku",

@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The Suku command line: create a project, generate features, routes and services, and run, build and start your app.",
   "keywords": [
     "suku",
