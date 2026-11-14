@@ -1,8 +1,9 @@
 import {
   type Constructor,
-  getInjectableOptions,
+  getServiceOptions,
   isConstructor,
   type ServiceProvider,
+  tokenName,
 } from '@suku/di';
 import type { FetchHandler } from './adapter.js';
 import { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
@@ -103,6 +104,14 @@ export function createKernel(
   const addRoute = (r: Route, key: string | undefined, scope: Scope, owner?: Compiled['owner']) => {
     const path = joinPaths(scope.prefix, r.path);
     const name = r.config.name ?? key ?? `${r.method} ${path}`;
+    for (const [serviceName, token] of Object.entries(r.config.services ?? {})) {
+      if (!provider.has(token)) {
+        throw new FeatureError(
+          `Route ${name} asks for service "${serviceName}" (${tokenName(token)}), which is not registered. ` +
+            'Add it to the `services` of a feature or of Suku.create().',
+        );
+      }
+    }
     const compiled: Compiled = {
       method: r.method,
       config: r.config,
@@ -179,7 +188,7 @@ export function createKernel(
 
   const isSingleton = (cls: Constructor): boolean => {
     const lifetime =
-      getRoutesMetadata(cls)?.lifetime ?? getInjectableOptions(cls)?.lifetime ?? 'singleton';
+      getRoutesMetadata(cls)?.lifetime ?? getServiceOptions(cls)?.lifetime ?? 'singleton';
     return lifetime === 'singleton';
   };
 
@@ -205,7 +214,7 @@ export function createKernel(
     if (!isConstructor(ref)) return ref as MiddlewareFn | Middleware;
     const cls = ref as Constructor<Middleware>;
     if (provider.has(cls)) return ctx.provider.get(cls);
-    const lifetime = getInjectableOptions(cls)?.lifetime ?? 'singleton';
+    const lifetime = getServiceOptions(cls)?.lifetime ?? 'singleton';
     if (lifetime !== 'singleton') return ctx.provider.create(cls);
     let instance = activated.get(cls);
     if (!instance) {

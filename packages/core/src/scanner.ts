@@ -1,4 +1,4 @@
-import { type Constructor, getInjectableOptions, ServiceCollection } from '@suku/di';
+import { type Constructor, getServiceOptions, ServiceCollection } from '@suku/di';
 import { type Feature, type FeatureRef, isFeature, type RouteEntry } from './feature.js';
 import { isRoute, isRouteGroup } from './route.js';
 import { getRoutesMetadata } from './routes-class.js';
@@ -65,7 +65,7 @@ export async function scanFeatures(root: FeatureRef): Promise<ScanResult> {
       entries.push({ entry, feature: f });
       // An explicit entry in `services` (e.g. a custom lifetime) wins over the implicit registration.
       if (!collection.has(entry)) {
-        const lifetime = meta.lifetime ?? getInjectableOptions(entry)?.lifetime ?? 'singleton';
+        const lifetime = meta.lifetime ?? getServiceOptions(entry)?.lifetime ?? 'singleton';
         collection.add({ provide: entry, useClass: entry, lifetime });
       }
     }

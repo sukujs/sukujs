@@ -9,7 +9,6 @@ import {
   feature,
   type Infer,
   Inject,
-  Injectable,
   Logger,
   type Middleware,
   type MiddlewareFn,
@@ -18,6 +17,7 @@ import {
   RequestContext,
   Routes,
   route,
+  Service,
   SilentLogger,
   Suku,
   singleton,
@@ -120,11 +120,11 @@ describe('middlewares', () => {
 
   test('class middlewares are injected without registration; scoped ones get the request context', async () => {
     let built = 0;
-    @Injectable()
+    @Service()
     class Counter {
       n = 0;
     }
-    @Injectable()
+    @Service()
     class Counting implements Middleware {
       constructor(private readonly counter: Counter) {
         built++;
@@ -134,7 +134,7 @@ describe('middlewares', () => {
         return next();
       }
     }
-    @Injectable({ lifetime: 'scoped' })
+    @Service({ lifetime: 'scoped' })
     class Auth implements Middleware {
       constructor(private readonly ctx: RequestContext) {}
       async use(_ctx: RequestContext, next: Next) {

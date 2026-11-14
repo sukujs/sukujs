@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   FeatureError,
   feature,
-  Injectable,
   InjectionToken,
   NotFoundException,
   RequestContext,
@@ -11,8 +10,10 @@ import {
   Routes,
   redirect,
   route,
+  Service,
   Suku,
   scoped,
+  service,
   singleton,
   value,
 } from '../src/index.js';
@@ -30,7 +31,7 @@ interface User {
   name: string;
 }
 
-@Injectable()
+@Service()
 class UsersService {
   private readonly users = new Map<number, User>([[1, { id: 1, name: 'Ada' }]]);
   find(id: number) {
@@ -220,7 +221,7 @@ describe('lifetimes', () => {
   let n = 0;
   const disposed: number[] = [];
 
-  @Injectable()
+  @Service()
   class Unit {
     readonly id = ++n;
     dispose() {
@@ -283,7 +284,7 @@ describe('startup validation', () => {
   });
 
   test('a missing service fails at startup, for classes and for per-route services', async () => {
-    @Injectable()
+    @Service()
     class Missing {}
     @Routes('/m')
     class Needs {
@@ -297,7 +298,7 @@ describe('startup validation', () => {
 
   test('features import once, nest by identity, and report cycles', async () => {
     let built = 0;
-    @Injectable()
+    @Service()
     class Shared {
       constructor() {
         built++;
@@ -355,5 +356,36 @@ describe('type-level', () => {
     // @ts-expect-error not an HTTP method
     route.fetch;
     expect(true).toBe(true);
+  });
+});
+
+describe('classless services with routes', () => {
+  const Greeter = service('greeter', {
+    services: { users: UsersService },
+    create: ({ users }) => ({ greet: (id: number) => `hello ${users.find(id)?.name}` }),
+  });
+
+  test('a route names a classless service and receives it typed', async () => {
+    const app = await Suku.create({
+      routes: [
+        route.get('/greet/:id', {
+          params: Id,
+          services: { greeter: Greeter },
+          handle: ({ params, greeter }) => greeter.greet(params.id),
+        }),
+      ],
+      services: [UsersService, Greeter],
+    });
+    expect(await (await app.handle(req('/greet/1'))).text()).toBe('hello Ada');
+  });
+
+  test('forgetting to register it fails at startup, naming the route and the service', async () => {
+    const lonely = route.get('/x', {
+      services: { greeter: Greeter },
+      handle: ({ greeter }) => greeter.greet(1),
+    });
+    await expect(Suku.create({ routes: [lonely] })).rejects.toThrow(
+      /Route GET \/x asks for service "greeter" \(InjectionToken\(greeter\)\), which is not registered/,
+    );
   });
 });

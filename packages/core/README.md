@@ -31,6 +31,8 @@ const app = await Suku.create({ features: [UsersFeature], routes: [health], adap
   path literal is checked against the `params` schema at compile time.
 - **`@Routes` classes** hold routes as fields and receive services through the constructor.
   Singleton by default; the class is constructed once at startup to discover its routes.
+- **Services** are classes (`@Service()` when the constructor takes parameters) or classless
+  `service(name, { services, create })` values. Both are injected by lifetime.
 - **Features** bundle routes, services and middlewares. `prefix`, `middlewares` and `onError`
   apply to a feature's own routes. All services share one flat container.
 - **Middlewares** are the one cross-cutting concept: `(ctx, next) => Response`. Functions,

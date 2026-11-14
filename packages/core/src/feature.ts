@@ -14,7 +14,7 @@ export interface FeatureOptions {
   routes?: RouteEntry[];
   /**
    * Service registrations: typed helpers such as `singleton(Logger, ConsoleLogger)`, or bare
-   * classes (singleton unless `@Injectable({ lifetime })` says otherwise).
+   * classes (singleton unless `@Service({ lifetime })` says otherwise).
    */
   services?: ServiceEntry[];
   /** Applied to this feature's own routes, after app-level middlewares. */
