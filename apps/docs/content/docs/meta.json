@@ -23,6 +23,7 @@
     "---Platforms---",
     "platforms",
     "---Guides---",
+    "graphql",
     "from-nestjs",
     "from-dotnet",
     "performance"

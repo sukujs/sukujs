@@ -1,0 +1,16 @@
+{
+  "name": "@suku-examples/graphql",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/main.ts"
+  },
+  "dependencies": {
+    "@suku/core": "workspace:*",
+    "@suku/platform-bun": "workspace:*",
+    "@suku/platform-node": "workspace:*",
+    "@suku/security": "workspace:*",
+    "graphql": "^17.1.0",
+    "graphql-yoga": "^6.1.0"
+  }
+}

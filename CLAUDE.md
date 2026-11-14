@@ -43,3 +43,19 @@ Releasing:
 2. `bun run check`
 3. `git commit -am "chore(release): vX.Y.Z"`
 4. `git tag vX.Y.Z`
+
+## Scope: GraphQL is supported through guides, not packages
+
+Suku does not ship first-party GraphQL support.
+
+- **No GraphQL package.** Do not add `@suku/graphql`, GraphQL decorators, schema builders,
+  resolver discovery, or a GraphQL dependency to any package under `packages/`.
+- **Guides instead.** The documentation shows how to mount an existing GraphQL server as a
+  Suku route, sharing services, middlewares and the request context. A GraphQL server that
+  exposes a Fetch handler mounts as one `route.all('/graphql', ...)`.
+- **Guides must be tested.** Every guide example runs against the real library in a test, so
+  it cannot go stale. The library is a dev dependency of the test only.
+- **Core stays neutral.** A change to `@suku/core` made for the benefit of a GraphQL guide is
+  acceptable only if it is generally useful, not GraphQL-specific.
+
+If a request asks for built-in GraphQL features, point to the guide and this decision.
