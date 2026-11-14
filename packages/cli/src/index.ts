@@ -103,15 +103,16 @@ function defined<T extends Record<string, unknown>>(
 
 /**
  * Runs the CLI with `argv` (without `node` and the script path) and resolves with the exit
- * code. Usage mistakes are printed and return `1`; they do not throw.
+ * code. Usage mistakes are printed and return `1`; they do not throw. Questions are asked
+ * only when `io.prompter` is given.
  */
 export async function run(argv: string[], io: Partial<Io> = {}): Promise<number> {
-  const prompter =
-    io.prompter ?? (process.stdin.isTTY && process.stdout.isTTY ? new Prompter() : undefined);
+  // No prompter means no questions. The executable passes one when it has a terminal; this
+  // function never looks at the terminal itself, so embedding it and testing it cannot hang.
   const out: Io = {
     cwd: io.cwd ?? process.cwd(),
     log: io.log ?? console.log,
-    ...(prompter ? { prompter } : {}),
+    ...(io.prompter ? { prompter: io.prompter } : {}),
   };
   const split = argv.indexOf('--');
   const own = split === -1 ? argv : argv.slice(0, split);
