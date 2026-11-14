@@ -156,3 +156,57 @@ test('passes the peer address to the handler', async () => {
   const res = await fetch(`${server.url}/ip`);
   assert.match(((await res.json()) as { ip: string }).ip, /127\.0\.0\.1/);
 });
+
+test('request.signal aborts when the client disconnects mid-stream', async () => {
+  let aborted = false;
+  let started!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const s = await nodeAdapter().serve(
+    (req) => {
+      req.signal.addEventListener('abort', () => {
+        aborted = true;
+      });
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: 1\n\n'));
+          started();
+        },
+      });
+      return new Response(stream, { headers: { 'content-type': 'text/event-stream' } });
+    },
+    { port: 0, hostname: '127.0.0.1' },
+  );
+  try {
+    const client = new AbortController();
+    const res = await fetch(s.url, { signal: client.signal });
+    await ready;
+    await res.body!.getReader().read();
+    client.abort();
+    for (let i = 0; i < 50 && !aborted; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(aborted, true);
+  } finally {
+    await s.close({ force: true });
+  }
+});
+
+test('request.signal stays quiet for a request that completes normally', async () => {
+  let aborted = false;
+  const s = await nodeAdapter().serve(
+    (req) => {
+      req.signal.addEventListener('abort', () => {
+        aborted = true;
+      });
+      return new Response('done');
+    },
+    { port: 0, hostname: '127.0.0.1' },
+  );
+  try {
+    assert.equal(await (await fetch(s.url)).text(), 'done');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(aborted, false);
+  } finally {
+    await s.close({ force: true });
+  }
+});

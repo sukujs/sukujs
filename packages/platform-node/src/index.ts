@@ -76,7 +76,14 @@ function toRequest(req: IncomingMessage, res: ServerResponse): Request {
     headers[j] = [rawHeaders[i]!, rawHeaders[i + 1]!];
   }
 
-  const init: RequestInit & { duplex?: 'half' } = { method, headers };
+  // Aborts `request.signal` when the client disconnects before the response is finished,
+  // so handlers can stop streaming or cancel work nobody is waiting for.
+  const abort = new AbortController();
+  res.once('close', () => {
+    if (!res.writableFinished) abort.abort();
+  });
+
+  const init: RequestInit & { duplex?: 'half' } = { method, headers, signal: abort.signal };
   if (method !== 'GET' && method !== 'HEAD') {
     init.body = Readable.toWeb(req) as unknown as ReadableStream<Uint8Array>;
     init.duplex = 'half';
