@@ -1,7 +1,7 @@
 import { type ConsoleLogger, Logger, Suku } from '@suku/core';
 import { bunAdapter } from '@suku/platform-bun';
 import { nodeAdapter } from '@suku/platform-node';
-import { health, hello, whoami } from './app.routes.js';
+import { health, hello, Uptime, whoami } from './app.routes.js';
 import { RequestLogger } from './common.js';
 import { Env } from './config.js';
 import { UsersFeature } from './users/users.feature.js';
@@ -11,6 +11,7 @@ const adapter = typeof Bun !== 'undefined' ? bunAdapter() : nodeAdapter();
 const app = await Suku.create({
   features: [Env.load(), UsersFeature],
   routes: [hello, health, whoami],
+  services: [Uptime],
   middlewares: [RequestLogger],
   adapter,
 });

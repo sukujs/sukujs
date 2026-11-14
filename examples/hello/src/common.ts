@@ -1,9 +1,9 @@
 import type { Infer, Middleware, Next } from '@suku/core';
-import { Inject, Injectable, Logger, RequestContext, UnauthorizedException } from '@suku/core';
+import { Inject, Logger, RequestContext, Service, UnauthorizedException } from '@suku/core';
 import { Env } from './config.js';
 
 /** App-level middleware: one log line per request with status and duration. */
-@Injectable()
+@Service()
 export class RequestLogger implements Middleware {
   constructor(private readonly log: Logger) {}
 
@@ -18,7 +18,7 @@ export class RequestLogger implements Middleware {
 }
 
 /** Rejects requests without the configured API key. Attach to the routes that need it. */
-@Injectable()
+@Service()
 export class RequireApiKey implements Middleware {
   constructor(@Inject(Env) private readonly env: Infer<typeof Env.schema>) {}
 

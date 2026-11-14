@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@suku/core';
+import { Logger, Service } from '@suku/core';
 
 export interface User {
   id: string;
   name: string;
 }
 
-@Injectable()
+@Service()
 export class UsersService {
   private readonly users = new Map<string, User>([
     ['1', { id: '1', name: 'Ada Lovelace' }],
