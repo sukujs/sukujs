@@ -10,7 +10,6 @@ import {
   start,
 } from './commands.js';
 import { CliError } from './errors.js';
-import { Prompter } from './prompts.js';
 import { SCHEMATICS } from './schematics.js';
 
 export { DEPLOY_TARGETS, type DeployTarget } from './deploy.js';
