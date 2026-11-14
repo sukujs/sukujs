@@ -1,4 +1,13 @@
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/suku-logo-dark.svg">
+    <img src="brand/suku-logo.svg" alt="Suku" height="48">
+  </picture>
+</p>
+
 # Suku
+
+**Room to spare.**
 
 A lightweight TypeScript backend framework built from four ideas: **routes**, **features**,
 **middlewares** and **services**. Routes are typed by their schemas, and services come from a

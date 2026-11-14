@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Suku</title>
+  <style>
+    .n { fill: #17140F; } .a { fill: #C14F38; }
+    @media (prefers-color-scheme: dark) { .n { fill: #FAF7F2; } .a { fill: #E2725B; } }
+  </style>
+  <rect class="n" x="1" y="1" width="14" height="14" rx="4"/>
+  <rect class="n" x="1" y="17" width="14" height="14" rx="4"/>
+  <rect class="a" x="17" y="17" width="14" height="14" rx="4"/>
+</svg>

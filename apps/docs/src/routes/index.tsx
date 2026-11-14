@@ -2,14 +2,14 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { Boxes, Feather, Gauge, Layers, ShieldCheck, Workflow } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { baseOptions } from '@/lib/layout.shared';
+import { baseOptions, SukuMark } from '@/lib/layout.shared';
 import { gitConfig } from '@/lib/shared';
 
 export const Route = createFileRoute('/')({
   component: Home,
   head: () => ({
     meta: [
-      { title: 'Suku — a lightweight TypeScript backend framework' },
+      { title: 'Suku — room to spare. A lightweight TypeScript backend framework' },
       {
         name: 'description',
         content:
@@ -94,18 +94,18 @@ function Home() {
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-16 px-4 py-14 md:py-20">
         <section className="grid items-center gap-10 lg:grid-cols-2">
           <div>
+            <SukuMark className="mb-6 size-12" />
             <p className="mb-4 inline-flex rounded-full border bg-fd-card px-3 py-1 text-xs font-medium text-fd-muted-foreground">
               Pre-release · Node 22+ and Bun
             </p>
             <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
-              Typed routes.
-              <br />
-              <span className="text-fd-muted-foreground">A real container.</span>
+              Room to spare<span className="text-fd-primary">.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg text-fd-muted-foreground">
-              Suku is a lightweight TypeScript backend framework: decorated controllers and a
-              familiar request pipeline, on a dependency injection container with real lifetimes and
-              scopes. No runtime dependencies.
+              Suku is a lightweight TypeScript backend framework built from four ideas: routes,
+              features, middlewares and services. Routes are typed by their schemas, and services
+              come from a dependency injection container with real lifetimes and scopes. No runtime
+              dependencies.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link

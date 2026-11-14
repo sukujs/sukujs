@@ -2,6 +2,54 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
+/*
+ * Suku brand tokens. See brand/README.md at the repo root.
+ * Ink #17140F, paper #FAF7F2, terracotta #C14F38 (light) and #E2725B (dark).
+ */
+:root {
+  --color-fd-background: #faf7f2;
+  --color-fd-foreground: #17140f;
+  --color-fd-muted: #f1ece4;
+  --color-fd-muted-foreground: #6b6258;
+  --color-fd-popover: #fdfbf8;
+  --color-fd-popover-foreground: #2a251e;
+  --color-fd-card: #f4efe7;
+  --color-fd-card-foreground: #17140f;
+  --color-fd-border: rgba(23, 20, 15, 0.12);
+  --color-fd-primary: #c14f38;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #efe9e0;
+  --color-fd-secondary-foreground: #17140f;
+  --color-fd-accent: rgba(23, 20, 15, 0.07);
+  --color-fd-accent-foreground: #17140f;
+  --color-fd-ring: #c14f38;
+}
+
+.dark {
+  --color-fd-background: #17140f;
+  --color-fd-foreground: #f2ede6;
+  --color-fd-muted: #25201a;
+  --color-fd-muted-foreground: #a89f94;
+  --color-fd-popover: #1f1b16;
+  --color-fd-popover-foreground: #e6e0d8;
+  --color-fd-card: #1e1a15;
+  --color-fd-card-foreground: #faf7f2;
+  --color-fd-border: rgba(250, 247, 242, 0.1);
+  --color-fd-primary: #e2725b;
+  --color-fd-primary-foreground: #17140f;
+  --color-fd-secondary: #25201a;
+  --color-fd-secondary-foreground: #f2ede6;
+  --color-fd-accent: rgba(250, 247, 242, 0.08);
+  --color-fd-accent-foreground: #f2ede6;
+  --color-fd-ring: #e2725b;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #2a251e;
+  --color-fd-secondary: #2e2821;
+  --color-fd-muted-foreground: #b5ada2;
+}
+
 html {
   scrollbar-gutter: stable;
 }
