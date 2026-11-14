@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/security",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Security middlewares for Suku: CORS, security headers, CSRF protection and rate limiting.",
   "keywords": [
     "suku",

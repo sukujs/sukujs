@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/platform-node",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Suku platform adapter for node:http.",
   "keywords": [
     "suku",

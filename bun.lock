@@ -97,7 +97,7 @@
     },
     "packages/core": {
       "name": "@sukujs/core",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@sukujs/di": "workspace:*",
       },
@@ -107,15 +107,15 @@
     },
     "packages/crypto": {
       "name": "@sukujs/crypto",
-      "version": "0.0.0",
+      "version": "0.1.0",
     },
     "packages/di": {
       "name": "@sukujs/di",
-      "version": "0.0.0",
+      "version": "0.1.0",
     },
     "packages/graphql": {
       "name": "@sukujs/graphql",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@sukujs/core": "workspace:*",
         "@sukujs/di": "workspace:*",
@@ -132,21 +132,21 @@
     },
     "packages/platform-bun": {
       "name": "@sukujs/platform-bun",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@sukujs/core": "workspace:*",
       },
     },
     "packages/platform-node": {
       "name": "@sukujs/platform-node",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@sukujs/core": "workspace:*",
       },
     },
     "packages/security": {
       "name": "@sukujs/security",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@sukujs/core": "workspace:*",
         "@sukujs/crypto": "workspace:*",
