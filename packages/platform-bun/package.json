@@ -2,7 +2,23 @@
   "name": "@suku/platform-bun",
   "version": "0.0.0",
   "description": "Suku platform adapter for Bun.serve.",
+  "keywords": [
+    "suku",
+    "adapter",
+    "bun",
+    "http"
+  ],
   "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/platform-bun"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -22,7 +38,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
@@ -30,5 +47,11 @@
   },
   "dependencies": {
     "@suku/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

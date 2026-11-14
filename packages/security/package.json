@@ -2,7 +2,25 @@
   "name": "@suku/security",
   "version": "0.0.0",
   "description": "Security middlewares for Suku: CORS, security headers, CSRF protection and rate limiting.",
+  "keywords": [
+    "suku",
+    "cors",
+    "csrf",
+    "rate-limit",
+    "security-headers",
+    "middleware"
+  ],
   "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/security"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -22,7 +40,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
@@ -31,5 +50,11 @@
   "dependencies": {
     "@suku/core": "workspace:*",
     "@suku/crypto": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

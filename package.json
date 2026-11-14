@@ -21,7 +21,9 @@
     "docs:build": "bun run --cwd apps/docs build",
     "version:check": "bun scripts/version.ts check",
     "version:set": "bun scripts/version.ts set",
-    "version:bump": "bun scripts/version.ts bump"
+    "version:bump": "bun scripts/version.ts bump",
+    "release:dry-run": "bun run build && bun scripts/publish.ts --dry-run",
+    "release:publish": "bun run check && bun scripts/publish.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

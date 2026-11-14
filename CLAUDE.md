@@ -43,6 +43,25 @@ Releasing:
 2. `bun run check`
 3. `git commit -am "chore(release): vX.Y.Z"`
 4. `git tag vX.Y.Z`
+5. `bun run release:dry-run` and read what would be published
+6. `bun run release:publish`
+7. `git push origin main --tags`
+
+### Publishing
+
+`scripts/publish.ts` publishes every package at the shared version, dependencies first, with
+public access. It refuses unless the versions are unified and not `0.0.0`, the git tree is
+clean, `HEAD` is tagged with the version, you are logged in to npm, and none of the versions
+already exist. `bun publish` rewrites `workspace:*` to the exact release version.
+
+- **Never publish by hand** with `npm publish` in one package. Always use the script, so every
+  package goes out together.
+- **Publishing is permanent.** A version can never be reused. Always run the dry run first.
+- **Never publish from an agent without the user's explicit go-ahead for that version.** Logging
+  in to npm is the user's step.
+- If a publish fails partway, the packages before it in the order are already out. Fix the
+  cause and rerun; the script skips nothing, so bump to a new patch version if any are live.
+- The `@suku` scope must be an npm organisation or user the publisher belongs to.
 
 ## Scope: GraphQL lives in `@suku/graphql`, never in core
 

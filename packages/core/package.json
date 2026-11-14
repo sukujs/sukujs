@@ -2,7 +2,29 @@
   "name": "@suku/core",
   "version": "0.0.0",
   "description": "Suku HTTP kernel: platform adapter contract, radix router, modules, controllers and request pipeline.",
+  "keywords": [
+    "suku",
+    "framework",
+    "backend",
+    "api",
+    "http",
+    "routes",
+    "dependency-injection",
+    "typescript",
+    "bun",
+    "node"
+  ],
   "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -22,7 +44,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
@@ -33,5 +56,11 @@
   },
   "devDependencies": {
     "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

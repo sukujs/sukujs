@@ -2,7 +2,24 @@
   "name": "@suku/graphql",
   "version": "0.0.0",
   "description": "Class-based GraphQL resolvers for Suku, with constructor injection and typed arguments. Built on GraphQL Yoga.",
+  "keywords": [
+    "suku",
+    "graphql",
+    "graphql-yoga",
+    "resolvers",
+    "typescript"
+  ],
   "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/graphql"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -22,7 +39,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
@@ -40,5 +58,11 @@
     "graphql": "^17.1.0",
     "graphql-yoga": "^6.1.0",
     "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

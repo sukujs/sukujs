@@ -2,7 +2,27 @@
   "name": "@suku/crypto",
   "version": "0.0.0",
   "description": "Zero-dependency crypto for Suku on Web Crypto: JWT, password hashing, signed and sealed values, random tokens.",
+  "keywords": [
+    "suku",
+    "jwt",
+    "password",
+    "hash",
+    "hmac",
+    "aes",
+    "webcrypto",
+    "security"
+  ],
   "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/crypto"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
@@ -22,10 +42,17 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
