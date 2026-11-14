@@ -2,13 +2,13 @@ import './metadata.js';
 
 export { ServiceCollection } from './collection.js';
 export {
-  getInjectableOptions,
+  getServiceOptions,
   Inject,
-  Injectable,
-  type InjectableOptions,
   type InjectOptions,
-  isInjectable,
+  isService,
   Optional,
+  Service,
+  type ServiceOptions,
 } from './decorators.js';
 export {
   type ClassProvider,
@@ -50,7 +50,20 @@ export {
   installReflectShim,
 } from './metadata.js';
 export { buildServiceProvider, ServiceProvider, type ServiceProviderOptions } from './provider.js';
-export { getConstructorParameters, type ParameterInfo } from './reflection.js';
+export {
+  getConstructorParameters,
+  type InjectEntry,
+  type InjectEntryObject,
+  type ParameterInfo,
+} from './reflection.js';
+export {
+  type Dependencies,
+  type ResolvedDependencies,
+  ServiceDefinition,
+  type ServiceDefinitionOptions,
+  type ServiceOf,
+  service,
+} from './service.js';
 export {
   type AbstractConstructor,
   type Constructor,

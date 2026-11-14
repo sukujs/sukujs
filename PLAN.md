@@ -1,5 +1,28 @@
 # Suku — a lightweight NestJS-shaped API framework with .NET-style DI
 
+## 0. Direction change (2026-11-14): Suku's own design
+
+The NestJS-shaped layer described in sections 2 and 3 and built in Phases 3 to 5 was replaced.
+Suku is now built from **routes, features, middlewares and services**:
+
+- `route.get(path, { params, query, body, headers, response, services, middlewares, onError, handle })`
+  is the single primitive. Schemas type the handler; the path literal is checked against `params`.
+- Two styles share it: fields on a `@Routes(prefix)` class with constructor injection, or plain
+  routes that declare `services`. `route.group` shares a prefix without a class.
+- `feature(name, { routes, services, middlewares, onError, prefix, imports })` replaces modules.
+- Middlewares are the only cross-cutting concept; guards, interceptors, pipes and exception
+  filters are gone. Errors map through `onError` at route, class/group, feature or app level.
+- Removed from core: `@Controller`, `@Get` and friends, parameter decorators, `@Module`,
+  `defineModule`, `@UseGuards`/`@UseInterceptors`/`@UsePipes`/`@UseFilters`, built-in pipes.
+- Unchanged: the container (now also `static inject` and `provider.create()`), radix router,
+  adapters, Standard Schema validation, `defineConfig`, `Logger`.
+- `@Injectable` was renamed `@Service`, and `service(name, { services, create })` declares a
+  service without a class; it is its own token and its dependencies are validated at startup.
+- Deferred: typed values added by middlewares, a route-level result hook, OpenAPI and a typed
+  client (routes already carry method, path, schemas and name for them).
+
+The sections below are kept as the record of how the project got here.
+
 ## 1. Goal
 
 A TypeScript backend framework that feels like NestJS to organise (modules, controllers,

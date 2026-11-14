@@ -1,144 +1,86 @@
-import { type Constructor, getInjectableOptions, ServiceCollection } from '@suku/di';
-import { getControllerMetadata } from './controller.js';
-import type { MiddlewareRef } from './enhancers.js';
-import {
-  getModuleMetadata,
-  isDynamicModule,
-  isModuleDefinition,
-  type ModuleDefinition,
-  type ModuleOptions,
-  type ModuleRef,
-  servicesOf,
-} from './module.js';
+import { type Constructor, getServiceOptions, ServiceCollection } from '@suku/di';
+import { type Feature, type FeatureRef, isFeature, type RouteEntry } from './feature.js';
+import { isRoute, isRouteGroup } from './route.js';
+import { getRoutesMetadata } from './routes-class.js';
 
-export class ModuleError extends Error {
-  override readonly name = 'ModuleError';
+export class FeatureError extends Error {
+  override readonly name = 'FeatureError';
 }
 
-/** A module's identity: the decorated class, or the object `defineModule()` returned. */
-export type ModuleId = Constructor | ModuleDefinition;
-
-export interface ScannedModule {
-  readonly id: ModuleId;
-  readonly name: string;
-  readonly options: ModuleOptions;
-  readonly imports: ModuleId[];
+export interface ScannedEntry {
+  readonly entry: RouteEntry;
+  readonly feature: Feature;
 }
 
 export interface ScanResult {
-  /** Every module reached from the root, parents after their imports (dependency order). */
-  readonly modules: ScannedModule[];
-  readonly controllers: Constructor[];
-  /** Middleware declared on the module that owns each controller. */
-  readonly controllerMiddleware: ReadonlyMap<Constructor, readonly MiddlewareRef[]>;
+  /** Every feature reached from the root, imports before the features that import them. */
+  readonly features: Feature[];
+  readonly entries: ScannedEntry[];
   readonly collection: ServiceCollection;
 }
 
-interface Resolved {
-  id: ModuleId;
-  name: string;
-  /** Metadata declared on the class or definition. */
-  base: ModuleOptions;
-  /** Extra metadata a dynamic module adds on top of its class. */
-  extra?: ModuleOptions;
-  cls?: Constructor;
-}
-
-function nameOf(id: ModuleId): string {
-  return typeof id === 'function' ? id.name || '<anonymous class>' : id.name;
-}
-
-async function resolve(ref: ModuleRef, chain: ModuleId[]): Promise<Resolved> {
-  const r = await ref;
-  if (isModuleDefinition(r)) return { id: r, name: r.name, base: r };
-  if (isDynamicModule(r)) {
-    const { module: cls, ...extra } = r;
-    return { id: cls, name: nameOf(cls), base: getModuleMetadata(cls) ?? {}, extra, cls };
-  }
-  if (typeof r === 'function') {
-    const base = getModuleMetadata(r);
-    if (base) return { id: r, name: nameOf(r), base, cls: r };
-  }
-  const via = chain.map(nameOf).join(' -> ') || 'root';
-  const what = typeof r === 'function' ? r.name : JSON.stringify(r);
-  throw new ModuleError(
-    `${what} is not a module (imported via ${via}). Use defineModule({ ... }) or decorate a class with @Module().`,
-  );
-}
-
 /**
- * Walks the module graph from the root and flattens it into one `ServiceCollection`:
- * every service, every controller (as a service with its declared lifetime) and every
- * decorated module class (as a singleton, so lifecycle hooks can run on it).
+ * Walks the feature graph from the root and flattens it into one `ServiceCollection`: every
+ * service, and every `@Routes` class registered with its declared lifetime.
  */
-export async function scanModules(root: ModuleRef): Promise<ScanResult> {
+export async function scanFeatures(root: FeatureRef): Promise<ScanResult> {
   const collection = new ServiceCollection();
-  const modules: ScannedModule[] = [];
-  const controllers: Constructor[] = [];
-  const seen = new Set<ModuleId>();
-  const seenControllers = new Set<Constructor>();
-  const controllerMiddleware = new Map<Constructor, readonly MiddlewareRef[]>();
+  const features: Feature[] = [];
+  const entries: ScannedEntry[] = [];
+  const seen = new Set<Feature>();
+  const seenClasses = new Set<Constructor>();
 
-  const register = (options: ModuleOptions, owner: string) => {
-    for (const s of servicesOf(options)) collection.add(s);
-    for (const c of options.controllers ?? []) {
-      const meta = getControllerMetadata(c);
+  const visit = async (ref: FeatureRef, chain: Feature[]): Promise<void> => {
+    const f = await ref;
+    const via = chain.map((c) => c.name).join(' -> ') || 'root';
+    if (!isFeature(f)) {
+      throw new FeatureError(
+        `${describe(f)} is not a feature (imported via ${via}). Create one with feature(name, { ... }).`,
+      );
+    }
+    if (chain.includes(f)) {
+      throw new FeatureError(
+        `Circular feature import: ${[...chain, f].map((c) => c.name).join(' -> ')}`,
+      );
+    }
+    if (seen.has(f)) return;
+    seen.add(f);
+
+    for (const imp of f.imports ?? []) await visit(imp, [...chain, f]);
+
+    for (const s of f.services ?? []) collection.add(s);
+    for (const entry of f.routes ?? []) {
+      if (isRoute(entry) || isRouteGroup(entry)) {
+        entries.push({ entry, feature: f });
+        continue;
+      }
+      const meta = typeof entry === 'function' ? getRoutesMetadata(entry) : undefined;
       if (!meta) {
-        throw new ModuleError(
-          `${c.name} is listed in ${owner}.controllers but is not decorated with @Controller().`,
+        throw new FeatureError(
+          `${describe(entry)} in feature "${f.name}" is not a route. Use route.get(...), route.group(...), or a class decorated with @Routes().`,
         );
       }
-      if (seenControllers.has(c)) continue;
-      seenControllers.add(c);
-      controllers.push(c);
-      controllerMiddleware.set(c, options.middleware ?? []);
+      if (seenClasses.has(entry)) continue;
+      seenClasses.add(entry);
+      entries.push({ entry, feature: f });
       // An explicit entry in `services` (e.g. a custom lifetime) wins over the implicit registration.
-      if (!collection.has(c)) {
-        const lifetime = meta.lifetime ?? getInjectableOptions(c)?.lifetime ?? 'singleton';
-        collection.add({ provide: c, useClass: c, lifetime });
+      if (!collection.has(entry)) {
+        const lifetime = meta.lifetime ?? getServiceOptions(entry)?.lifetime ?? 'singleton';
+        collection.add({ provide: entry, useClass: entry, lifetime });
       }
     }
-  };
-
-  const visit = async (ref: ModuleRef, chain: ModuleId[]): Promise<ModuleId> => {
-    const { id, name, base, extra, cls } = await resolve(ref, chain);
-    if (chain.includes(id)) {
-      throw new ModuleError(`Circular module import: ${[...chain, id].map(nameOf).join(' -> ')}`);
-    }
-    if (seen.has(id)) {
-      // Same class imported again with different dynamic metadata: register only the extras.
-      if (extra) {
-        for (const imp of extra.imports ?? []) await visit(imp, [...chain, id]);
-        register(extra, name);
-      }
-      return id;
-    }
-    seen.add(id);
-
-    const imports: ModuleId[] = [];
-    for (const imp of [...(base.imports ?? []), ...(extra?.imports ?? [])]) {
-      imports.push(await visit(imp, [...chain, id]));
-    }
-
-    if (cls) collection.tryAddSingleton(cls);
-    register(base, name);
-    if (extra) register(extra, name);
-    modules.push({ id, name, options: extra ? merge(base, extra) : base, imports });
-    return id;
+    features.push(f);
   };
 
   await visit(root, []);
-  return { modules, controllers, controllerMiddleware, collection };
+  return { features, entries, collection };
 }
 
-function merge(base: ModuleOptions, extra: ModuleOptions): ModuleOptions {
-  const name = base.name ?? extra.name;
-  return {
-    ...(name === undefined ? {} : { name }),
-    imports: [...(base.imports ?? []), ...(extra.imports ?? [])],
-    controllers: [...(base.controllers ?? []), ...(extra.controllers ?? [])],
-    middleware: [...(base.middleware ?? []), ...(extra.middleware ?? [])],
-    services: [...servicesOf(base), ...servicesOf(extra)],
-    exports: [...(base.exports ?? []), ...(extra.exports ?? [])],
-  };
+function describe(value: unknown): string {
+  if (typeof value === 'function') return value.name || '<anonymous class>';
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }

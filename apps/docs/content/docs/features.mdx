@@ -1,0 +1,101 @@
+---
+title: Features
+description: Bundle the routes, services and middlewares of one part of your app.
+icon: Package
+---
+
+A feature is a plain object created with `feature(name, options)`.
+
+```ts title="users/users.feature.ts"
+import { feature, scoped, singleton } from '@suku/core';
+
+export const UsersFeature = feature('users', {
+  routes: [UsersRoutes],
+  services: [singleton(UsersService), scoped(UnitOfWork)],
+  middlewares: [authenticate],
+});
+```
+
+## Options
+
+| Option | Meaning |
+| --- | --- |
+| `routes` | Routes, groups and `@Routes` classes that belong to this feature. |
+| `services` | Service registrations. |
+| `middlewares` | Applied to this feature's own routes. |
+| `onError` | Error handler for this feature's own routes. |
+| `prefix` | Prepended to this feature's own routes. |
+| `imports` | Other features to include. |
+
+`prefix`, `middlewares` and `onError` cover the feature's own routes, not the routes of
+features it imports. A feature imported from several places keeps one meaning that way.
+
+## Registering services
+
+```ts
+services: [
+  singleton(Logger, ConsoleLogger),   // token, implementation
+  scoped(UnitOfWork),                 // a class as its own token
+  value(CONFIG, { port: 3000 }),      // an existing value
+  factory(Mailer, (sp) => new Mailer(sp.get(Logger))),
+  alias(Cache, RedisCache),
+  UsersService,                       // a bare class: singleton
+]
+```
+
+The helpers check the implementation against the token.
+
+```ts
+singleton(Logger, ConsoleLogger);    // ok: ConsoleLogger extends Logger
+singleton(Logger, UsersService);     // compile error
+value(CONFIG, { port: '3000' });     // compile error if CONFIG is InjectionToken<{ port: number }>
+```
+
+A [classless service](/docs/dependency-injection#services-without-a-class) is listed by itself:
+`services: [Clock, Invoices]`. See [services](/docs/dependency-injection) for lifetimes and tokens.
+
+## Composing the app
+
+`Suku.create` is the composition root. List features, and for small apps add routes and
+services directly.
+
+```ts
+const app = await Suku.create({
+  features: [Env.load(), UsersFeature, BillingFeature],
+  routes: [health],
+  services: [singleton(Logger, PinoLogger)],
+  middlewares: [requestLogger],
+  prefix: '/api',
+  adapter: nodeAdapter(),
+});
+```
+
+| Option | Meaning |
+| --- | --- |
+| `features`, `routes`, `services` | What the app is made of. |
+| `middlewares` | Run for every request, matched or not. |
+| `onError` | Last error handler before the default. |
+| `prefix` | Prepended to every route. |
+| `bodyLimit` | Maximum request body in bytes. Default 1 MiB. |
+| `adapter` | The [platform](/docs/platforms). Not needed for tests. |
+| `configureServices` | Add or replace services just before the container is built. |
+
+## Features that take options
+
+A feature with options is a function.
+
+```ts
+export const MailFeature = (options: MailOptions) =>
+  feature('mail', { services: [value(MAIL_OPTIONS, options), singleton(Mailer)] });
+
+Suku.create({ features: [MailFeature({ from: 'hi@example.com' })] });
+```
+
+Features are compared by identity. Call such a function once and share the result when
+several features import it.
+
+## One flat container
+
+Every service from every feature lands in a single collection, as in .NET. Any service can be
+injected anywhere; features organise code, they do not hide services from each other. When
+two features register the same token, the last registration wins.

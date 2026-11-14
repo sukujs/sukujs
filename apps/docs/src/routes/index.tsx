@@ -13,71 +13,73 @@ export const Route = createFileRoute('/')({
       {
         name: 'description',
         content:
-          'NestJS-shaped structure on a .NET-style dependency injection container. Zero runtime dependencies. Runs on Node and Bun.',
+          'Typed routes, features and middlewares on a .NET-style dependency injection container. Zero runtime dependencies. Runs on Node and Bun.',
       },
     ],
   }),
 });
 
-const sample = `import { Body, Controller, Get, Param, Post, Suku, defineModule, singleton } from '@suku/core';
-import { Injectable } from '@suku/di';
+const sample = `import { Routes, Suku, feature, route, singleton } from '@suku/core';
 import { nodeAdapter } from '@suku/platform-node';
+import { z } from 'zod';
 
-@Injectable()
 class UsersService {
-  find(id: string) {
+  find(id: number) {
     return { id, name: 'Ada' };
   }
 }
 
-@Controller('users')
-class UsersController {
+@Routes('/users')
+class UsersRoutes {
   constructor(private readonly users: UsersService) {}
 
-  @Get(':id')
-  get(@Param('id') id: string) {
-    return this.users.find(id);
-  }
+  findOne = route.get('/:id', {
+    params: z.object({ id: z.coerce.number() }),
+    handle: ({ params }) => this.users.find(params.id),
+  });
 
-  @Post()
-  create(@Body(CreateUser) dto: CreateUser) {
-    return dto;
-  }
+  create = route.post('/', {
+    body: z.object({ name: z.string().min(2) }),
+    handle: ({ body }) => ({ created: body.name }),
+  });
 }
 
-const UsersModule = defineModule({
-  controllers: [UsersController],
+const UsersFeature = feature('users', {
+  routes: [UsersRoutes],
   services: [singleton(UsersService)],
 });
 
-const app = await Suku.create({ imports: [UsersModule], adapter: nodeAdapter() });
+const app = await Suku.create({
+  features: [UsersFeature],
+  adapter: nodeAdapter(),
+});
 await app.listen(3000);`;
 
 const features: { icon: ReactNode; title: string; body: string }[] = [
+  {
+    icon: <Workflow className="size-5" />,
+    title: 'Types written once',
+    body: "A route's schemas validate the request and type the handler. The path itself is checked against the params schema at compile time.",
+  },
+  {
+    icon: <Layers className="size-5" />,
+    title: 'With a class, or without',
+    body: 'Group routes in a class with constructor injection, or declare them as plain values that list the services they need.',
+  },
   {
     icon: <Boxes className="size-5" />,
     title: 'Dependency injection like .NET',
     body: 'One flat service collection with singleton, scoped and transient lifetimes, a scope per request, and disposal in reverse order.',
   },
   {
-    icon: <Layers className="size-5" />,
-    title: 'Structure you already know',
-    body: 'Controllers, route and parameter decorators, guards, interceptors, pipes and filters, in the order NestJS taught you.',
-  },
-  {
     icon: <ShieldCheck className="size-5" />,
-    title: 'Typed modules, not empty classes',
-    body: 'defineModule() returns a plain object. singleton(Logger, ConsoleLogger) fails to compile if the implementation does not fit.',
+    title: 'One cross-cutting concept',
+    body: 'Authentication, logging, caching and CORS are all middlewares: code before next(), code after it.',
   },
   {
     icon: <Feather className="size-5" />,
     title: 'Zero runtime dependencies',
-    body: 'No RxJS, no reflect-metadata, no Express. The container is 13 KB and the whole core is 24 KB minified.',
-  },
-  {
-    icon: <Workflow className="size-5" />,
-    title: 'Bring your own schema',
-    body: 'Validation runs through Standard Schema, so Zod, Valibot and ArkType plug into @Body(schema) with no adapter.',
+    body: 'No RxJS, no reflect-metadata, no Express. Validation works with any Standard Schema library.',
   },
   {
     icon: <Gauge className="size-5" />,
@@ -96,9 +98,9 @@ function Home() {
               Pre-release · Node 22+ and Bun
             </p>
             <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
-              The shape of NestJS.
+              Typed routes.
               <br />
-              <span className="text-fd-muted-foreground">The container of .NET.</span>
+              <span className="text-fd-muted-foreground">A real container.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg text-fd-muted-foreground">
               Suku is a lightweight TypeScript backend framework: decorated controllers and a

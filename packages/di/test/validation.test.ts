@@ -3,17 +3,17 @@ import {
   CaptiveDependencyError,
   CircularDependencyError,
   Inject,
-  Injectable,
   MissingServiceError,
+  Service,
   ServiceCollection,
   UnresolvableParameterError,
 } from '../src/index.js';
 
 describe('validateOnBuild', () => {
   test('missing dependency fails at build', () => {
-    @Injectable()
+    @Service()
     class Missing {}
-    @Injectable()
+    @Service()
     class Needs {
       constructor(public m: Missing) {}
     }
@@ -23,9 +23,9 @@ describe('validateOnBuild', () => {
   });
 
   test('singleton depending on scoped fails at build as a captive dependency', () => {
-    @Injectable()
+    @Service()
     class Scoped {}
-    @Injectable()
+    @Service()
     class Single {
       constructor(public s: Scoped) {}
     }
@@ -35,10 +35,10 @@ describe('validateOnBuild', () => {
   });
 
   test('captive detection follows useExisting aliases', () => {
-    @Injectable()
+    @Service()
     class Scoped {}
     abstract class Alias {}
-    @Injectable()
+    @Service()
     class Single {
       constructor(public a: Alias) {}
     }
@@ -50,13 +50,13 @@ describe('validateOnBuild', () => {
   });
 
   test('scoped depending on transient and singleton depending on transient are fine', () => {
-    @Injectable()
+    @Service()
     class T {}
-    @Injectable()
+    @Service()
     class S {
       constructor(public t: T) {}
     }
-    @Injectable()
+    @Service()
     class Single {
       constructor(public t: T) {}
     }
@@ -65,15 +65,15 @@ describe('validateOnBuild', () => {
   });
 
   test('cycles fail at build', () => {
-    @Injectable()
+    @Service()
     class A {
       constructor(@Inject('B') public b: unknown) {}
     }
-    @Injectable()
+    @Service()
     class B {
       constructor(@Inject('C') public c: unknown) {}
     }
-    @Injectable()
+    @Service()
     class C {
       constructor(public a: A) {}
     }
@@ -82,7 +82,7 @@ describe('validateOnBuild', () => {
   });
 
   test('unresolvable parameter types fail at build', () => {
-    @Injectable()
+    @Service()
     class Bad {
       constructor(public port: number) {}
     }
@@ -91,9 +91,9 @@ describe('validateOnBuild', () => {
   });
 
   test('optional missing dependencies pass validation', () => {
-    @Injectable()
+    @Service()
     class Missing {}
-    @Injectable()
+    @Service()
     class Needs {
       constructor(@Inject(Missing) public m?: Missing) {}
     }

@@ -29,16 +29,16 @@ interface Target {
 const targets: Target[] = [
   { name: 'raw node:http', runtime: 'node', file: 'raw-node.ts' },
   { name: 'suku node adapter', runtime: 'node', file: 'suku-node.ts', baseline: 'raw node:http' },
-  { name: 'suku app (node)', runtime: 'node', file: 'dist/app-nest.js', baseline: 'raw node:http' },
+  { name: 'suku app (node)', runtime: 'node', file: 'dist/app-suku.js', baseline: 'raw node:http' },
   { name: 'raw Bun.serve', runtime: 'bun', file: 'raw-bun.ts' },
   { name: 'suku bun adapter', runtime: 'bun', file: 'suku-bun.ts', baseline: 'raw Bun.serve' },
-  { name: 'suku app (bun)', runtime: 'bun', file: 'app-nest.ts', baseline: 'raw Bun.serve' },
+  { name: 'suku app (bun)', runtime: 'bun', file: 'app-suku.ts', baseline: 'raw Bun.serve' },
 ];
 
 // Node cannot run decorators or emit decorator metadata itself, so the full app is bundled with Bun first.
 const bundle = spawnSync(
   'bun',
-  ['build', join(here, 'app-nest.ts'), '--target', 'node', '--outdir', join(here, 'dist')],
+  ['build', join(here, 'app-suku.ts'), '--target', 'node', '--outdir', join(here, 'dist')],
   {
     stdio: 'inherit',
   },

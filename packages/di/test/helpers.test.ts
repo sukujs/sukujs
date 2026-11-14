@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   alias,
   factory,
-  Injectable,
   InjectionToken,
+  Service,
   ServiceCollection,
   scoped,
   singleton,
@@ -14,11 +14,11 @@ import {
 abstract class Logger {
   abstract log(m: string): void;
 }
-@Injectable()
+@Service()
 class ConsoleLogger extends Logger {
   log(_m: string) {}
 }
-@Injectable()
+@Service()
 class Unrelated {}
 const CONFIG = new InjectionToken<{ port: number }>('CONFIG');
 

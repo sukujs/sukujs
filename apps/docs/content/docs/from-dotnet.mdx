@@ -26,9 +26,11 @@ icon: ArrowRightLeft
 | `ILogger` | `Logger` |
 | `HttpContext` | `RequestContext` |
 | Middleware `(context, next)` | Middleware `(ctx, next)` |
-| `[ApiController]`, `[HttpGet("{id}")]` | `@Controller()`, `@Get(':id')` |
-| Action filters | Guards and interceptors |
-| Exception filters | Exception filters |
+| Minimal API `app.MapGet("/users/{id}", ...)` | `route.get('/users/:id', { ... })` |
+| Controller class | A `@Routes` class |
+| Model binding and validation | The route's `params`, `query` and `body` schemas |
+| Action filters | Middlewares |
+| Exception filters, `UseExceptionHandler` | `onError` |
 
 ## Interfaces become abstract classes
 
@@ -54,13 +56,18 @@ class Invoices {
 - A singleton that depends on a scoped service is rejected as a captive dependency.
 - Disposal runs in reverse order of creation. Instances you registered yourself are left alone.
 
-## Controllers are singletons by default
+## Routes classes are singletons by default
 
-In ASP.NET Core a controller is created per request. In Suku it is a singleton unless you ask
-otherwise, which is the NestJS convention and avoids an allocation per request.
+In ASP.NET Core a controller is created per request. A Suku `@Routes` class is a singleton
+unless you ask otherwise, which avoids an allocation per request. Request-bound services are
+usually taken per route instead.
 
 ```ts
-@Controller({ path: 'orders', lifetime: 'scoped' })
+place = route.post('/', {
+  body: PlaceOrder,
+  services: { uow: UnitOfWork },     // scoped: one per request
+  handle: ({ body, uow }) => uow.orders.place(body),
+});
 ```
 
 ## The composition root
@@ -69,7 +76,7 @@ otherwise, which is the NestJS convention and avoids an allocation per request.
 
 ```ts
 const app = await Suku.create({
-  imports: [OrdersModule],
+  features: [OrdersFeature],
   services: [singleton(IClock, SystemClock)],
   configureServices: (services) => services.addScoped(UnitOfWork),
   adapter: nodeAdapter(),

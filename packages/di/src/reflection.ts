@@ -3,6 +3,18 @@ import { UnresolvableParameterError } from './errors.js';
 import { DESIGN_PARAMTYPES, hasOwnMetadata, readMetadata, readOwnMetadata } from './metadata.js';
 import type { Token } from './types.js';
 
+export interface InjectEntryObject {
+  token: Token;
+  key?: unknown;
+  optional?: boolean;
+}
+/** One entry of a class's `static inject` array. */
+export type InjectEntry = Token | InjectEntryObject;
+
+function isEntryObject(value: unknown): value is InjectEntryObject {
+  return typeof value === 'object' && value !== null && 'token' in value;
+}
+
 export interface ParameterInfo {
   readonly index: number;
   readonly token: Token;
@@ -41,6 +53,24 @@ export function getConstructorParameters(cls: Function): readonly ParameterInfo[
   const cached = cache.get(cls);
   if (cached) return cached;
 
+  // Decorator-free form: `static inject = [Database, { token: CONFIG, optional: true }]`.
+  const explicit = (cls as { inject?: unknown }).inject;
+  if (Array.isArray(explicit) && Object.hasOwn(cls, 'inject')) {
+    const params = (explicit as InjectEntry[]).map((entry, index): ParameterInfo => {
+      const e =
+        isTokenLike(entry) && !isEntryObject(entry)
+          ? { token: entry as Token }
+          : (entry as InjectEntryObject);
+      if (!isTokenLike(e.token)) {
+        throw new UnresolvableParameterError(cls, index, 'static inject entry is not a token.');
+      }
+      const info: ParameterInfo = { index, token: e.token, optional: e.optional ?? false };
+      return e.key === undefined ? info : { ...info, key: e.key };
+    });
+    cache.set(cls, params);
+    return params;
+  }
+
   // If the class declares its own constructor metadata, ignore inherited @Inject /
   // @Optional markers, which were written for the parent's parameters.
   const own = hasOwnMetadata(DESIGN_PARAMTYPES, cls);
@@ -61,7 +91,7 @@ export function getConstructorParameters(cls: Function): readonly ParameterInfo[
       cls,
       -1,
       `it declares ${cls.length} constructor parameter(s) but no type metadata was emitted. ` +
-        'Decorate the class with @Injectable() and compile with "emitDecoratorMetadata": true, ' +
+        'Decorate the class with @Service() and compile with "emitDecoratorMetadata": true, ' +
         'or annotate each parameter with @Inject(token).',
     );
   }

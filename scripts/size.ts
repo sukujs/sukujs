@@ -5,8 +5,8 @@
 import { resolve } from 'node:path';
 
 const budgets: Record<string, number> = {
-  'packages/di/src/index.ts': 14 * 1024,
-  'packages/core/src/index.ts': 26 * 1024,
+  'packages/di/src/index.ts': 16 * 1024,
+  'packages/core/src/index.ts': 24 * 1024,
   'packages/platform-node/src/index.ts': 4 * 1024,
   'packages/platform-bun/src/index.ts': 2 * 1024,
 };

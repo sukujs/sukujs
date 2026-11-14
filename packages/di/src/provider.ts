@@ -75,6 +75,13 @@ export abstract class ServiceProvider {
   abstract getKeyedOptional<T>(token: Token<T>, key: unknown): T | undefined;
   abstract has(token: Token, key?: unknown): boolean;
 
+  /**
+   * Constructs a class that is not registered, resolving its constructor parameters from
+   * this provider (like .NET's `ActivatorUtilities.CreateInstance`). The instance is owned by
+   * this provider and disposed with it.
+   */
+  abstract create<T>(cls: Constructor<T>): T;
+
   /** Creates a child provider. Dispose it to release scoped and transient instances it created. */
   abstract createScope(): ServiceProvider;
   /** Disposes instances this provider owns, newest first, then child scopes (root only). */
@@ -169,6 +176,13 @@ class Container extends ServiceProvider {
 
   has(token: Token, key?: unknown): boolean {
     return token === ServiceProvider || (this.registry.lookup(token, key)?.length ?? 0) > 0;
+  }
+
+  create<T>(cls: Constructor<T>): T {
+    this.assertAlive();
+    const instance = this.construct(cls);
+    this.track(instance);
+    return instance as T;
   }
 
   createScope(): ServiceProvider {
@@ -294,6 +308,16 @@ function validate(registry: Registry): void {
 
   const dependenciesOf = (d: ServiceDescriptor): ServiceDescriptor[] => {
     const c = concrete(d);
+    if (c.kind === 'factory' && c.dependsOn) {
+      const declared: ServiceDescriptor[] = [];
+      for (const token of c.dependsOn) {
+        if (token === ServiceProvider) continue;
+        const dep = resolveDependency({ token });
+        if (!dep) throw new MissingServiceError(token, undefined, [d]);
+        declared.push(dep);
+      }
+      return declared;
+    }
     if (c.kind !== 'class') return [];
     const deps: ServiceDescriptor[] = [];
     for (const p of getConstructorParameters(c.useClass!)) {

@@ -3,9 +3,9 @@ import {
   getConstructorParameters,
   getMetadata,
   Inject,
-  Injectable,
   InjectionToken,
   Optional,
+  Service,
   UnresolvableParameterError,
 } from '../src/index.js';
 
@@ -13,7 +13,7 @@ describe('metadata shim', () => {
   test('TypeScript emits design:paramtypes through the shim', () => {
     class A {}
     class B {}
-    @Injectable()
+    @Service()
     class C {
       constructor(
         public a: A,
@@ -27,7 +27,7 @@ describe('metadata shim', () => {
   test('@Inject overrides the token and @Optional marks the parameter', () => {
     const CONFIG = new InjectionToken<{ port: number }>('CONFIG');
     class Logger {}
-    @Injectable()
+    @Service()
     class Svc {
       constructor(
         @Inject(CONFIG) public cfg: { port: number },
@@ -47,7 +47,7 @@ describe('metadata shim', () => {
     interface Clock {
       now(): number;
     }
-    @Injectable()
+    @Service()
     class Uses {
       constructor(public clock: Clock) {}
     }
@@ -60,12 +60,12 @@ describe('metadata shim', () => {
     class Plain {
       constructor(public dep: Dep) {}
     }
-    expect(() => getConstructorParameters(Plain)).toThrow(/@Injectable\(\)/);
+    expect(() => getConstructorParameters(Plain)).toThrow(/@Service\(\)/);
   });
 
   test('subclass without its own constructor inherits parent parameters', () => {
     class Dep {}
-    @Injectable()
+    @Service()
     class Base {
       constructor(public dep: Dep) {}
     }

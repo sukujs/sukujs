@@ -3,7 +3,6 @@ import {
   PayloadTooLargeException,
   UnsupportedMediaTypeException,
 } from './http-errors.js';
-import { createParamDecorator } from './params.js';
 
 export interface BodyOptions {
   /** Reject bodies larger than this many bytes with 413. Default 1 MiB. */
@@ -93,15 +92,3 @@ export function assertMediaType(request: Request, types: string[]): void {
   if (!types.includes(type))
     throw new UnsupportedMediaTypeException(`Expected ${types.join(' or ')}`);
 }
-
-/**
- * The parsed request body (`@Body()`), or one property of it (`@Body('name')`). Pass a
- * Standard Schema to validate: `@Body(CreateUser)`. Parsed once per request via `ctx.body()`.
- */
-export const Body = createParamDecorator<string>('Body', async (name, ctx) => {
-  const value = await ctx.body();
-  if (name === undefined) return value;
-  return value !== null && typeof value === 'object'
-    ? (value as Record<string, unknown>)[name]
-    : undefined;
-});

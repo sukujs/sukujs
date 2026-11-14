@@ -1,5 +1,5 @@
 import { InjectionToken, value } from '@suku/di';
-import { defineModule, type ModuleDefinition } from './module.js';
+import { type Feature, feature } from './feature.js';
 import {
   flattenIssues,
   type InferOutput,
@@ -20,12 +20,12 @@ export class ConfigError extends Error {
 
 /**
  * A typed injection token for validated configuration. `load()` validates a source (by
- * default the process environment) at startup and returns a module that provides the value.
+ * default the process environment) at startup and returns a feature that provides the value.
  *
  * ```ts
  * export const Env = defineConfig('env', z.object({ PORT: z.coerce.number().default(3000) }));
  *
- * Suku.create({ imports: [Env.load()] });
+ * Suku.create({ features: [Env.load()] });
  *
  * class Server { constructor(@Inject(Env) private env: Infer<typeof Env.schema>) {} }
  * ```
@@ -38,14 +38,11 @@ export class ConfigToken<S extends StandardSchema> extends InjectionToken<InferO
     super(name);
   }
 
-  /** Validates `source` and returns a module providing the result. Rejects with `ConfigError`. */
-  async load(source: Record<string, unknown> = defaultSource()): Promise<ModuleDefinition> {
+  /** Validates `source` and returns a feature providing the result. Rejects with `ConfigError`. */
+  async load(source: Record<string, unknown> = defaultSource()): Promise<Feature> {
     const result = await this.schema['~standard'].validate(source);
     if (result.issues) throw new ConfigError(this.description, result.issues);
-    return defineModule({
-      name: `config:${this.description}`,
-      services: [value(this, result.value)],
-    });
+    return feature(`config:${this.description}`, { services: [value(this, result.value)] });
   }
 
   /** Validates `source` synchronously-ish and returns the value, for use outside DI. */

@@ -3,13 +3,13 @@
 Zero-dependency dependency injection for TypeScript with .NET-style lifetimes.
 
 ```ts
-import { Injectable, Inject, InjectionToken, ServiceCollection } from '@suku/di';
+import { Service, Inject, InjectionToken, ServiceCollection } from '@suku/di';
 
 abstract class Cache {
   abstract get(k: string): unknown;
 }
 
-@Injectable()
+@Service()
 class RedisCache extends Cache {
   get(k: string) {
     /* ... */
@@ -18,7 +18,7 @@ class RedisCache extends Cache {
 
 const CONFIG = new InjectionToken<{ port: number }>('CONFIG');
 
-@Injectable()
+@Service()
 class Server {
   constructor(
     private cache: Cache,
@@ -36,6 +36,22 @@ const scope = root.createScope();
 scope.get(Server);
 await scope.dispose();
 ```
+
+## Without a class
+
+```ts
+const Clock = service('clock', () => ({ now: () => new Date() }));
+const Invoices = service('invoices', {
+  lifetime: 'scoped',
+  services: { clock: Clock },
+  create: ({ clock }) => ({ dueAt: () => clock.now() }),
+});
+
+new ServiceCollection().addRange([Clock, Invoices]).build().createScope().get(Invoices);
+```
+
+`@Service()` is only needed on classes whose constructor takes parameters; a `static inject = [...]`
+array is the decorator-free alternative.
 
 ## Lifetimes
 
