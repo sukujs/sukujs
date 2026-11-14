@@ -8,7 +8,7 @@ icon: Timer
 once the limit is passed.
 
 ```ts
-import { rateLimit } from '@suku/security';
+import { rateLimit } from '@sukujs/security';
 
 Suku.create({ middlewares: [rateLimit({ limit: 300, window: '1m' })] });
 ```
@@ -115,7 +115,7 @@ counters reset on deploy.
 For a shared limit, implement `RateLimitStore` over something every instance can reach.
 
 ```ts
-import type { RateLimitStore } from '@suku/security';
+import type { RateLimitStore } from '@sukujs/security';
 
 export const redisStore = (redis: Redis): RateLimitStore => ({
   async hit(key, windowMs) {

@@ -1,4 +1,4 @@
-import type { Token } from '@suku/di';
+import type { Token } from '@sukujs/di';
 import type { RequestContext } from './context.js';
 import type { ErrorHandler, MiddlewareRef } from './middleware.js';
 import type { InferInput, InferOutput, StandardSchema } from './schema.js';

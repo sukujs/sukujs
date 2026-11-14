@@ -1,5 +1,5 @@
 {
-  "name": "@suku/platform-node",
+  "name": "@sukujs/platform-node",
   "version": "0.0.0",
   "description": "Suku platform adapter for node:http.",
   "keywords": [
@@ -46,7 +46,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@suku/core": "workspace:*"
+    "@sukujs/core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

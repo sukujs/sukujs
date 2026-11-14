@@ -21,7 +21,7 @@ for (const [entry, limit] of Object.entries(budgets)) {
     minify: true,
     target: 'node',
     write: false,
-    external: ['@suku/*', 'graphql', 'graphql-yoga'],
+    external: ['@sukujs/*', 'graphql', 'graphql-yoga'],
   });
   if (!result.success) {
     console.error(result.logs);

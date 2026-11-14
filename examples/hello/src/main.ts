@@ -1,6 +1,6 @@
-import { type ConsoleLogger, Logger, Suku } from '@suku/core';
-import { bunAdapter } from '@suku/platform-bun';
-import { nodeAdapter } from '@suku/platform-node';
+import { type ConsoleLogger, Logger, Suku } from '@sukujs/core';
+import { bunAdapter } from '@sukujs/platform-bun';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { health, hello, Uptime, whoami } from './app.routes.js';
 import { RequestLogger } from './common.js';
 import { Env } from './config.js';

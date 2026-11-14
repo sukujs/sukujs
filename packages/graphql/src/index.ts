@@ -7,8 +7,8 @@ import {
   route,
   type ServiceMap,
   type StandardSchema,
-} from '@suku/core';
-import type { Constructor, ServiceProvider } from '@suku/di';
+} from '@sukujs/core';
+import type { Constructor, ServiceProvider } from '@sukujs/di';
 import { GraphQLError, type GraphQLResolveInfo, type GraphQLSchema } from 'graphql';
 import { createSchema, createYoga, type YogaServerOptions } from 'graphql-yoga';
 
@@ -330,7 +330,7 @@ export function graphql(options: GraphqlOptions = {}): Route {
   });
 }
 
-/** Everything in one object, for `import sukuGraphql from '@suku/graphql'`. */
+/** Everything in one object, for `import sukuGraphql from '@sukujs/graphql'`. */
 const sukuGraphql = {
   GraphqlResolver,
   query,

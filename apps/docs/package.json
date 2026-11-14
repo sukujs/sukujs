@@ -1,5 +1,5 @@
 {
-  "name": "@suku/docs",
+  "name": "@sukujs/docs",
   "private": true,
   "type": "module",
   "sideEffects": false,

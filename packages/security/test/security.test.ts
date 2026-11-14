@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { route, Suku, UnauthorizedException } from '@suku/core';
+import { route, Suku, UnauthorizedException } from '@sukujs/core';
 import sukuSecurity, {
   buildCsp,
   clientIp,
@@ -28,7 +28,7 @@ const routes = [
   }),
   route.get('/redirect', { handle: () => Response.redirect('http://api.test/data', 302) }),
 ];
-const create = (middlewares: import('@suku/core').MiddlewareRef[]) =>
+const create = (middlewares: import('@sukujs/core').MiddlewareRef[]) =>
   Suku.create({ routes, middlewares });
 
 describe('cors', () => {

@@ -1,4 +1,4 @@
-import { type Constructor, getServiceOptions, ServiceCollection } from '@suku/di';
+import { type Constructor, getServiceOptions, ServiceCollection } from '@sukujs/di';
 import { type Feature, type FeatureRef, isFeature, type RouteEntry } from './feature.js';
 import { isRoute, isRouteGroup } from './route.js';
 import { getRoutesMetadata } from './routes-class.js';

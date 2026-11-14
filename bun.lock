@@ -13,7 +13,7 @@
       },
     },
     "apps/docs": {
-      "name": "@suku/docs",
+      "name": "@sukujs/docs",
       "dependencies": {
         "@tanstack/react-router": "1.170.46",
         "@tanstack/react-router-devtools": "1.167.3",
@@ -43,9 +43,9 @@
     "benchmarks": {
       "name": "@suku-benchmarks/http",
       "dependencies": {
-        "@suku/core": "workspace:*",
-        "@suku/platform-bun": "workspace:*",
-        "@suku/platform-node": "workspace:*",
+        "@sukujs/core": "workspace:*",
+        "@sukujs/platform-bun": "workspace:*",
+        "@sukujs/platform-node": "workspace:*",
       },
     },
     "examples/database": {
@@ -55,7 +55,7 @@
         "@libsql/client": "^0.18.0",
         "@prisma/adapter-libsql": "^7.10.1",
         "@prisma/client": "^7.10.1",
-        "@suku/core": "workspace:*",
+        "@sukujs/core": "workspace:*",
         "drizzle-orm": "^0.45.4",
         "kysely": "^0.29.9",
         "kysely-pglite-dialect": "^1.4.0",
@@ -77,10 +77,10 @@
     "examples/graphql": {
       "name": "@suku-examples/graphql",
       "dependencies": {
-        "@suku/core": "workspace:*",
-        "@suku/platform-bun": "workspace:*",
-        "@suku/platform-node": "workspace:*",
-        "@suku/security": "workspace:*",
+        "@sukujs/core": "workspace:*",
+        "@sukujs/platform-bun": "workspace:*",
+        "@sukujs/platform-node": "workspace:*",
+        "@sukujs/security": "workspace:*",
         "graphql": "^17.1.0",
         "graphql-yoga": "^6.1.0",
       },
@@ -88,37 +88,37 @@
     "examples/hello": {
       "name": "@suku-examples/hello",
       "dependencies": {
-        "@suku/core": "workspace:*",
-        "@suku/di": "workspace:*",
-        "@suku/platform-bun": "workspace:*",
-        "@suku/platform-node": "workspace:*",
+        "@sukujs/core": "workspace:*",
+        "@sukujs/di": "workspace:*",
+        "@sukujs/platform-bun": "workspace:*",
+        "@sukujs/platform-node": "workspace:*",
         "zod": "^4.6.7",
       },
     },
     "packages/core": {
-      "name": "@suku/core",
+      "name": "@sukujs/core",
       "version": "0.0.0",
       "dependencies": {
-        "@suku/di": "workspace:*",
+        "@sukujs/di": "workspace:*",
       },
       "devDependencies": {
         "zod": "^4.6.7",
       },
     },
     "packages/crypto": {
-      "name": "@suku/crypto",
+      "name": "@sukujs/crypto",
       "version": "0.0.0",
     },
     "packages/di": {
-      "name": "@suku/di",
+      "name": "@sukujs/di",
       "version": "0.0.0",
     },
     "packages/graphql": {
-      "name": "@suku/graphql",
+      "name": "@sukujs/graphql",
       "version": "0.0.0",
       "dependencies": {
-        "@suku/core": "workspace:*",
-        "@suku/di": "workspace:*",
+        "@sukujs/core": "workspace:*",
+        "@sukujs/di": "workspace:*",
       },
       "devDependencies": {
         "graphql": "^17.1.0",
@@ -131,25 +131,25 @@
       },
     },
     "packages/platform-bun": {
-      "name": "@suku/platform-bun",
+      "name": "@sukujs/platform-bun",
       "version": "0.0.0",
       "dependencies": {
-        "@suku/core": "workspace:*",
+        "@sukujs/core": "workspace:*",
       },
     },
     "packages/platform-node": {
-      "name": "@suku/platform-node",
+      "name": "@sukujs/platform-node",
       "version": "0.0.0",
       "dependencies": {
-        "@suku/core": "workspace:*",
+        "@sukujs/core": "workspace:*",
       },
     },
     "packages/security": {
-      "name": "@suku/security",
+      "name": "@sukujs/security",
       "version": "0.0.0",
       "dependencies": {
-        "@suku/core": "workspace:*",
-        "@suku/crypto": "workspace:*",
+        "@sukujs/core": "workspace:*",
+        "@sukujs/crypto": "workspace:*",
       },
     },
   },
@@ -476,21 +476,21 @@
 
     "@suku-examples/hello": ["@suku-examples/hello@workspace:examples/hello"],
 
-    "@suku/core": ["@suku/core@workspace:packages/core"],
+    "@sukujs/core": ["@sukujs/core@workspace:packages/core"],
 
-    "@suku/crypto": ["@suku/crypto@workspace:packages/crypto"],
+    "@sukujs/crypto": ["@sukujs/crypto@workspace:packages/crypto"],
 
-    "@suku/di": ["@suku/di@workspace:packages/di"],
+    "@sukujs/di": ["@sukujs/di@workspace:packages/di"],
 
-    "@suku/docs": ["@suku/docs@workspace:apps/docs"],
+    "@sukujs/docs": ["@sukujs/docs@workspace:apps/docs"],
 
-    "@suku/graphql": ["@suku/graphql@workspace:packages/graphql"],
+    "@sukujs/graphql": ["@sukujs/graphql@workspace:packages/graphql"],
 
-    "@suku/platform-bun": ["@suku/platform-bun@workspace:packages/platform-bun"],
+    "@sukujs/platform-bun": ["@sukujs/platform-bun@workspace:packages/platform-bun"],
 
-    "@suku/platform-node": ["@suku/platform-node@workspace:packages/platform-node"],
+    "@sukujs/platform-node": ["@sukujs/platform-node@workspace:packages/platform-node"],
 
-    "@suku/security": ["@suku/security@workspace:packages/security"],
+    "@sukujs/security": ["@sukujs/security@workspace:packages/security"],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.3.5", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.24.5", "jiti": "^2.7.0", "lightningcss": "1.33.0", "magic-string": "^1.1.0", "source-map-js": "^1.2.1", "tailwindcss": "4.3.5" } }, "sha512-yT53FzV4ke0cr/BguDxhWMpm5MJu1O2muzk+tKw6lKHjODAsYArBbWwFbJiaksfzFv1tpkO9QHGzmfs1hJT66g=="],
 

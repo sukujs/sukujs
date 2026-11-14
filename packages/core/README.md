@@ -1,9 +1,9 @@
-# @suku/core
+# @sukujs/core
 
 Routes, features and middlewares on a .NET-style container.
 
 ```ts
-import { Routes, Suku, feature, route, singleton } from '@suku/core';
+import { Routes, Suku, feature, route, singleton } from '@sukujs/core';
 import { z } from 'zod';
 
 @Routes('/users')

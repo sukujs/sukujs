@@ -14,7 +14,7 @@ lookup.
 it once and reuse it.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const jwt = sukuCrypto.createJwt<{ role: 'user' | 'admin' }>({
   secret: env.JWT_SECRET,
@@ -55,7 +55,7 @@ Durations are seconds, or strings such as `30s`, `15m`, `12h`, `7d`.
 ## Verifying
 
 ```ts
-import sukuCrypto, { JwtError } from '@suku/crypto';
+import sukuCrypto, { JwtError } from '@sukujs/crypto';
 
 try {
   const payload = await jwt.verify(token);
@@ -86,7 +86,7 @@ HMAC using an RSA public key as the secret.
 ### Reading the token from a request
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const token = sukuCrypto.bearerToken(ctx.headers.get('authorization'));   // undefined if absent or malformed
 ```

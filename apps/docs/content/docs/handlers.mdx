@@ -299,7 +299,7 @@ const data = await sealer.unseal<{ userId: string }>(ctx.cookies.get('session') 
 ### Redirects
 
 ```ts
-import { redirect } from '@suku/core';
+import { redirect } from '@sukujs/core';
 
 route.get('/old-page', { handle: () => redirect('/new-page', 301) });
 

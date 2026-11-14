@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
-import { type Feature, factory, Service, singleton } from '@suku/core';
+import { type Feature, factory, Service, singleton } from '@sukujs/core';
 import { Prisma, PrismaClient } from './generated/prisma/client.js';
 import {
   DuplicateEmail,

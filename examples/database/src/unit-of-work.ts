@@ -1,4 +1,4 @@
-import { type MiddlewareFn, middleware, type RequestContext } from '@suku/core';
+import { type MiddlewareFn, middleware, type RequestContext } from '@sukujs/core';
 import type { EntityManager } from 'typeorm';
 import { TypeormConnection } from './typeorm.js';
 

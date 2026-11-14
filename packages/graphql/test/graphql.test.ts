@@ -10,7 +10,7 @@ import {
   type SukuOptions,
   scoped,
   service,
-} from '@suku/core';
+} from '@sukujs/core';
 import { z } from 'zod';
 import sukuGraphql, {
   createGraphqlSchema,

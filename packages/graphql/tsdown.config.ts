@@ -7,5 +7,5 @@ export default defineConfig({
   clean: true,
   minify: false,
   sourcemap: true,
-  external: [/^@suku\//],
+  external: [/^@sukujs\//],
 });

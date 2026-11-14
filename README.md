@@ -14,8 +14,8 @@ A lightweight TypeScript backend framework built from four ideas: **routes**, **
 dependency injection container modelled on .NET's. Zero runtime dependencies. Runs on Node and Bun.
 
 ```ts
-import { Routes, Suku, feature, route, singleton } from '@suku/core';
-import { nodeAdapter } from '@suku/platform-node';
+import { Routes, Suku, feature, route, singleton } from '@sukujs/core';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { z } from 'zod';
 
 class UsersService {
@@ -66,15 +66,15 @@ const findOne = route.get('/users/:id', {
 
 ## Packages
 
-| Package               | What it is                                                                          |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `@suku/core`          | Routes, features, middlewares, validation, config, logger                           |
-| `@suku/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation       |
-| `@suku/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own |
-| `@suku/security`      | CORS, security headers, CSRF protection and rate limiting, as middlewares           |
-| `@suku/graphql`       | Class-based GraphQL resolvers with injection and typed arguments. Optional          |
-| `@suku/platform-node` | `node:http` adapter                                                                 |
-| `@suku/platform-bun`  | `Bun.serve` adapter                                                                 |
+| Package                 | What it is                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `@sukujs/core`          | Routes, features, middlewares, validation, config, logger                           |
+| `@sukujs/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation       |
+| `@sukujs/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own |
+| `@sukujs/security`      | CORS, security headers, CSRF protection and rate limiting, as middlewares           |
+| `@sukujs/graphql`       | Class-based GraphQL resolvers with injection and typed arguments. Optional          |
+| `@sukujs/platform-node` | `node:http` adapter                                                                 |
+| `@sukujs/platform-bun`  | `Bun.serve` adapter                                                                 |
 
 ## Development
 

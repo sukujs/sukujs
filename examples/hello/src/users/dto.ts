@@ -1,4 +1,4 @@
-import type { Infer } from '@suku/core';
+import type { Infer } from '@sukujs/core';
 import { z } from 'zod';
 
 export const CreateUser = z.object({

@@ -19,7 +19,7 @@ uses that to make a logged-in user perform an action they did not intend.
 ## Origin mode
 
 ```ts
-import { csrf } from '@suku/security';
+import { csrf } from '@sukujs/security';
 
 Suku.create({ middlewares: [csrf()] });
 ```
@@ -81,7 +81,7 @@ await fetch('/api/orders', {
 For server-rendered forms, read the token in a handler:
 
 ```ts
-import { csrfToken } from '@suku/security';
+import { csrfToken } from '@sukujs/security';
 
 route.get('/form', { handle: ({ ctx }) => renderForm({ csrf: csrfToken(ctx) }) });
 ```

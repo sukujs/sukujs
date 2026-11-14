@@ -1,4 +1,4 @@
-import { RequestContext, service } from '@suku/core';
+import { RequestContext, service } from '@sukujs/core';
 
 export interface Book {
   id: string;

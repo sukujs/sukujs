@@ -1,5 +1,5 @@
-import { type MiddlewareFn, middleware, route, Suku, type SukuOptions } from '@suku/core';
-import { cors } from '@suku/security';
+import { type MiddlewareFn, middleware, route, Suku, type SukuOptions } from '@sukujs/core';
+import { cors } from '@sukujs/security';
 import { graphql } from './graphql.js';
 import { AuthorLoader, Books, type Viewer } from './services.js';
 

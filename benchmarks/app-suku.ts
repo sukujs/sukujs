@@ -1,6 +1,6 @@
-import { Routes, route, Suku } from '@suku/core';
-import { bunAdapter } from '@suku/platform-bun';
-import { nodeAdapter } from '@suku/platform-node';
+import { Routes, route, Suku } from '@sukujs/core';
+import { bunAdapter } from '@sukujs/platform-bun';
+import { nodeAdapter } from '@sukujs/platform-node';
 
 @Routes('/users')
 class UsersRoutes {

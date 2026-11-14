@@ -1,5 +1,5 @@
 import { Database as Sqlite } from 'bun:sqlite';
-import { type Feature, type ServiceOf, service, singleton } from '@suku/core';
+import { type Feature, type ServiceOf, service, singleton } from '@sukujs/core';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import {

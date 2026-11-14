@@ -1,4 +1,4 @@
-import type { Constructor } from '@suku/di';
+import type { Constructor } from '@sukujs/di';
 import type { RequestContext } from './context.js';
 import { ForbiddenException } from './http-errors.js';
 

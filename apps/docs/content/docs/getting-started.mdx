@@ -15,11 +15,11 @@ icon: Rocket
 ### Install
 
 ```bash
-bun add @suku/core @suku/platform-bun zod
+bun add @sukujs/core @sukujs/platform-bun zod
 ```
 
 Any [Standard Schema](https://standardschema.dev) library works in place of Zod. Use
-`@suku/platform-node` when you deploy on Node.
+`@sukujs/platform-node` when you deploy on Node.
 
 </Step>
 <Step>
@@ -27,8 +27,8 @@ Any [Standard Schema](https://standardschema.dev) library works in place of Zod.
 ### A first route
 
 ```ts title="src/main.ts"
-import { Suku, route } from '@suku/core';
-import { bunAdapter } from '@suku/platform-bun';
+import { Suku, route } from '@sukujs/core';
+import { bunAdapter } from '@sukujs/platform-bun';
 import { z } from 'zod';
 
 const hello = route.get('/hello/:name', {
@@ -74,7 +74,7 @@ Classes that receive services through their constructor need TypeScript's decora
 ```
 
 ```ts title="src/users.ts"
-import { NotFoundException, Routes, feature, route, singleton } from '@suku/core';
+import { NotFoundException, Routes, feature, route, singleton } from '@sukujs/core';
 import { z } from 'zod';
 
 export class UsersService {

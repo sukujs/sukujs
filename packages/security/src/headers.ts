@@ -1,4 +1,4 @@
-import type { MiddlewareFn } from '@suku/core';
+import type { MiddlewareFn } from '@sukujs/core';
 import { mutable } from './util.js';
 
 export type CspDirectives = Record<string, string | string[]>;

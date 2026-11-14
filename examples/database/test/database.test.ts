@@ -1,6 +1,6 @@
 // The same HTTP behaviour, verified against every database library in the guides.
 import { describe, expect, test } from 'bun:test';
-import { type Feature, Logger, SilentLogger, Suku, singleton } from '@suku/core';
+import { type Feature, Logger, SilentLogger, Suku, singleton } from '@sukujs/core';
 import { drizzleFeature } from '../src/drizzle.js';
 import { kyselyFeature } from '../src/kysely.js';
 import { PrismaConnection, prismaFeature } from '../src/prisma.js';

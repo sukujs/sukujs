@@ -1,4 +1,4 @@
-import { NotFoundException, Routes, route } from '@suku/core';
+import { NotFoundException, Routes, route } from '@sukujs/core';
 import { z } from 'zod';
 import { RequireApiKey } from '../common.js';
 import { CreateUser, ListUsers } from './dto.js';

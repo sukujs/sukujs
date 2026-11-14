@@ -1,11 +1,11 @@
-# @suku/platform-bun
+# @sukujs/platform-bun
 
 The Bun adapter for [Suku](https://github.com/sukujs/sukujs). It connects the framework's
 Fetch-based kernel to `Bun.serve`.
 
 ```ts
-import { Suku } from '@suku/core';
-import { bunAdapter } from '@suku/platform-bun';
+import { Suku } from '@sukujs/core';
+import { bunAdapter } from '@sukujs/platform-bun';
 
 const app = await Suku.create({ features: [UsersFeature], adapter: bunAdapter() });
 await app.listen(3000);

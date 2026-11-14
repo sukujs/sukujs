@@ -13,7 +13,7 @@ export {
   singleton,
   transient,
   value,
-} from '@suku/di';
+} from '@sukujs/di';
 export type {
   CloseOptions,
   FetchHandler,

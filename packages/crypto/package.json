@@ -1,5 +1,5 @@
 {
-  "name": "@suku/crypto",
+  "name": "@sukujs/crypto",
   "version": "0.0.0",
   "description": "Zero-dependency crypto for Suku on Web Crypto: JWT, password hashing, signed and sealed values, random tokens.",
   "keywords": [

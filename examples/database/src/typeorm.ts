@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { type Feature, factory, Service, singleton } from '@suku/core';
+import { type Feature, factory, Service, singleton } from '@sukujs/core';
 import { Column, DataSource, Entity, PrimaryGeneratedColumn, QueryFailedError } from 'typeorm';
 import {
   DuplicateEmail,

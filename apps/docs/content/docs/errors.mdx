@@ -49,7 +49,7 @@ throw new HttpException(402, 'Subscription required');
 
 ## HTTP exceptions
 
-`HttpException` and its subclasses are exported from `@suku/core`. Throw one from a handler,
+`HttpException` and its subclasses are exported from `@sukujs/core`. Throw one from a handler,
 a service or a middleware and the request ends with that response.
 
 | Status | Class | Typical use |
@@ -112,7 +112,7 @@ try {
 `HttpException` takes the status directly.
 
 ```ts
-import { HttpException } from '@suku/core';
+import { HttpException } from '@sukujs/core';
 
 throw new HttpException(402, 'Subscription required');
 // { "statusCode": 402, "message": "Subscription required", "error": "Payment Required" }
@@ -128,7 +128,7 @@ is labelled `HTTP 499`.
 Extend `HttpException` and fix the status.
 
 ```ts
-import { HttpException } from '@suku/core';
+import { HttpException } from '@sukujs/core';
 
 export class PaymentRequiredException extends HttpException {
   constructor(message = 'Payment required') {
@@ -185,7 +185,7 @@ export class AccountFrozen extends Error {}
 One [error handler](#error-handlers) translates them at the edge.
 
 ```ts title="billing/billing.feature.ts"
-import type { ErrorHandler } from '@suku/core';
+import type { ErrorHandler } from '@sukujs/core';
 
 const billingErrors: ErrorHandler = (error) => {
   if (error instanceof InsufficientFunds) {
@@ -244,7 +244,7 @@ cannot leak a query or a hostname.
 `onError` maps an error to a response. Return nothing to pass it on.
 
 ```ts
-import type { ErrorHandler } from '@suku/core';
+import type { ErrorHandler } from '@sukujs/core';
 
 export const domainErrors: ErrorHandler = (error, ctx) => {
   if (error instanceof InsufficientFunds) {
@@ -275,7 +275,7 @@ handler itself throws, the client receives a `500` and the failure is logged.
 Because the app-level handler sees every error, it can give them all one shape.
 
 ```ts
-import { HttpException, ValidationException, defaultMessage } from '@suku/core';
+import { HttpException, ValidationException, defaultMessage } from '@sukujs/core';
 
 export const problemDetails: ErrorHandler = (error, ctx) => {
   const status = error instanceof HttpException ? error.status : 500;

@@ -4,15 +4,15 @@ description: CORS, security headers, CSRF protection and rate limiting.
 icon: Shield
 ---
 
-`@suku/security` is a set of [middlewares](/docs/middlewares) that most public-facing apps
+`@sukujs/security` is a set of [middlewares](/docs/middlewares) that most public-facing apps
 need. Each one is a function that returns a middleware, with safe defaults.
 
 ```bash
-bun add @suku/security
+bun add @sukujs/security
 ```
 
 ```ts
-import sukuSecurity from '@suku/security';
+import sukuSecurity from '@sukujs/security';
 
 const app = await Suku.create({
   features: [UsersFeature],
@@ -24,7 +24,7 @@ const app = await Suku.create({
 });
 ```
 
-Each function is also a named export: `import { cors, rateLimit } from '@suku/security'`.
+Each function is also a named export: `import { cors, rateLimit } from '@sukujs/security'`.
 
 | Middleware | Protects against | You need it when |
 | --- | --- | --- |
@@ -53,7 +53,7 @@ the same holds for a `401` thrown by your own authentication middleware.
 
 Authentication, input validation, account lockout, bot detection and a web application
 firewall are separate concerns. For tokens and passwords see
-[`@suku/crypto`](/docs/crypto); for input see [validation](/docs/validation).
+[`@sukujs/crypto`](/docs/crypto); for input see [validation](/docs/validation).
 
 <Callout type="warn">
   Like the rest of Suku, this package has not had an independent security audit.

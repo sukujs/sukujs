@@ -19,8 +19,8 @@ export const Route = createFileRoute('/')({
   }),
 });
 
-const sample = `import { Routes, Suku, feature, route, singleton } from '@suku/core';
-import { nodeAdapter } from '@suku/platform-node';
+const sample = `import { Routes, Suku, feature, route, singleton } from '@sukujs/core';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { z } from 'zod';
 
 class UsersService {

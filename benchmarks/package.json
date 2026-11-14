@@ -6,8 +6,8 @@
     "bench": "node --experimental-strip-types run.ts"
   },
   "dependencies": {
-    "@suku/core": "workspace:*",
-    "@suku/platform-bun": "workspace:*",
-    "@suku/platform-node": "workspace:*"
+    "@sukujs/core": "workspace:*",
+    "@sukujs/platform-bun": "workspace:*",
+    "@sukujs/platform-node": "workspace:*"
   }
 }

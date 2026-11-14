@@ -1,4 +1,4 @@
-import { type FetchHandler, pathnameOf, Router } from '@suku/core';
+import { type FetchHandler, pathnameOf, Router } from '@sukujs/core';
 
 type Handler = (req: Request, params: Record<string, string>) => Response | Promise<Response>;
 const router = new Router<Handler>()

@@ -21,8 +21,8 @@ long-lived random token it exchanges for a new one.
 | Can be revoked | No | Yes, delete the row |
 
 ```ts title="auth/auth.routes.ts"
-import { UnauthorizedException, route } from '@suku/core';
-import sukuCrypto from '@suku/crypto';
+import { UnauthorizedException, route } from '@sukujs/core';
+import sukuCrypto from '@sukujs/crypto';
 
 const REFRESH_DAYS = 30;
 
@@ -85,8 +85,8 @@ One middleware verifies the token and shares the result. A second, built with `a
 checks roles declared on the route.
 
 ```ts title="auth/authenticate.ts"
-import { Inject, type Middleware, type Next, RequestContext, Service, type ServiceOf, UnauthorizedException, allow } from '@suku/core';
-import sukuCrypto, { type JwtPayload } from '@suku/crypto';
+import { Inject, type Middleware, type Next, RequestContext, Service, type ServiceOf, UnauthorizedException, allow } from '@sukujs/core';
+import sukuCrypto, { type JwtPayload } from '@sukujs/crypto';
 
 export type CurrentUser = JwtPayload<{ role: 'user' | 'admin' }>;
 
@@ -132,7 +132,7 @@ Binding it to the current password hash makes it single-use: once the password c
 link stops working.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const Reset = service('reset-links', {
   services: { env: Env },
@@ -174,7 +174,7 @@ A provider signs the raw request body with a secret you share. Verify against th
 received, before parsing.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 export const paymentsWebhook = route.post('/webhooks/payments', {
   services: { env: Env, orders: Orders },
@@ -195,7 +195,7 @@ Leave the route without a `body` schema, so nothing reads the body before you do
 `sha256=ab12...`. Convert yours to the same form and compare in constant time.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const expected = `sha256=${sukuCrypto.hexEncode(sukuCrypto.base64urlDecode(await sukuCrypto.createSigner(secret).sign(raw)))}`;
 if (!sukuCrypto.timingSafeEqual(expected, ctx.headers.get('x-hub-signature-256') ?? '')) {
@@ -238,7 +238,7 @@ Keep the lifetime short, or keep a server-side list of revoked session ids.
 Show the key once, store only its hash, and look it up by that hash.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 export const createApiKey = route.post('/api-keys', {
   middlewares: [Authenticate],
@@ -269,7 +269,7 @@ attempts. A six-digit code has a million possibilities, so the attempt limit is 
 it safe.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const code = String(sukuCrypto.randomInt(0, 1_000_000)).padStart(6, '0');
 await codes.save({ userId, hash: await sukuCrypto.sha256(`${userId}:${code}`), expiresAt: Date.now() + 10 * 60_000, attempts: 0 });

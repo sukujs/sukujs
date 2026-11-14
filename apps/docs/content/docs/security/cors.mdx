@@ -8,7 +8,7 @@ Browsers stop a page on one origin from reading responses from another unless th
 allows it. `cors` adds the headers that grant that permission.
 
 ```ts
-import { cors } from '@suku/security';
+import { cors } from '@sukujs/security';
 
 Suku.create({
   middlewares: [cors({ origin: ['https://app.example.com'], credentials: true })],

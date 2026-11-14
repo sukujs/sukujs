@@ -1,5 +1,5 @@
 {
-  "name": "@suku/graphql",
+  "name": "@sukujs/graphql",
   "version": "0.0.0",
   "description": "Class-based GraphQL resolvers for Suku, with constructor injection and typed arguments. Built on GraphQL Yoga.",
   "keywords": [
@@ -47,8 +47,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@suku/core": "workspace:*",
-    "@suku/di": "workspace:*"
+    "@sukujs/core": "workspace:*",
+    "@sukujs/di": "workspace:*"
   },
   "peerDependencies": {
     "graphql": ">=16",

@@ -1,5 +1,5 @@
 // Suku's metadata shim loads first and records a class; reflect-metadata loads afterwards.
-import { Service } from '@suku/core';
+import { Service } from '@sukujs/core';
 import { ServiceCollection } from '../../../../packages/di/src/index.js';
 
 class Engine {}

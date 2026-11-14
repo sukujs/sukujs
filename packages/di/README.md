@@ -1,9 +1,9 @@
-# @suku/di
+# @sukujs/di
 
 Zero-dependency dependency injection for TypeScript with .NET-style lifetimes.
 
 ```ts
-import { Service, Inject, InjectionToken, ServiceCollection } from '@suku/di';
+import { Service, Inject, InjectionToken, ServiceCollection } from '@sukujs/di';
 
 abstract class Cache {
   abstract get(k: string): unknown;

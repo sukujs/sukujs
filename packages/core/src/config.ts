@@ -1,4 +1,4 @@
-import { InjectionToken, value } from '@suku/di';
+import { InjectionToken, value } from '@sukujs/di';
 import { type Feature, feature } from './feature.js';
 import {
   flattenIssues,

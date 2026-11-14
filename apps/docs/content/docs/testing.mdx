@@ -9,7 +9,7 @@ port is opened, so tests are fast and can run in parallel.
 
 ```ts title="users.test.ts"
 import { expect, test } from 'bun:test';
-import { Suku } from '@suku/core';
+import { Suku } from '@sukujs/core';
 import { UsersFeature } from './users.feature.js';
 
 test('GET /users/:id', async () => {
@@ -70,7 +70,7 @@ const app = await Suku.create({
 The container needs no HTTP.
 
 ```ts
-import { ServiceCollection } from '@suku/di';
+import { ServiceCollection } from '@sukujs/di';
 
 const provider = new ServiceCollection()
   .addSingleton(Clock, FixedClock)

@@ -9,7 +9,7 @@ A route is created with `route.get`, `route.post`, `route.put`, `route.patch`,
 object whose `handle` function produces the response.
 
 ```ts
-import { route } from '@suku/core';
+import { route } from '@sukujs/core';
 import { z } from 'zod';
 
 const findUser = route.get('/users/:id', {
@@ -142,7 +142,7 @@ route.get('/users/:id', {
 | A `Response` | Sent as it is. |
 
 ```ts
-import { redirect } from '@suku/core';
+import { redirect } from '@sukujs/core';
 
 route.get('/old', { handle: () => redirect('/new', 301) });
 route.post('/jobs', { status: 202, handle: ({ ctx }) => queue.add(ctx) });

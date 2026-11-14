@@ -1,4 +1,4 @@
-import { defineConfig } from '@suku/core';
+import { defineConfig } from '@sukujs/core';
 import { z } from 'zod';
 
 /** Validated at startup from process.env; injected with `@Inject(Env)`. */

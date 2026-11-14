@@ -1,13 +1,13 @@
-# @suku/graphql
+# @sukujs/graphql
 
 Class-based GraphQL resolvers for Suku, shaped like a `@Routes` class. Built on GraphQL Yoga.
 
 ```bash
-bun add @suku/graphql graphql graphql-yoga
+bun add @sukujs/graphql graphql graphql-yoga
 ```
 
 ```ts
-import { GraphqlResolver, graphql, mutation, objectType, query } from '@suku/graphql';
+import { GraphqlResolver, graphql, mutation, objectType, query } from '@sukujs/graphql';
 
 @GraphqlResolver({
   typeDefs: /* GraphQL */ `

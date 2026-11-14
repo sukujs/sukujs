@@ -1,4 +1,4 @@
-import { type MiddlewareFn, type RequestContext, TooManyRequestsException } from '@suku/core';
+import { type MiddlewareFn, type RequestContext, TooManyRequestsException } from '@sukujs/core';
 import { type Duration, mutable, toSeconds } from './util.js';
 
 export interface RateLimitHit {

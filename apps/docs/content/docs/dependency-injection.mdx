@@ -13,7 +13,7 @@ explicit lifetime. Like routes, a service can be written with a class or without
     Dependencies arrive through the constructor.
 
     ```ts
-    import { Service } from '@suku/core';
+    import { Service } from '@sukujs/core';
 
     @Service()
     export class UsersService {
@@ -29,7 +29,7 @@ explicit lifetime. Like routes, a service can be written with a class or without
     The service lists what it needs and returns its implementation. Its type is inferred.
 
     ```ts
-    import { service } from '@suku/core';
+    import { service } from '@sukujs/core';
 
     export const UsersService = service('users', {
       services: { db: Database },
@@ -101,10 +101,10 @@ with a `dispose()` method is disposed with its scope.
 
 ## Using the container directly
 
-`@suku/di` also works on its own, without HTTP.
+`@sukujs/di` also works on its own, without HTTP.
 
 ```ts
-import { ServiceCollection } from '@suku/di';
+import { ServiceCollection } from '@sukujs/di';
 
 const provider = new ServiceCollection()
   .addSingleton(Database)

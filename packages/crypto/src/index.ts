@@ -45,7 +45,7 @@ import { createSealer } from './seal.js';
 import { createSigner } from './signer.js';
 
 /**
- * Everything in one object, for `import sukuCrypto from '@suku/crypto'`.
+ * Everything in one object, for `import sukuCrypto from '@sukujs/crypto'`.
  * The named exports are the same functions and tree-shake better.
  */
 const sukuCrypto = {

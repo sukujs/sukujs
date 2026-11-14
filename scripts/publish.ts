@@ -42,7 +42,7 @@ const all = readdirSync(join(root, 'packages'), { withFileTypes: true })
       dir,
       name: json.name,
       version: json.version,
-      internal: Object.keys(deps).filter((d) => d.startsWith('@suku/')),
+      internal: Object.keys(deps).filter((d) => d.startsWith('@sukujs/')),
     };
   });
 
@@ -107,7 +107,7 @@ for (const pkg of ordered) {
     const result = run('bun', args, pkg.dir);
     const summary = (result.stdout + result.stderr)
       .split('\n')
-      .filter((l) => /Total files|Unpacked size|Tag:|Access:|error|\+ @suku/.test(l));
+      .filter((l) => /Total files|Unpacked size|Tag:|Access:|error|\+ @sukujs/.test(l));
     console.log(`${pkg.name}@${version}\n  ${summary.join('\n  ')}`);
     continue;
   }

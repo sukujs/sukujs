@@ -4,7 +4,7 @@ import {
   feature,
   route,
   type ServiceEntry,
-} from '@suku/core';
+} from '@sukujs/core';
 import { z } from 'zod';
 
 export interface User {

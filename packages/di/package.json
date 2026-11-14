@@ -1,5 +1,5 @@
 {
-  "name": "@suku/di",
+  "name": "@sukujs/di",
   "version": "0.0.0",
   "description": "Zero-dependency dependency injection container with .NET-style lifetimes (singleton, scoped, transient).",
   "keywords": [

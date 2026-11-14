@@ -104,7 +104,7 @@ All three go straight into `body: CreateUser`.
 ## Outside a route
 
 ```ts
-import { type Infer, validate } from '@suku/core';
+import { type Infer, validate } from '@sukujs/core';
 
 type CreateUser = Infer<typeof CreateUser>;
 const user = await validate(CreateUser, input);      // throws ValidationException

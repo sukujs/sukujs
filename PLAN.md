@@ -18,9 +18,9 @@ Suku is now built from **routes, features, middlewares and services**:
   adapters, Standard Schema validation, `defineConfig`, `Logger`.
 - `@Injectable` was renamed `@Service`, and `service(name, { services, create })` declares a
   service without a class; it is its own token and its dependencies are validated at startup.
-- `@suku/crypto` (2026-11-14): standalone, Web Crypto only. JWT (HS/RS/PS/ES/EdDSA, algorithm
+- `@sukujs/crypto` (2026-11-14): standalone, Web Crypto only. JWT (HS/RS/PS/ES/EdDSA, algorithm
   fixed at creation), PBKDF2 password hashing, HMAC signer, AES-GCM sealer, random and hash helpers.
-- `@suku/security` (2026-11-14): `cors`, `securityHeaders`, `csrf` (origin and token modes) and
+- `@sukujs/security` (2026-11-14): `cors`, `securityHeaders`, `csrf` (origin and token modes) and
   `rateLimit` (pluggable store). Core gained `ctx.remoteAddress` via `FetchHandler(request, info)`,
   and errors thrown by inner middlewares are rendered before returning to outer ones.
 - Handlers API (2026-11-14): `ctx.cookies` (get/has/all/set/delete), `ctx.setHeader` and
@@ -86,7 +86,7 @@ export const ConfigModule = (schema: Schema) => defineModule({ ... });   // repl
 const app = await Suku.create({ imports: [UsersModule], adapter: nodeAdapter() }); // inline root
 ```
 
-`singleton/scoped/transient/value/factory/alias` live in `@suku/di` and check the
+`singleton/scoped/transient/value/factory/alias` live in `@sukujs/di` and check the
 implementation against the token (`NoInfer` keeps inference on the token side). `@Module`
 on a class remains as an alias for migrating code. Decorators stay where they earn their
 place: controllers, routes, parameters, `@Injectable`.
@@ -147,9 +147,9 @@ Resolving a scoped service from the root provider throws, as in .NET.
 Decision: the kernel speaks **Fetch `Request` / `Response`**. A platform adapter is a
 single function `(req: Request) => Promise<Response>` plus a `listen()`.
 
-- `@suku/platform-node`: wraps `node:http`, converts `IncomingMessage` to `Request` with a
+- `@sukujs/platform-node`: wraps `node:http`, converts `IncomingMessage` to `Request` with a
   streaming body, writes the `Response` back. This is the only piece with Node-specific code.
-- `@suku/platform-bun`: `Bun.serve({ fetch })`, basically a one-liner.
+- `@sukujs/platform-bun`: `Bun.serve({ fetch })`, basically a one-liner.
 - Deno and Cloudflare Workers get adapters later for free because they are already fetch-native.
 
 Router: radix tree, static > param > wildcard precedence, zero dependencies.
@@ -235,11 +235,11 @@ can be used on its own.
 ```
 suku/
   packages/
-    di/              @suku/di          container, decorators, metadata shim   (no deps)
-    core/            @suku/core        modules, controllers, router, pipeline  (depends on di)
-    platform-node/   @suku/platform-node
-    platform-bun/    @suku/platform-bun
-    testing/         @suku/testing     createTestingModule, overrideProvider
+    di/              @sukujs/di          container, decorators, metadata shim   (no deps)
+    core/            @sukujs/core        modules, controllers, router, pipeline  (depends on di)
+    platform-node/   @sukujs/platform-node
+    platform-bun/    @sukujs/platform-bun
+    testing/         @sukujs/testing     createTestingModule, overrideProvider
   examples/
     hello/
     realworld/       a small CRUD app used for benchmarks and docs
@@ -263,7 +263,7 @@ and can be built in parallel.
 - Bun workspace, base tsconfig, Biome, tsdown build, `bun test`, CI workflow, size-limit.
 - Done when: `bun run build && bun test` is green on an empty package.
 
-### Phase 1 — `@suku/di` (the heart, ~3 days) — DONE 2026-11-08 (43 tests, 12.5 KB minified)
+### Phase 1 — `@sukujs/di` (the heart, ~3 days) — DONE 2026-11-08 (43 tests, 12.5 KB minified)
 
 1. Metadata shim: `Reflect.metadata`, `Reflect.getMetadata`, `Reflect.getOwnMetadata`.
 2. Decorators: `@Injectable()`, `@Inject(token, key?)`, `@Optional()`.
@@ -283,8 +283,8 @@ and can be built in parallel.
 
 1. `Adapter` interface: `{ handle(req: Request): Promise<Response>; listen(port) ; close() }`.
 2. Radix router with param and wildcard segments, method dispatch, 404/405 handling.
-3. `@suku/platform-node`: IncomingMessage → Request (streaming body, headers, URL), Response → ServerResponse (streams, keep-alive), graceful close.
-4. `@suku/platform-bun`.
+3. `@sukujs/platform-node`: IncomingMessage → Request (streaming body, headers, URL), Response → ServerResponse (streams, keep-alive), graceful close.
+4. `@sukujs/platform-bun`.
 5. Benchmark harness in `benchmarks/` so overhead is measured from day one.
 
 - Done when: a hand-wired route serves JSON on both Node and Bun within the overhead budget.
@@ -344,7 +344,7 @@ and can be built in parallel.
 
 - Done when: an integration test shows in-flight requests complete and singletons dispose on SIGTERM.
 
-### Phase 7 — `@suku/testing` (~1 day)
+### Phase 7 — `@sukujs/testing` (~1 day)
 
 1. `Test.createTestingModule({ imports, providers }).overrideProvider(X).useValue(y).compile()`.
 2. `app.inject({ method, url, body })` in-process requests without a socket (just call `handle(Request)`).
@@ -355,7 +355,7 @@ and can be built in parallel.
 
 1. Benchmarks vs raw node:http, Fastify, NestJS on Express and Fastify; publish numbers.
 2. README per package, a "coming from NestJS" and a "coming from .NET" guide.
-3. Changesets, `0.1.0` to npm under the `@suku` scope.
+3. Changesets, `0.1.0` to npm under the `@sukujs` scope.
 
 ## 6. Risks and how the plan handles them
 
@@ -370,7 +370,7 @@ and can be built in parallel.
 
 ## 7. Open questions to settle before Phase 3
 
-1. Package name: `@suku/*` on npm, or a single `suku` package with subpath exports? The
+1. Package name: `@sukujs/*` on npm, or a single `suku` package with subpath exports? The
    monorepo layout supports either; the scope just needs claiming.
 2. Default controller lifetime: singleton (Nest default, fastest) or scoped (.NET default,
    lets controllers hold request state). Plan assumes singleton with opt-in `lifetime: 'scoped'`.

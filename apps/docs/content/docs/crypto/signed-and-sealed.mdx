@@ -21,7 +21,7 @@ expiry built in.
 ## Signing
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const signer = sukuCrypto.createSigner(env.COOKIE_SECRET);
 
@@ -46,7 +46,7 @@ Signatures are base64url. For a provider that sends hex, see
 ## Sealing
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const sealer = sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'session' });
 

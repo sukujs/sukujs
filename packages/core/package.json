@@ -1,5 +1,5 @@
 {
-  "name": "@suku/core",
+  "name": "@sukujs/core",
   "version": "0.0.0",
   "description": "Suku HTTP kernel: platform adapter contract, radix router, modules, controllers and request pipeline.",
   "keywords": [
@@ -52,7 +52,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@suku/di": "workspace:*"
+    "@sukujs/di": "workspace:*"
   },
   "devDependencies": {
     "zod": "^4.6.7"

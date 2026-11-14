@@ -8,7 +8,7 @@ A middleware receives the request context and a `next` function. Code before `ne
 the way in, code after it on the way out.
 
 ```ts
-import { middleware } from '@suku/core';
+import { middleware } from '@sukujs/core';
 
 export const timing = middleware(async (ctx, next) => {
   const started = performance.now();
@@ -45,7 +45,7 @@ always resolves to a `Response`, because errors and 404s are rendered before con
 so a CORS or request-id middleware can decorate every response.
 
 Ready-made middlewares for CORS, security headers, CSRF and rate limiting are in
-[`@suku/security`](/docs/security).
+[`@sukujs/security`](/docs/security).
 
 ## Authentication
 
@@ -63,7 +63,7 @@ export const authenticate = middleware(async (ctx, next) => {
 `allow` builds a middleware from a yes-or-no check. `false` becomes a `403`.
 
 ```ts
-import { allow } from '@suku/core';
+import { allow } from '@sukujs/core';
 
 const adminOnly = allow((ctx) => ctx.get<User>('user')?.role === 'admin');
 

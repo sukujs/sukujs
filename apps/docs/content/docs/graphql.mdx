@@ -4,12 +4,12 @@ description: Class-based resolvers with injection and typed arguments, organised
 icon: Share2
 ---
 
-`@suku/graphql` brings GraphQL to Suku in the same shape as REST. A resolver class looks like
+`@sukujs/graphql` brings GraphQL to Suku in the same shape as REST. A resolver class looks like
 a [`@Routes` class](/docs/routes): services through the constructor, one field per resolver,
 and a schema that types the arguments.
 
 ```bash
-bun add @suku/graphql graphql graphql-yoga
+bun add @sukujs/graphql graphql graphql-yoga
 ```
 
 `graphql` and [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server) are peer
@@ -18,7 +18,7 @@ dependencies. An app that does not use GraphQL installs none of this.
 ## A resolver class
 
 ```ts title="books/books.resolver.ts"
-import { GraphqlResolver, mutation, query } from '@suku/graphql';
+import { GraphqlResolver, mutation, query } from '@sukujs/graphql';
 import { z } from 'zod';
 
 @GraphqlResolver({
@@ -75,7 +75,7 @@ A resolver class is registered like any service. The `graphql()` route finds eve
 resolver by itself.
 
 ```ts
-import { graphql } from '@suku/graphql';
+import { graphql } from '@sukujs/graphql';
 
 export const BooksFeature = feature('books', {
   routes: [BooksRoutes],
@@ -149,7 +149,7 @@ Use `objectType` for a field that needs its own resolver, such as a relation. Th
 parameter is the shape of the parent object.
 
 ```ts
-import { objectType } from '@suku/graphql';
+import { objectType } from '@sukujs/graphql';
 
 const BookType = objectType<Book>('Book');
 
@@ -292,7 +292,7 @@ The schema is built on the first request. To catch a mistake before the server l
 it yourself.
 
 ```ts
-import { createGraphqlSchema } from '@suku/graphql';
+import { createGraphqlSchema } from '@sukujs/graphql';
 
 const app = await Suku.create({ features, routes: [graphql()], adapter });
 createGraphqlSchema(app.provider);     // throws GraphqlSetupError if anything is wrong
@@ -329,7 +329,7 @@ great deal of work. Add a query depth or complexity limit through `yoga.plugins`
 
 ## Without the package
 
-`@suku/graphql` is a thin layer. Any GraphQL server that speaks Fetch mounts on a route by
+`@sukujs/graphql` is a thin layer. Any GraphQL server that speaks Fetch mounts on a route by
 hand, which is also how to use a different GraphQL library.
 
 ```ts

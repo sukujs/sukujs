@@ -15,7 +15,7 @@ bun add drizzle-orm
 
 ```ts title="db.ts"
 import { Database as Sqlite } from 'bun:sqlite';
-import { service } from '@suku/core';
+import { service } from '@sukujs/core';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
@@ -40,7 +40,7 @@ the pool and pass it to `drizzle-orm/node-postgres`, with `dispose: () => pool.e
 ## Repository
 
 ```ts title="users.repository.ts"
-import type { ServiceOf } from '@suku/core';
+import type { ServiceOf } from '@sukujs/core';
 
 const isUnique = (error: unknown) => {
   const e = error as { code?: string; cause?: { code?: string } };

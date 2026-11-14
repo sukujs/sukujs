@@ -1,4 +1,4 @@
-import type { FetchHandler, HttpServer, PlatformAdapter, ServeOptions } from '@suku/core';
+import type { FetchHandler, HttpServer, PlatformAdapter, ServeOptions } from '@sukujs/core';
 
 export interface BunAdapterOptions {
   /** Called when the handler throws. Default logs to `console.error` and answers 500. */

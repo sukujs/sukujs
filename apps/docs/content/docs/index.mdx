@@ -9,8 +9,8 @@ Suku is a lightweight TypeScript backend framework built from four ideas: **rout
 services come from a dependency injection container modelled on .NET's.
 
 ```ts title="main.ts"
-import { Routes, Suku, feature, route, singleton } from '@suku/core';
-import { nodeAdapter } from '@suku/platform-node';
+import { Routes, Suku, feature, route, singleton } from '@sukujs/core';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { z } from 'zod';
 
 class UsersService {
@@ -61,15 +61,15 @@ await app.listen(3000);
 
 | Package | Purpose |
 | --- | --- |
-| `@suku/core` | Routes, features, middlewares, validation, config, logger. |
-| `@suku/di` | The container. Usable on its own, without HTTP. |
-| `@suku/crypto` | JWT, passwords, signed and encrypted values. Works on its own. |
-| `@suku/security` | CORS, security headers, CSRF protection, rate limiting. |
-| `@suku/graphql` | Class-based GraphQL resolvers. Optional. |
-| `@suku/platform-node` | Adapter for `node:http`. |
-| `@suku/platform-bun` | Adapter for `Bun.serve`. |
+| `@sukujs/core` | Routes, features, middlewares, validation, config, logger. |
+| `@sukujs/di` | The container. Usable on its own, without HTTP. |
+| `@sukujs/crypto` | JWT, passwords, signed and encrypted values. Works on its own. |
+| `@sukujs/security` | CORS, security headers, CSRF protection, rate limiting. |
+| `@sukujs/graphql` | Class-based GraphQL resolvers. Optional. |
+| `@sukujs/platform-node` | Adapter for `node:http`. |
+| `@sukujs/platform-bun` | Adapter for `Bun.serve`. |
 
-None of them has a runtime dependency. `@suku/core` re-exports the container's decorators and
+None of them has a runtime dependency. `@sukujs/core` re-exports the container's decorators and
 registration helpers, so application code usually imports from one place.
 
 ## Status

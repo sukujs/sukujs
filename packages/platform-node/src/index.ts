@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
-import type { FetchHandler, HttpServer, PlatformAdapter, ServeOptions } from '@suku/core';
+import type { FetchHandler, HttpServer, PlatformAdapter, ServeOptions } from '@sukujs/core';
 
 export interface NodeAdapterOptions {
   /**

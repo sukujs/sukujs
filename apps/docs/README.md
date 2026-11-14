@@ -1,4 +1,4 @@
-# @suku/docs
+# @sukujs/docs
 
 The Suku documentation site: [Fumadocs](https://fumadocs.dev) on [TanStack Start](https://tanstack.com/start).
 

@@ -7,7 +7,7 @@
     "@libsql/client": "^0.18.0",
     "@prisma/adapter-libsql": "^7.10.1",
     "@prisma/client": "^7.10.1",
-    "@suku/core": "workspace:*",
+    "@sukujs/core": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "kysely": "^0.29.9",
     "kysely-pglite-dialect": "^1.4.0",

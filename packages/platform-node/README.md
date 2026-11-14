@@ -1,11 +1,11 @@
-# @suku/platform-node
+# @sukujs/platform-node
 
 The Node.js adapter for [Suku](https://github.com/sukujs/sukujs). It connects the framework's
 Fetch-based kernel to `node:http`.
 
 ```ts
-import { Suku } from '@suku/core';
-import { nodeAdapter } from '@suku/platform-node';
+import { Suku } from '@sukujs/core';
+import { nodeAdapter } from '@sukujs/platform-node';
 
 const app = await Suku.create({ features: [UsersFeature], adapter: nodeAdapter() });
 await app.listen(3000);

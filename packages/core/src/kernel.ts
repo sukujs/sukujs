@@ -4,7 +4,7 @@ import {
   isConstructor,
   type ServiceProvider,
   tokenName,
-} from '@suku/di';
+} from '@sukujs/di';
 import type { FetchHandler } from './adapter.js';
 import { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
 import type { Feature } from './feature.js';

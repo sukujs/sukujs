@@ -1,5 +1,5 @@
-import { bunAdapter } from '@suku/platform-bun';
-import { nodeAdapter } from '@suku/platform-node';
+import { bunAdapter } from '@sukujs/platform-bun';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { createApp } from './app.js';
 
 const adapter = typeof Bun !== 'undefined' ? bunAdapter() : nodeAdapter();

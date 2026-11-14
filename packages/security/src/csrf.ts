@@ -1,5 +1,5 @@
-import { ForbiddenException, type MiddlewareFn, type RequestContext } from '@suku/core';
-import { createSigner, randomToken, timingSafeEqual } from '@suku/crypto';
+import { ForbiddenException, type MiddlewareFn, type RequestContext } from '@sukujs/core';
+import { createSigner, randomToken, timingSafeEqual } from '@sukujs/crypto';
 import { matchesOrigin, mutable, type OriginRule } from './util.js';
 
 interface CsrfCommon {

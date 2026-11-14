@@ -7,7 +7,7 @@ icon: Settings
 `defineConfig` pairs a name with a schema and returns a typed injection token.
 
 ```ts title="config.ts"
-import { defineConfig } from '@suku/core';
+import { defineConfig } from '@sukujs/core';
 import { z } from 'zod';
 
 export const Env = defineConfig(
@@ -30,7 +30,7 @@ await app.listen(app.get(Env).PORT);
 Inject it with the token.
 
 ```ts
-import type { Infer } from '@suku/core';
+import type { Infer } from '@sukujs/core';
 
 @Service()
 export class Database {

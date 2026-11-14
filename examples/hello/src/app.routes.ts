@@ -1,4 +1,4 @@
-import { RequestContext, route, service } from '@suku/core';
+import { RequestContext, route, service } from '@sukujs/core';
 
 /** A service without a class: its dependencies are listed, its type is inferred. */
 export const Uptime = service('uptime', () => {

@@ -1,4 +1,4 @@
-import { type Constructor, defineMetadata, getOwnMetadata, type Lifetime } from '@suku/di';
+import { type Constructor, defineMetadata, getOwnMetadata, type Lifetime } from '@sukujs/di';
 import type { ErrorHandler, MiddlewareRef } from './middleware.js';
 
 const ROUTES_KEY = 'suku:routes';

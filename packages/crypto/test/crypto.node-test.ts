@@ -2,7 +2,13 @@
 // Imports the built package, because Node cannot map the sources' `.js` imports to `.ts`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createJwt, createSealer, createSigner, hashPassword, verifyPassword } from '@suku/crypto';
+import {
+  createJwt,
+  createSealer,
+  createSigner,
+  hashPassword,
+  verifyPassword,
+} from '@sukujs/crypto';
 
 const SECRET = 'a-secret-that-is-at-least-32-bytes-long!';
 

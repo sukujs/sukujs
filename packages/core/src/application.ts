@@ -1,4 +1,4 @@
-import type { ServiceCollection, ServiceProvider, ServiceProviderOptions, Token } from '@suku/di';
+import type { ServiceCollection, ServiceProvider, ServiceProviderOptions, Token } from '@sukujs/di';
 import type {
   CloseOptions,
   FetchHandler,

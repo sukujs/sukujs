@@ -1,5 +1,5 @@
 {
-  "name": "@suku/security",
+  "name": "@sukujs/security",
   "version": "0.0.0",
   "description": "Security middlewares for Suku: CORS, security headers, CSRF protection and rate limiting.",
   "keywords": [
@@ -48,8 +48,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@suku/core": "workspace:*",
-    "@suku/crypto": "workspace:*"
+    "@sukujs/core": "workspace:*",
+    "@sukujs/crypto": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

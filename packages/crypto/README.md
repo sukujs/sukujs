@@ -1,10 +1,10 @@
-# @suku/crypto
+# @sukujs/crypto
 
 Zero-dependency crypto helpers on the Web Crypto API. Works on Node 22+, Bun and edge
 runtimes, with or without the rest of Suku.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const jwt = sukuCrypto.createJwt<{ role: string }>({
   secret: env.JWT_SECRET,
@@ -38,7 +38,7 @@ Creates a signer/verifier bound to one algorithm and one set of keys. The algori
 at creation time and never read from a token.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 // HMAC (default HS256) — secret must be at least 32 bytes for HS256
 const jwt = sukuCrypto.createJwt<{ role: string }>({
@@ -102,7 +102,7 @@ try {
 Extracts the token from an `Authorization: Bearer <token>` header value.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const token = sukuCrypto.bearerToken(request.headers.get('authorization'));
 if (!token) return Response.json({ error: 'unauthorized' }, { status: 401 });
@@ -116,7 +116,7 @@ Reads header and payload **without verifying anything**. Attacker-controlled —
 pick a key or to log; never to authorize.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const { header, payload } = sukuCrypto.decodeJwtUnverified(token);
 console.log(header.kid, payload.sub); // do not trust these for access control
@@ -131,7 +131,7 @@ has. If you can take a native dependency, Argon2id is stronger.
 ### `hashPassword`
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const stored = await sukuCrypto.hashPassword(password);
 // "$pbkdf2-sha256$i=600000$…"
@@ -145,7 +145,7 @@ const stronger = await sukuCrypto.hashPassword(password, { iterations: 800_000 }
 Returns `true` only on a match. Malformed stored values return `false`, never throw.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 if (!(await sukuCrypto.verifyPassword(password, user.passwordHash))) {
   return Response.json({ error: 'invalid credentials' }, { status: 401 });
@@ -158,7 +158,7 @@ if (!(await sukuCrypto.verifyPassword(password, user.passwordHash))) {
 successful login.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 if (await sukuCrypto.verifyPassword(password, user.passwordHash)) {
   if (sukuCrypto.needsRehash(user.passwordHash, { iterations: 800_000 })) {
@@ -175,7 +175,7 @@ links. The value stays readable; use `createSealer` to hide it. Secret must be �
 ### `createSigner`
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const signer = sukuCrypto.createSigner(env.COOKIE_SECRET); // ≥ 32 bytes
 const rotated = sukuCrypto.createSigner(env.COOKIE_SECRET, {
@@ -209,7 +209,7 @@ change: encrypted cookies, OAuth state, password-reset payloads. Secret must be 
 ### `createSealer`
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const sealer = sukuCrypto.createSealer(env.COOKIE_SECRET, {
   purpose: 'session', // binds ciphertext to a use (default 'suku.seal')
@@ -235,7 +235,7 @@ const session = await sealer.unseal<{ id: number; role: string }>(sealed);
 URL-safe random token. 32 bytes (256 bits) by default — session ids, reset tokens, API keys.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const sessionId = sukuCrypto.randomToken(); // 32 bytes → base64url
 const apiKey = sukuCrypto.randomToken(32);
@@ -247,7 +247,7 @@ const shortId = sukuCrypto.randomToken(16);
 Cryptographically secure random bytes (`Uint8Array`).
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const salt = sukuCrypto.randomBytes(16);
 const iv = sukuCrypto.randomBytes(12);
@@ -258,7 +258,7 @@ const iv = sukuCrypto.randomBytes(12);
 Hex-encoded random bytes. 16 bytes by default.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const requestId = sukuCrypto.randomHex(); // 32 hex chars
 const nonce = sukuCrypto.randomHex(8);
@@ -267,7 +267,7 @@ const nonce = sukuCrypto.randomHex(8);
 ### `randomUUID`
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const id = sukuCrypto.randomUUID(); // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
@@ -277,7 +277,7 @@ const id = sukuCrypto.randomUUID(); // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 Uniform integer in `[min, max)`, without modulo bias.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const dice = sukuCrypto.randomInt(1, 7); // 1..6
 const index = sukuCrypto.randomInt(0, items.length);
@@ -292,7 +292,7 @@ Not for passwords — use `hashPassword`.
 Hex digests for content fingerprints and cache keys.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const etag = await sukuCrypto.sha256(body);
 const fingerprint = await sukuCrypto.sha512(fileBytes);
@@ -303,7 +303,7 @@ const fingerprint = await sukuCrypto.sha512(fileBytes);
 Raw digest bytes for a chosen algorithm.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 const bytes = await sukuCrypto.digest('SHA-256', 'hello'); // Uint8Array
 const wide = await sukuCrypto.digest('SHA-512', buffer);
@@ -315,7 +315,7 @@ Constant-time compare for secrets you check yourself (API keys, tokens). Signatu
 this package are already verified in constant time.
 
 ```ts
-import sukuCrypto from '@suku/crypto';
+import sukuCrypto from '@sukujs/crypto';
 
 if (!sukuCrypto.timingSafeEqual(providedApiKey, storedApiKey)) {
   return Response.json({ error: 'unauthorized' }, { status: 401 });

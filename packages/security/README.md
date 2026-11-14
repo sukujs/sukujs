@@ -1,9 +1,9 @@
-# @suku/security
+# @sukujs/security
 
 Security middlewares for Suku: CORS, security headers, CSRF protection and rate limiting.
 
 ```ts
-import sukuSecurity from '@suku/security';
+import sukuSecurity from '@sukujs/security';
 
 const app = await Suku.create({
   features: [UsersFeature],
@@ -16,7 +16,7 @@ const app = await Suku.create({
 });
 ```
 
-Named exports work too: `import { cors, rateLimit } from '@suku/security'`.
+Named exports work too: `import { cors, rateLimit } from '@sukujs/security'`.
 
 | Middleware                 | Notes                                                                                                                                |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |

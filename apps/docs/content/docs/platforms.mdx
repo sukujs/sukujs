@@ -10,7 +10,7 @@ runtime's HTTP server.
 <Tabs items={['Bun', 'Node']}>
   <Tab value="Bun">
     ```ts
-    import { bunAdapter } from '@suku/platform-bun';
+    import { bunAdapter } from '@sukujs/platform-bun';
 
     const app = await Suku.create({ features: [AppFeature], adapter: bunAdapter() });
     await app.listen(3000);
@@ -20,7 +20,7 @@ runtime's HTTP server.
   </Tab>
   <Tab value="Node">
     ```ts
-    import { nodeAdapter } from '@suku/platform-node';
+    import { nodeAdapter } from '@sukujs/platform-node';
 
     const app = await Suku.create({ features: [AppFeature], adapter: nodeAdapter() });
     await app.listen(3000);
@@ -77,7 +77,7 @@ Official adapters for those runtimes are not published yet.
 ## Writing an adapter
 
 ```ts
-import type { PlatformAdapter } from '@suku/core';
+import type { PlatformAdapter } from '@sukujs/core';
 
 export const myAdapter = (): PlatformAdapter => ({
   name: 'mine',

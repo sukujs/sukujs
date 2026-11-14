@@ -1,4 +1,4 @@
-import { feature, singleton } from '@suku/core';
+import { feature, singleton } from '@sukujs/core';
 import { UsersRoutes } from './users.routes.js';
 import { UsersService } from './users.service.js';
 

@@ -1,6 +1,6 @@
 // Every pattern in the GraphQL guide, run against the real GraphQL Yoga.
 import { describe, expect, test } from 'bun:test';
-import { middleware, PayloadTooLargeException, UnauthorizedException } from '@suku/core';
+import { middleware, PayloadTooLargeException, UnauthorizedException } from '@sukujs/core';
 import { createApp } from '../src/app.js';
 
 const appP = createApp();

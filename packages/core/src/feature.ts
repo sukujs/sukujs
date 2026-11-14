@@ -1,4 +1,4 @@
-import type { Constructor, Provider, ServiceDescriptor } from '@suku/di';
+import type { Constructor, Provider, ServiceDescriptor } from '@sukujs/di';
 import type { ErrorHandler, MiddlewareRef } from './middleware.js';
 import type { Route, RouteGroup } from './route.js';
 

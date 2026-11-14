@@ -1,4 +1,4 @@
-import { Logger, Service } from '@suku/core';
+import { Logger, Service } from '@sukujs/core';
 
 export interface User {
   id: string;

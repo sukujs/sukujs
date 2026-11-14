@@ -4,8 +4,8 @@
 
 All publishable packages share a single version number. They are released together, always.
 
-- **Scope.** Every package under `packages/*`: `@suku/core`, `@suku/di`, `@suku/crypto`,
-  `@suku/security`, `@suku/platform-node`, `@suku/platform-bun`, and any package added later.
+- **Scope.** Every package under `packages/*`: `@sukujs/core`, `@sukujs/di`, `@sukujs/crypto`,
+  `@sukujs/security`, `@sukujs/platform-node`, `@sukujs/platform-bun`, and any package added later.
   Private workspaces (`apps/*`, `examples/*`, `benchmarks`, the repo root) carry no version.
 - **Always identical.** The `version` field in every `packages/*/package.json` must be the same
   string. Never bump one package on its own, even if it is the only one that changed.
@@ -18,9 +18,9 @@ All publishable packages share a single version number. They are released togeth
   - a new feature anywhere → minor (below `1.0.0`: patch is acceptable for small additions)
   - fixes only → patch
 - **Unchanged packages are still published** at the new version, so users can install every
-  `@suku/*` package at one version and know they work together.
+  `@sukujs/*` package at one version and know they work together.
 - **Internal dependencies stay as `workspace:*`.** Never write a version range for another
-  `@suku/*` package by hand. The publish step replaces `workspace:*` with the release version.
+  `@sukujs/*` package by hand. The publish step replaces `workspace:*` with the release version.
 - **A new package starts at the current shared version**, not at `0.0.0` or `0.1.0`.
 - **Docs and READMEs refer to one version.** Write "Suku 0.3.0", never a version per package.
 
@@ -61,23 +61,23 @@ already exist. `bun publish` rewrites `workspace:*` to the exact release version
   in to npm is the user's step.
 - If a publish fails partway, the packages before it in the order are already out. Fix the
   cause and rerun; the script skips nothing, so bump to a new patch version if any are live.
-- The `@suku` scope must be an npm organisation or user the publisher belongs to.
+- The `@sukujs` scope must be an npm organisation or user the publisher belongs to.
 - **Two-factor authentication.** With 2FA on for writes, npm asks for a one-time code for each
   package. Run `bun run release:publish` in your own terminal so the prompts appear; it cannot
   be run unattended.
 
-## Scope: GraphQL lives in `@suku/graphql`, never in core
+## Scope: GraphQL lives in `@sukujs/graphql`, never in core
 
 Suku ships first-party GraphQL support as its own package. (This replaces an earlier decision,
 made the same day, to offer guides only.)
 
-- **One package.** `@suku/graphql` provides `@GraphqlResolver`, `query`, `mutation`,
+- **One package.** `@sukujs/graphql` provides `@GraphqlResolver`, `query`, `mutation`,
   `objectType(...).field`, `subscription` and the `graphql()` route. It follows the unified
   version rule like every other package.
-- **Core stays neutral.** Nothing GraphQL-specific goes into `@suku/core`, `@suku/di` or any
+- **Core stays neutral.** Nothing GraphQL-specific goes into `@sukujs/core`, `@sukujs/di` or any
   other package. A change there made for GraphQL's benefit must be generally useful.
 - **GraphQL libraries are peer dependencies.** `graphql` and `graphql-yoga` are peers of
-  `@suku/graphql`, never bundled and never a dependency of another package. Apps that do not
+  `@sukujs/graphql`, never bundled and never a dependency of another package. Apps that do not
   use GraphQL install nothing.
 - **Same shape as REST.** A resolver class mirrors a `@Routes` class: constructor injection,
   fields as resolvers, a `services` option for request-scoped dependencies, a Standard Schema
@@ -92,7 +92,7 @@ made the same day, to offer guides only.)
 
 Suku ships no database layer and no ORM integration packages.
 
-- **No `@suku/drizzle`, `@suku/prisma` or similar.** A database library is an ordinary service,
+- **No `@sukujs/drizzle`, `@sukujs/prisma` or similar.** A database library is an ordinary service,
   and the docs show how to wire each one. Do not add database dependencies to any package
   under `packages/`.
 - **One pattern for all of them**, documented in the Database section: a connection service

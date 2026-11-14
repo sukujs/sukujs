@@ -2,7 +2,7 @@
 // be exercised against Node's own Request/Response implementation.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import type { HttpServer } from '@suku/core';
+import type { HttpServer } from '@sukujs/core';
 import { getNodeRaw, nodeAdapter } from '../src/index.ts';
 
 let server: HttpServer;

@@ -1,4 +1,4 @@
-import { type RequestContext, route, type ServiceOf } from '@suku/core';
+import { type RequestContext, route, type ServiceOf } from '@sukujs/core';
 import { GraphQLError } from 'graphql';
 import { createSchema, createYoga } from 'graphql-yoga';
 import { AuthorLoader, type Book, Books, type Viewer } from './services.js';

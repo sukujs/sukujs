@@ -7,7 +7,7 @@
  * just enough of the Reflect metadata API, backed by a WeakMap, so the container can
  * read constructor parameter types without a dependency.
  *
- * It is installed once on `globalThis.Reflect` the first time `@suku/di` is imported,
+ * It is installed once on `globalThis.Reflect` the first time `@sukujs/di` is imported,
  * and never overrides an existing implementation (for example a user-installed
  * `reflect-metadata`).
  */

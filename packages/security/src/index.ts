@@ -28,7 +28,7 @@ export {
 export type { Duration, OriginRule } from './util.js';
 
 /**
- * Everything in one object, for `import sukuSecurity from '@suku/security'`.
+ * Everything in one object, for `import sukuSecurity from '@sukujs/security'`.
  * The named exports are the same functions.
  */
 const sukuSecurity = {

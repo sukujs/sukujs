@@ -1,4 +1,4 @@
-import type { ServiceProvider } from '@suku/di';
+import type { ServiceProvider } from '@sukujs/di';
 import { type BodyOptions, parseBody } from './body.js';
 import { Cookies } from './cookies.js';
 
