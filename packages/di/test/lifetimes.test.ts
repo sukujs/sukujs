@@ -70,6 +70,9 @@ describe('lifetimes', () => {
     expect(scope.get(Needs).sp).toBe(scope);
     expect(scope.get(ServiceProvider)).toBe(scope);
     expect(root.isRoot).toBe(true);
+    expect(root.root).toBe(root);
+    expect(scope.root).toBe(root);
+    expect(scope.createScope().root).toBe(root);
     expect(scope.isRoot).toBe(false);
   });
 });

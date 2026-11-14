@@ -44,18 +44,24 @@ Releasing:
 3. `git commit -am "chore(release): vX.Y.Z"`
 4. `git tag vX.Y.Z`
 
-## Scope: GraphQL is supported through guides, not packages
+## Scope: GraphQL lives in `@suku/graphql`, never in core
 
-Suku does not ship first-party GraphQL support.
+Suku ships first-party GraphQL support as its own package. (This replaces an earlier decision,
+made the same day, to offer guides only.)
 
-- **No GraphQL package.** Do not add `@suku/graphql`, GraphQL decorators, schema builders,
-  resolver discovery, or a GraphQL dependency to any package under `packages/`.
-- **Guides instead.** The documentation shows how to mount an existing GraphQL server as a
-  Suku route, sharing services, middlewares and the request context. A GraphQL server that
-  exposes a Fetch handler mounts as one `route.all('/graphql', ...)`.
-- **Guides must be tested.** Every guide example runs against the real library in a test, so
-  it cannot go stale. The library is a dev dependency of the test only.
-- **Core stays neutral.** A change to `@suku/core` made for the benefit of a GraphQL guide is
-  acceptable only if it is generally useful, not GraphQL-specific.
-
-If a request asks for built-in GraphQL features, point to the guide and this decision.
+- **One package.** `@suku/graphql` provides `@GraphqlResolver`, `query`, `mutation`,
+  `objectType(...).field`, `subscription` and the `graphql()` route. It follows the unified
+  version rule like every other package.
+- **Core stays neutral.** Nothing GraphQL-specific goes into `@suku/core`, `@suku/di` or any
+  other package. A change there made for GraphQL's benefit must be generally useful.
+- **GraphQL libraries are peer dependencies.** `graphql` and `graphql-yoga` are peers of
+  `@suku/graphql`, never bundled and never a dependency of another package. Apps that do not
+  use GraphQL install nothing.
+- **Same shape as REST.** A resolver class mirrors a `@Routes` class: constructor injection,
+  fields as resolvers, a `services` option for request-scoped dependencies, a Standard Schema
+  for arguments. Keep the two in step when either changes.
+- **Schema-first.** The schema is written in SDL on the decorator. Do not add a code-first
+  type system or field decorators; users who want that can pair Suku with a dedicated library.
+- **Tested against the real library.** Every documented pattern runs in a test.
+- **Other API styles stay as guides.** tRPC, oRPC and similar get documentation, not packages,
+  unless that is decided separately.

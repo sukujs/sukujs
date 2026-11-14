@@ -65,6 +65,8 @@ async function disposeOne(value: Disposable): Promise<void> {
  */
 export abstract class ServiceProvider {
   abstract readonly isRoot: boolean;
+  /** The application's root provider. For a root provider, itself. */
+  abstract readonly root: ServiceProvider;
 
   /** Resolves the last registration for `token`; throws `MissingServiceError` if none. */
   abstract get<T>(token: Token<T>): T;
@@ -142,13 +144,17 @@ class Container extends ServiceProvider {
 
   constructor(
     private readonly registry: Registry,
-    private readonly root: Container | null,
+    private readonly parent: Container | null,
   ) {
     super();
   }
 
   get isRoot(): boolean {
-    return this.root === null;
+    return this.parent === null;
+  }
+
+  get root(): ServiceProvider {
+    return this.parent ?? this;
   }
 
   get<T>(token: Token<T>): T {
@@ -187,7 +193,7 @@ class Container extends ServiceProvider {
 
   createScope(): ServiceProvider {
     this.assertAlive();
-    const rootContainer = this.root ?? this;
+    const rootContainer = this.parent ?? this;
     const scope = new Container(this.registry, rootContainer);
     (rootContainer.children ??= new Set()).add(scope);
     return scope;
@@ -196,7 +202,7 @@ class Container extends ServiceProvider {
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
-    this.root?.children?.delete(this);
+    this.parent?.children?.delete(this);
     if (this.children) {
       for (const child of [...this.children].reverse()) await child.dispose();
       this.children = null;
@@ -238,7 +244,7 @@ class Container extends ServiceProvider {
     }
     switch (d.lifetime) {
       case 'singleton':
-        return (this.root ?? this).getOrCreate(d);
+        return (this.parent ?? this).getOrCreate(d);
       case 'scoped':
         if (this.isRoot && this.registry.options.validateScopes) {
           throw new ScopedFromRootError(d, [...this.registry.stack]);
