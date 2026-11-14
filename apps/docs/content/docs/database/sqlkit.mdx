@@ -1,0 +1,152 @@
+---
+title: sqlkit
+description: sqlkit's repository and query builder for PostgreSQL as a Suku service.
+icon: Wrench
+---
+
+[sqlkit](https://github.com/sqlkit-dev/sqlkit) is a zero-dependency query builder and
+repository layer for PostgreSQL. It fits the [database pattern](/docs/database) closely,
+because it already separates the executor from the repository.
+
+The code is from `examples/database`, where it is tested against PGlite, a PostgreSQL that
+runs in process.
+
+```bash
+bun add sqlkit pg
+```
+
+## Connection
+
+sqlkit talks to the database through an executor. In production that is its `PostgresAdapter`
+around a `pg` pool.
+
+```ts title="db.ts"
+import { Pool } from 'pg';
+import { PostgresAdapter, type SqlExecutor } from 'sqlkit';
+
+export class SqlkitConnection {
+  constructor(
+    readonly executor: SqlExecutor,
+    private readonly close: () => Promise<void>,
+  ) {}
+
+  dispose() {
+    return this.close();
+  }
+}
+
+export const DatabaseFeature = () => {
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  return feature('database', {
+    services: [factory(SqlkitConnection, () => new SqlkitConnection(new PostgresAdapter(pool), () => pool.end()))],
+  });
+};
+```
+
+## Repository
+
+sqlkit's `Repository` does the querying. Wrap it in your own class, so routes depend on your
+contract and your domain errors.
+
+```ts title="users.repository.ts"
+import { Repository } from 'sqlkit';
+
+// 23505 is PostgreSQL's code for a unique constraint violation.
+const isUnique = (error: unknown) => (error as { code?: string }).code === '23505';
+
+@Service()
+export class SqlkitUsers extends UsersRepository {
+  private readonly repo: Repository<User>;
+
+  constructor(connection: SqlkitConnection) {
+    super();
+    this.repo = new Repository<User>({ tableName: 'users', executor: connection.executor });
+  }
+
+  list() {
+    return this.repo.find({});
+  }
+
+  async create(input: NewUser) {
+    try {
+      const { rows } = await this.repo.insert(input as User);
+      return rows[0]!;
+    } catch (error) {
+      if (isUnique(error)) throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+}
+```
+
+The rest of sqlkit's API is available on `this.repo`: `findOne`, `paginate`, `count`, `update`
+and `delete`, with its condition helpers.
+
+```ts
+import { and, asc, gt, like } from 'sqlkit';
+
+search(term: string, page: number) {
+  return this.repo.paginate({
+    page,
+    limit: 20,
+    where: and(like('name', `%${term}%`), gt('id', 0)),
+    orderBy: [asc('name')],
+  });
+}
+```
+
+`paginate` returns `{ nodes, meta }`, which a route can return as it is.
+
+## Transactions
+
+sqlkit sends statements through the executor, so a transaction is `BEGIN`, your work, then
+`COMMIT` or `ROLLBACK`.
+
+```ts
+async transaction<T>(work: () => Promise<T>): Promise<T> {
+  await this.executor.executeSQL('BEGIN', []);
+  try {
+    const result = await work();
+    await this.executor.executeSQL('COMMIT', []);
+    return result;
+  } catch (error) {
+    await this.executor.executeSQL('ROLLBACK', []);
+    throw error;
+  }
+}
+```
+
+<Callout type="error" title="With a pool, a transaction needs one connection">
+  The version above is correct when the executor is a single connection, which is how the
+  example and its tests run. A `pg` **pool** hands each statement to whichever connection is
+  free, so `BEGIN` and the statements after it may land on different connections and the
+  transaction silently does nothing. With a pool, check out one client with `pool.connect()`,
+  build an executor around that client for the duration of the transaction, and release it
+  afterwards.
+</Callout>
+
+## Reads from a view, writes to a table
+
+sqlkit can read from a view while writing to its base table, which suits a repository that
+returns enriched rows.
+
+```ts
+new Repository<Item>({
+  tableName: 'inventory__v_items',
+  mutableTableName: 'inventory_items',
+  executor,
+});
+```
+
+## Testing without a server
+
+Because the executor is a one-method interface, a test can supply PGlite instead of a pool.
+
+```ts
+import { PGlite } from '@electric-sql/pglite';
+
+const pg = new PGlite();
+const executor: SqlExecutor = { executeSQL: (sql, values) => pg.query(sql, values) as never };
+```
+
+That is real PostgreSQL, so error codes such as `23505` behave as they do in production.

@@ -1,0 +1,238 @@
+---
+title: Database
+description: One pattern for every database library, and the guidelines that go with it.
+icon: Database
+---
+
+Suku has no database layer and no ORM integration packages. It does not need them. A database
+library is a [service](/docs/dependency-injection) like any other, and the same four-step
+pattern works for all of them.
+
+| Library | Guide | Tested here against |
+| --- | --- | --- |
+| Drizzle | [Drizzle](/docs/database/drizzle) | SQLite, in process |
+| Prisma | [Prisma](/docs/database/prisma) | SQLite, through a driver adapter |
+| TypeORM | [TypeORM](/docs/database/typeorm) | SQLite, in process |
+| Sequelize | [Sequelize](/docs/database/sequelize) | SQLite, in process |
+| sqlkit | [sqlkit](/docs/database/sqlkit) | PostgreSQL, in process |
+| Kysely and others | [Other libraries](/docs/database/others) | PostgreSQL, in process |
+
+Every guide comes from `examples/database` in the repository. One test suite runs the same
+checks against each library: create, list, a duplicate rejected with `409`, a transaction that
+rolls back, one that commits, and the connection closing with the app.
+
+## The pattern
+
+### 1. A service owns the connection
+
+Create the connection once and give it a `dispose` method. The container calls it when the app
+closes.
+
+```ts
+export class Database {
+  constructor(readonly client: Client) {}
+
+  dispose() {
+    return this.client.close();
+  }
+}
+```
+
+Most libraries connect asynchronously, and service factories are synchronous. So connect
+first, then register the result. A [feature](/docs/features) can be async for exactly this.
+
+```ts
+export const DatabaseFeature = async () => {
+  const client = await connect(env.DATABASE_URL);
+  return feature('database', {
+    services: [factory(Database, () => new Database(client))],
+  });
+};
+
+Suku.create({ features: [DatabaseFeature(), UsersFeature] });
+```
+
+<Callout title="Use factory, not value">
+  `value(Database, instance)` registers something the container did not create, so it will
+  never dispose it. `factory(...)` makes the container the owner, and `dispose` runs on
+  `app.close()`.
+</Callout>
+
+### 2. A repository hides the library
+
+Put queries behind a class your routes depend on. Make the contract an abstract class, so it
+can be a token.
+
+```ts
+export abstract class UsersRepository {
+  abstract list(): Promise<User[]>;
+  abstract create(input: NewUser): Promise<User>;
+}
+
+@Service()
+export class SqlUsers extends UsersRepository {
+  constructor(private readonly db: Database) {
+    super();
+  }
+  // queries written with your library
+}
+```
+
+```ts
+services: [singleton(UsersRepository, SqlUsers)];
+```
+
+Routes then know nothing about the library.
+
+```ts
+export const createUser = route.post('/users', {
+  body: NewUser,
+  services: { users: UsersRepository },
+  handle: ({ body, users }) => users.create(body),
+});
+```
+
+In the example, the same routes run unchanged on six libraries, by changing that one
+registration.
+
+### 3. Database errors become domain errors
+
+Each library reports a duplicate key differently. Catch that inside the repository and throw
+your own error, so nothing outside it depends on the library.
+
+```ts
+export class DuplicateEmail extends Error {
+  constructor(readonly email: string) {
+    super(`Email ${email} is already registered`);
+  }
+}
+```
+
+| Library | A unique violation looks like |
+| --- | --- |
+| Drizzle with SQLite | `error.code` starting with `SQLITE_CONSTRAINT` |
+| Prisma | `PrismaClientKnownRequestError` with `code === 'P2002'` |
+| TypeORM | `QueryFailedError`; inspect the message or driver code |
+| Sequelize | `UniqueConstraintError` |
+| PostgreSQL drivers, sqlkit, Kysely | `error.code === '23505'` |
+
+### 4. One handler maps them to HTTP
+
+```ts
+export const databaseErrors: ErrorHandler = (error) => {
+  if (error instanceof DuplicateEmail) {
+    return new ConflictException({ code: 'email_taken', message: error.message }).toResponse();
+  }
+};
+
+feature('users', { routes, services, onError: databaseErrors });
+```
+
+See [errors](/docs/errors#domain-errors-without-http) for why this split is worth it.
+
+## Transactions
+
+### Inside one repository method
+
+When several writes belong together, do them in one method using your library's transaction.
+
+```ts
+async createMany(inputs: NewUser[]) {
+  return this.db.client.transaction(async (tx) => {
+    const created = [];
+    for (const input of inputs) created.push(await tx.insert(input));
+    return created;
+  });
+}
+```
+
+### Across a whole request
+
+When a handler calls several repositories, a [middleware](/docs/middlewares) can wrap the
+request in one transaction. This version uses TypeORM; the shape is the same for any library
+with an async transaction callback.
+
+```ts
+class Rollback extends Error {
+  constructor(readonly response: Response) {
+    super('rollback');
+  }
+}
+
+export const transactional = middleware(async (ctx, next) => {
+  const { dataSource } = ctx.provider.get(TypeormConnection);
+  try {
+    return await dataSource.transaction(async (manager) => {
+      ctx.set(MANAGER, manager);
+      const response = await next();
+      if (response.status >= 400) throw new Rollback(response);
+      return response;
+    });
+  } catch (error) {
+    if (error instanceof Rollback) return error.response;
+    throw error;
+  }
+});
+
+route.post('/signup', { middlewares: [transactional], handle });
+```
+
+The detail that matters: by the time a response returns to a middleware, an error in the
+handler has already been turned into an error response. So the middleware checks the status,
+and throws inside the transaction to roll it back while keeping that response.
+
+Keep these transactions short. Do not call other services over the network while one is open.
+
+## Guidelines
+
+**Configuration.** Validate the connection string at startup with
+[`defineConfig`](/docs/configuration), so a missing one stops the app before it listens.
+
+```ts
+export const Env = defineConfig('env', z.object({ DATABASE_URL: z.url() }));
+```
+
+**One pool per process.** The connection service is a singleton. Never open a connection per
+request.
+
+**Do not scope the connection.** A scoped connection service would connect on every request.
+Scope only things that are truly per request, such as a transaction handle.
+
+**Run migrations separately.** Run them as a deploy step, not when the app starts. Several
+instances starting at once would race, and a slow migration would fail health checks.
+`synchronize` and `sync()` are for tests and prototypes only.
+
+**Pool size.** Total connections are the pool size times the number of instances. Keep that
+under your database's limit, with room for migrations and consoles.
+
+**Health checks.** Give the connection service a `ping()` and call it from a route.
+
+```ts
+route.get('/health', {
+  services: { db: Database },
+  handle: async ({ db }) => ({ database: (await db.ping()) ? 'up' : 'down' }),
+});
+```
+
+**Timeouts.** Set a statement timeout in the driver. A stuck query should fail, not hold a
+connection forever.
+
+**Never build SQL from input.** Use your library's parameters. The route's
+[schemas](/docs/validation) reject malformed input, and parameters stop injection.
+
+**Do not return rows directly.** Give routes a `response` schema, so a new column such as a
+password hash cannot leak. See [validation](/docs/validation#responses).
+
+## Testing
+
+Replace the repository, not the database, for fast tests.
+
+```ts
+const app = await Suku.create({
+  features: [UsersFeature],
+  configureServices: (services) => services.replace(singleton(UsersRepository, InMemoryUsers)),
+});
+```
+
+For tests that should exercise real SQL, an in-process database needs no server: SQLite for
+most libraries, or PGlite for PostgreSQL. That is how this repository tests every guide.

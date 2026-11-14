@@ -1,0 +1,106 @@
+---
+title: Drizzle
+description: Drizzle ORM as a Suku service.
+icon: Droplet
+---
+
+This follows the [database pattern](/docs/database). The code is from `examples/database` and
+is tested there against SQLite running in process.
+
+```bash
+bun add drizzle-orm
+```
+
+## Schema and connection
+
+```ts title="db.ts"
+import { Database as Sqlite } from 'bun:sqlite';
+import { service } from '@suku/core';
+import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+});
+
+export const Db = service('db', () => {
+  const sqlite = new Sqlite(env.DATABASE_FILE);
+  return {
+    orm: drizzle(sqlite, { schema: { users } }),
+    dispose: () => sqlite.close(),
+  };
+});
+```
+
+Opening a SQLite file is synchronous, so a plain `service` is enough. For PostgreSQL, create
+the pool and pass it to `drizzle-orm/node-postgres`, with `dispose: () => pool.end()`.
+
+## Repository
+
+```ts title="users.repository.ts"
+import type { ServiceOf } from '@suku/core';
+
+const isUnique = (error: unknown) => {
+  const e = error as { code?: string; cause?: { code?: string } };
+  return (e.code ?? e.cause?.code)?.startsWith('SQLITE_CONSTRAINT') ?? false;
+};
+
+export class DrizzleUsers extends UsersRepository {
+  static inject = [Db];
+
+  constructor(private readonly db: ServiceOf<typeof Db>) {
+    super();
+  }
+
+  async list() {
+    return this.db.orm.select().from(users);
+  }
+
+  async create(input: NewUser) {
+    try {
+      const [row] = await this.db.orm.insert(users).values(input).returning();
+      return row!;
+    } catch (error) {
+      if (isUnique(error)) throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+}
+```
+
+`Db` is a classless service, so the repository lists it in `static inject` and takes its type
+with `ServiceOf`. With PostgreSQL, check for `error.code === '23505'` instead.
+
+## Transactions
+
+```ts
+async createMany(inputs: NewUser[]) {
+  return this.db.orm.transaction((tx) =>
+    inputs.map((input) => tx.insert(users).values(input).returning().get()),
+  );
+}
+```
+
+<Callout title="SQLite transactions are synchronous">
+  With `bun:sqlite` and `better-sqlite3`, the transaction callback cannot be `async`. With
+  PostgreSQL drivers it is, and you `await` each statement inside it.
+</Callout>
+
+## Registering
+
+```ts
+export const UsersFeature = feature('users', {
+  routes: [usersRoutes],
+  services: [Db, singleton(UsersRepository, DrizzleUsers)],
+  onError: databaseErrors,
+});
+```
+
+## Notes
+
+- **Migrations.** Use `drizzle-kit` as a deploy step. The example creates its table directly
+  only because it runs in memory.
+- **Typed results.** `users.$inferSelect` and `users.$inferInsert` give you row types, so the
+  table definition stays the single source of truth.

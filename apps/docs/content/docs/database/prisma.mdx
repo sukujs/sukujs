@@ -1,0 +1,133 @@
+---
+title: Prisma
+description: Prisma Client as a Suku service.
+icon: Triangle
+---
+
+This follows the [database pattern](/docs/database). The code is from `examples/database` and
+is tested there against SQLite through Prisma's libSQL driver adapter.
+
+<Callout type="warn" title="Pin your Prisma versions">
+  At the time of writing, the `latest` tag of the `prisma` CLI on npm is an 8.0 release
+  candidate with a different command set and no `generate` command, while `@prisma/client` is
+  7.10. Install matching versions explicitly. This guide was tested with 7.10.1 of both.
+</Callout>
+
+```bash
+bun add @prisma/client@7.10.1 @prisma/adapter-libsql
+bun add -d prisma@7.10.1
+```
+
+## Schema and config
+
+Prisma 7 keeps the connection URL out of the schema file and requires a driver adapter.
+
+```prisma title="prisma/schema.prisma"
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  name  String
+  email String @unique
+
+  @@map("users")
+}
+```
+
+```ts title="prisma.config.ts"
+import { defineConfig } from 'prisma/config';
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  datasource: { url: 'file:./prisma/dev.db' },
+});
+```
+
+Generate the client, and keep it out of version control.
+
+```json title="package.json"
+{ "scripts": { "postinstall": "prisma generate" } }
+```
+
+## Connection
+
+```ts title="db.ts"
+import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { PrismaClient } from './generated/prisma/client.js';
+
+export class PrismaConnection {
+  constructor(readonly client: PrismaClient) {}
+
+  dispose() {
+    return this.client.$disconnect();
+  }
+}
+
+export const DatabaseFeature = () => {
+  const client = new PrismaClient({ adapter: new PrismaLibSql({ url: env.DATABASE_URL }) });
+  return feature('database', {
+    services: [factory(PrismaConnection, () => new PrismaConnection(client))],
+  });
+};
+```
+
+For PostgreSQL, use `@prisma/adapter-pg` in place of the libSQL adapter.
+
+## Repository
+
+```ts title="users.repository.ts"
+import { Prisma } from './generated/prisma/client.js';
+
+const isUnique = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+@Service()
+export class PrismaUsers extends UsersRepository {
+  constructor(private readonly connection: PrismaConnection) {
+    super();
+  }
+
+  list() {
+    return this.connection.client.user.findMany({ orderBy: { id: 'asc' } });
+  }
+
+  async create(input: NewUser) {
+    try {
+      return await this.connection.client.user.create({ data: input });
+    } catch (error) {
+      if (isUnique(error)) throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+}
+```
+
+## Transactions
+
+```ts
+async createMany(inputs: NewUser[]) {
+  return this.connection.client.$transaction(async (tx) => {
+    const created = [];
+    for (const input of inputs) created.push(await tx.user.create({ data: input }));
+    return created;
+  });
+}
+```
+
+Use `tx` for every query inside the callback. A query on the outer client runs outside the
+transaction.
+
+## Notes
+
+- **Do not test with `:memory:`.** A Prisma transaction uses a second connection, and each
+  in-memory SQLite connection is a separate, empty database. Use a temporary file.
+- **`$disconnect` is not final.** The client reconnects on the next query. After
+  `app.close()`, do not keep using a client you held on to.
+- **Migrations.** Run `prisma migrate deploy` as a deploy step.

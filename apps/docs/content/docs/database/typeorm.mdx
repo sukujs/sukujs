@@ -1,0 +1,135 @@
+---
+title: TypeORM
+description: TypeORM as a Suku service, alongside reflect-metadata.
+icon: Table
+---
+
+This follows the [database pattern](/docs/database). The code is from `examples/database` and
+is tested there against SQLite running in process through `sql.js`.
+
+```bash
+bun add typeorm reflect-metadata
+```
+
+## reflect-metadata
+
+TypeORM requires the `reflect-metadata` package. Suku has its own small implementation for
+constructor injection, and the two work together: `@Service()` and `@Routes()` classes keep
+working whichever loads first. Import `reflect-metadata` once, at the top of your entry file
+or of the file that defines your entities.
+
+```ts
+import 'reflect-metadata';
+```
+
+Entity property initialisers also need this compiler setting:
+
+```json title="tsconfig.json"
+{ "compilerOptions": { "strictPropertyInitialization": false } }
+```
+
+## Entity and connection
+
+```ts title="db.ts"
+import 'reflect-metadata';
+import { Column, DataSource, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('users')
+export class UserEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  name: string;
+
+  @Column({ unique: true })
+  email: string;
+}
+
+export class TypeormConnection {
+  constructor(readonly dataSource: DataSource) {}
+
+  dispose() {
+    return this.dataSource.destroy();
+  }
+}
+
+export const DatabaseFeature = async () => {
+  const dataSource = await new DataSource({
+    type: 'postgres',
+    url: env.DATABASE_URL,
+    entities: [UserEntity],
+  }).initialize();
+
+  return feature('database', {
+    services: [factory(TypeormConnection, () => new TypeormConnection(dataSource))],
+  });
+};
+```
+
+`initialize()` is asynchronous, so the feature is an async function.
+
+## Repository
+
+```ts title="users.repository.ts"
+import { QueryFailedError } from 'typeorm';
+
+@Service()
+export class TypeormUsers extends UsersRepository {
+  constructor(private readonly connection: TypeormConnection) {
+    super();
+  }
+
+  private get repo() {
+    return this.connection.dataSource.getRepository(UserEntity);
+  }
+
+  list() {
+    return this.repo.find({ order: { id: 'ASC' } });
+  }
+
+  async create(input: NewUser) {
+    try {
+      return await this.repo.save(this.repo.create(input));
+    } catch (error) {
+      if (isUnique(error)) throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+}
+```
+
+TypeORM wraps driver errors in `QueryFailedError`, and the detail depends on the database.
+
+```ts
+// SQLite
+const isUnique = (e: unknown) => e instanceof QueryFailedError && /UNIQUE constraint failed/i.test(e.message);
+
+// PostgreSQL
+const isUnique = (e: unknown) => e instanceof QueryFailedError && (e.driverError as { code?: string }).code === '23505';
+```
+
+Only the SQLite form is tested here.
+
+## Transactions
+
+```ts
+async createMany(inputs: NewUser[]) {
+  return this.connection.dataSource.transaction(async (manager) => {
+    const created = [];
+    for (const input of inputs) created.push(await manager.save(manager.create(UserEntity, input)));
+    return created;
+  });
+}
+```
+
+Use `manager` for every query inside the callback. For a transaction that spans a whole
+request, see the [`transactional` middleware](/docs/database#across-a-whole-request), which is
+written and tested with TypeORM.
+
+## Notes
+
+- **`synchronize: true` is for tests.** It alters tables to match your entities and can drop
+  data. Use migrations in production.
+- **Entities are not responses.** Give routes a `response` schema instead of returning
+  entities, so a new column cannot leak.
