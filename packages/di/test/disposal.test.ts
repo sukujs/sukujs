@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import { Injectable, ProviderDisposedError, ServiceCollection } from '../src/index.js';
+import { ProviderDisposedError, Service, ServiceCollection } from '../src/index.js';
 
 describe('disposal', () => {
   test('owned instances dispose newest-first; sync, async and Symbol forms are supported', async () => {
     const order: string[] = [];
-    @Injectable()
+    @Service()
     class A {
       dispose() {
         order.push('A');
       }
     }
-    @Injectable()
+    @Service()
     class B {
       constructor(public a: A) {}
       async [Symbol.asyncDispose]() {
@@ -18,14 +18,14 @@ describe('disposal', () => {
         order.push('B');
       }
     }
-    @Injectable()
+    @Service()
     class C {
       constructor(public b: B) {}
       [Symbol.dispose]() {
         order.push('C');
       }
     }
-    @Injectable()
+    @Service()
     class D {
       onDispose() {
         order.push('D');
@@ -45,19 +45,19 @@ describe('disposal', () => {
 
   test('scope disposal releases scoped and transient instances it created, not singletons', async () => {
     const disposed: string[] = [];
-    @Injectable()
+    @Service()
     class Single {
       dispose() {
         disposed.push('single');
       }
     }
-    @Injectable()
+    @Service()
     class Scoped {
       dispose() {
         disposed.push('scoped');
       }
     }
-    @Injectable()
+    @Service()
     class Trans {
       dispose() {
         disposed.push('transient');
@@ -90,7 +90,7 @@ describe('disposal', () => {
 
   test('root disposal disposes live child scopes', async () => {
     const disposed: string[] = [];
-    @Injectable()
+    @Service()
     class Scoped {
       dispose() {
         disposed.push('scoped');
@@ -107,7 +107,7 @@ describe('disposal', () => {
   });
 
   test('using a disposed provider throws; disposing twice is a no-op', async () => {
-    @Injectable()
+    @Service()
     class X {}
     const root = new ServiceCollection().addSingleton(X).build();
     await root.dispose();
@@ -118,7 +118,7 @@ describe('disposal', () => {
 
   test('works with `await using`', async () => {
     let disposed = false;
-    @Injectable()
+    @Service()
     class X {
       dispose() {
         disposed = true;

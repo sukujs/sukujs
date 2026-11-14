@@ -1,13 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  Injectable,
-  ScopedFromRootError,
-  ServiceCollection,
-  ServiceProvider,
-} from '../src/index.js';
+import { ScopedFromRootError, Service, ServiceCollection, ServiceProvider } from '../src/index.js';
 
 let counter = 0;
-@Injectable()
+@Service()
 class Counted {
   readonly id = ++counter;
 }
@@ -51,9 +46,9 @@ describe('lifetimes', () => {
   });
 
   test('singleton dependencies are resolved from the root even when requested in a scope', () => {
-    @Injectable()
+    @Service()
     class Scoped {}
-    @Injectable()
+    @Service()
     class Single {
       constructor(public dep: Scoped) {}
     }
@@ -65,7 +60,7 @@ describe('lifetimes', () => {
   });
 
   test('ServiceProvider injection yields the resolving scope', () => {
-    @Injectable()
+    @Service()
     class Needs {
       constructor(public sp: ServiceProvider) {}
     }

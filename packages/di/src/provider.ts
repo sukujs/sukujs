@@ -308,6 +308,16 @@ function validate(registry: Registry): void {
 
   const dependenciesOf = (d: ServiceDescriptor): ServiceDescriptor[] => {
     const c = concrete(d);
+    if (c.kind === 'factory' && c.dependsOn) {
+      const declared: ServiceDescriptor[] = [];
+      for (const token of c.dependsOn) {
+        if (token === ServiceProvider) continue;
+        const dep = resolveDependency({ token });
+        if (!dep) throw new MissingServiceError(token, undefined, [d]);
+        declared.push(dep);
+      }
+      return declared;
+    }
     if (c.kind !== 'class') return [];
     const deps: ServiceDescriptor[] = [];
     for (const p of getConstructorParameters(c.useClass!)) {

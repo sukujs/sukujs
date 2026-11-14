@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { Injectable, InvalidDescriptorError, ServiceCollection } from '../src/index.js';
+import { InvalidDescriptorError, Service, ServiceCollection } from '../src/index.js';
 
-@Injectable()
+@Service()
 class A {}
-@Injectable()
+@Service()
 class B {}
 abstract class T {}
 

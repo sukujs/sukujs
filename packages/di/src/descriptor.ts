@@ -1,5 +1,6 @@
-import { getInjectableOptions } from './decorators.js';
+import { getServiceOptions } from './decorators.js';
 import { InvalidDescriptorError } from './errors.js';
+import { ServiceDefinition } from './service.js';
 import {
   type Constructor,
   type Factory,
@@ -23,6 +24,8 @@ export interface ServiceDescriptor<T = unknown> {
   readonly useFactory?: Factory<T>;
   readonly useValue?: T;
   readonly useExisting?: Token<T>;
+  /** For factories that declare what they resolve, so startup validation can check them. */
+  readonly dependsOn?: readonly Token[];
 }
 
 /** Second argument of `addSingleton(token, impl)` and friends. */
@@ -58,6 +61,7 @@ export interface ExistingProvider<T = unknown> extends ProviderBase<T> {
  */
 export type Provider<T = unknown> =
   | Constructor<T>
+  | ServiceDefinition<T>
   | ClassProvider<T>
   | FactoryProvider<T>
   | ValueProvider<T>
@@ -78,6 +82,10 @@ export function describe<T>(
 ): ServiceDescriptor<T> {
   if (!isToken(token)) {
     throw new InvalidDescriptorError(`Invalid token: ${String(token)}`);
+  }
+  if (impl === undefined && token instanceof ServiceDefinition) {
+    // `scoped(Users)` re-registers a classless service under another lifetime.
+    return withKey({ ...(token.descriptor as ServiceDescriptor<T>), lifetime }, key);
   }
   if (impl === undefined) {
     if (!isConstructor(token)) {
@@ -125,8 +133,9 @@ export function describe<T>(
 
 /** Converts NestJS-style provider shorthand into a descriptor. Bare classes default to singleton. */
 export function normalizeProvider<T>(provider: Provider<T>): ServiceDescriptor<T> {
+  if (provider instanceof ServiceDefinition) return provider.descriptor as ServiceDescriptor<T>;
   if (isConstructor(provider)) {
-    const lifetime = getInjectableOptions(provider)?.lifetime ?? 'singleton';
+    const lifetime = getServiceOptions(provider)?.lifetime ?? 'singleton';
     return describe<T>(provider as Constructor<T>, undefined, lifetime);
   }
   if (provider === null || typeof provider !== 'object' || !('provide' in provider)) {
@@ -142,7 +151,7 @@ export function normalizeProvider<T>(provider: Provider<T>): ServiceDescriptor<T
   ) as Implementation<T>;
   const effective: Lifetime =
     lifetime ??
-    ('useClass' in impl ? getInjectableOptions(impl.useClass)?.lifetime : undefined) ??
+    ('useClass' in impl ? getServiceOptions(impl.useClass)?.lifetime : undefined) ??
     'singleton';
   return describe(provide, impl, effective, key);
 }

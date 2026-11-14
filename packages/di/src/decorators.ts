@@ -1,11 +1,11 @@
 import { defineMetadata, getOwnMetadata } from './metadata.js';
 import type { Lifetime, Token } from './types.js';
 
-export const INJECTABLE_KEY = 'suku:injectable';
+export const SERVICE_KEY = 'suku:service';
 export const INJECT_KEY = 'suku:inject';
 export const OPTIONAL_KEY = 'suku:optional';
 
-export interface InjectableOptions {
+export interface ServiceOptions {
   /** Default lifetime used when the class is registered bare (`collection.add(MyService)`). */
   lifetime?: Lifetime;
 }
@@ -20,18 +20,18 @@ export interface InjectOptions {
  * `design:paramtypes`, which is what the container reads to perform constructor
  * injection; this one additionally records default registration options.
  */
-export function Injectable(options: InjectableOptions = {}): ClassDecorator {
+export function Service(options: ServiceOptions = {}): ClassDecorator {
   return (target) => {
-    defineMetadata(INJECTABLE_KEY, options, target);
+    defineMetadata(SERVICE_KEY, options, target);
   };
 }
 
-export function getInjectableOptions(target: object): InjectableOptions | undefined {
-  return getOwnMetadata<InjectableOptions>(INJECTABLE_KEY, target);
+export function getServiceOptions(target: object): ServiceOptions | undefined {
+  return getOwnMetadata<ServiceOptions>(SERVICE_KEY, target);
 }
 
-export function isInjectable(target: object): boolean {
-  return getOwnMetadata(INJECTABLE_KEY, target) !== undefined;
+export function isService(target: object): boolean {
+  return getOwnMetadata(SERVICE_KEY, target) !== undefined;
 }
 
 /**

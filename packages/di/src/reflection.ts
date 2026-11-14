@@ -91,7 +91,7 @@ export function getConstructorParameters(cls: Function): readonly ParameterInfo[
       cls,
       -1,
       `it declares ${cls.length} constructor parameter(s) but no type metadata was emitted. ` +
-        'Decorate the class with @Injectable() and compile with "emitDecoratorMetadata": true, ' +
+        'Decorate the class with @Service() and compile with "emitDecoratorMetadata": true, ' +
         'or annotate each parameter with @Inject(token).',
     );
   }

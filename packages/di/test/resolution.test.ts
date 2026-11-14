@@ -2,22 +2,22 @@ import { describe, expect, test } from 'bun:test';
 import {
   CircularDependencyError,
   Inject,
-  Injectable,
   InjectionToken,
   MissingServiceError,
   Optional,
+  Service,
   ServiceCollection,
 } from '../src/index.js';
 
 describe('resolution', () => {
   test('constructor injection by class type', () => {
-    @Injectable()
+    @Service()
     class Db {}
-    @Injectable()
+    @Service()
     class Repo {
       constructor(public db: Db) {}
     }
-    @Injectable()
+    @Service()
     class Svc {
       constructor(public repo: Repo) {}
     }
@@ -35,11 +35,11 @@ describe('resolution', () => {
     abstract class Cache {
       abstract name: string;
     }
-    @Injectable()
+    @Service()
     class RedisCache extends Cache {
       name = 'redis';
     }
-    @Injectable()
+    @Service()
     class Uses {
       constructor(public cache: Cache) {}
     }
@@ -53,7 +53,7 @@ describe('resolution', () => {
   test('InjectionToken, string and symbol tokens with values', () => {
     const CONFIG = new InjectionToken<{ port: number }>('CONFIG');
     const SYM = Symbol('sym');
-    @Injectable()
+    @Service()
     class Svc {
       constructor(
         @Inject(CONFIG) public cfg: { port: number },
@@ -75,7 +75,7 @@ describe('resolution', () => {
   });
 
   test('factory receives the resolving provider', () => {
-    @Injectable()
+    @Service()
     class Logger {}
     const sp = new ServiceCollection()
       .addSingleton(Logger)
@@ -85,7 +85,7 @@ describe('resolution', () => {
   });
 
   test('useExisting aliases another token', () => {
-    @Injectable()
+    @Service()
     class Impl {}
     abstract class Alias {}
     const sp = new ServiceCollection()
@@ -99,11 +99,11 @@ describe('resolution', () => {
     abstract class Plugin {
       abstract n: number;
     }
-    @Injectable()
+    @Service()
     class P1 extends Plugin {
       n = 1;
     }
-    @Injectable()
+    @Service()
     class P2 extends Plugin {
       n = 2;
     }
@@ -114,9 +114,9 @@ describe('resolution', () => {
   });
 
   test('missing service throws with the resolution chain', () => {
-    @Injectable()
+    @Service()
     class Missing {}
-    @Injectable()
+    @Service()
     class Needs {
       constructor(public m: Missing) {}
     }
@@ -127,9 +127,9 @@ describe('resolution', () => {
   });
 
   test('@Optional yields undefined for missing dependencies', () => {
-    @Injectable()
+    @Service()
     class Missing {}
-    @Injectable()
+    @Service()
     class Needs {
       constructor(@Optional() public m?: Missing) {}
     }
@@ -138,11 +138,11 @@ describe('resolution', () => {
   });
 
   test('circular dependency is detected at runtime with the chain', () => {
-    @Injectable()
+    @Service()
     class A {
       constructor(@Inject('B') public b: unknown) {}
     }
-    @Injectable()
+    @Service()
     class B {
       constructor(@Inject(A) public a: unknown) {}
     }
@@ -155,15 +155,15 @@ describe('resolution', () => {
     abstract class Storage {
       abstract kind: string;
     }
-    @Injectable()
+    @Service()
     class S3 extends Storage {
       kind = 's3';
     }
-    @Injectable()
+    @Service()
     class Local extends Storage {
       kind = 'local';
     }
-    @Injectable()
+    @Service()
     class Uploader {
       constructor(@Inject(Storage, 's3') public storage: Storage) {}
     }
@@ -183,9 +183,9 @@ describe('resolution', () => {
   });
 
   test('NestJS-style provider objects via add()', () => {
-    @Injectable({ lifetime: 'transient' })
+    @Service({ lifetime: 'transient' })
     class Bare {}
-    @Injectable()
+    @Service()
     class Impl {}
     abstract class Tok {}
     const TOKEN = new InjectionToken<number>('n');
@@ -196,7 +196,7 @@ describe('resolution', () => {
       .add({ provide: 'f', useFactory: () => 'made' })
       .add({ provide: 'alias', useExisting: TOKEN })
       .build();
-    expect(sp.get(Bare)).not.toBe(sp.get(Bare)); // @Injectable lifetime hint honoured
+    expect(sp.get(Bare)).not.toBe(sp.get(Bare)); // @Service lifetime hint honoured
     const scope = sp.createScope();
     expect(scope.get(Tok)).toBeInstanceOf(Impl);
     expect(scope.get(Tok)).toBe(scope.get(Tok));
