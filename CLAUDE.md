@@ -62,6 +62,9 @@ already exist. `bun publish` rewrites `workspace:*` to the exact release version
 - If a publish fails partway, the packages before it in the order are already out. Fix the
   cause and rerun; the script skips nothing, so bump to a new patch version if any are live.
 - The `@suku` scope must be an npm organisation or user the publisher belongs to.
+- **Two-factor authentication.** With 2FA on for writes, npm asks for a one-time code for each
+  package. Run `bun run release:publish` in your own terminal so the prompts appear; it cannot
+  be run unattended.
 
 ## Scope: GraphQL lives in `@suku/graphql`, never in core
 

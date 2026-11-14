@@ -103,13 +103,20 @@ for (const pkg of ordered) {
     distTag!,
     ...(dryRun ? ['--dry-run'] : []),
   ];
-  const result = run('bun', args, pkg.dir);
-  const summary = (result.stdout + result.stderr)
-    .split('\n')
-    .filter((l) => /Total files|Unpacked size|Tag:|Access:|error|\+ @suku/.test(l));
-  console.log(`${pkg.name}@${version}\n  ${summary.join('\n  ')}`);
-  if (result.status !== 0 && !dryRun)
+  if (dryRun) {
+    const result = run('bun', args, pkg.dir);
+    const summary = (result.stdout + result.stderr)
+      .split('\n')
+      .filter((l) => /Total files|Unpacked size|Tag:|Access:|error|\+ @suku/.test(l));
+    console.log(`${pkg.name}@${version}\n  ${summary.join('\n  ')}`);
+    continue;
+  }
+  // A real publish runs attached to the terminal, so npm's one-time-code prompt can appear.
+  console.log(`\n${pkg.name}@${version}`);
+  const result = spawnSync('bun', args, { cwd: pkg.dir, stdio: 'inherit' });
+  if (result.status !== 0) {
     fail(`${pkg.name} failed to publish. Packages before it in the order are already out.`);
+  }
 }
 console.log(
   dryRun
