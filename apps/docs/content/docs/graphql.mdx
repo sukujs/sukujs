@@ -1,109 +1,182 @@
 ---
 title: GraphQL
-description: Mount a GraphQL server on a Suku route and share your services with it.
+description: Class-based resolvers with injection and typed arguments, organised by feature.
 icon: Share2
 ---
 
-Suku has no GraphQL package and does not plan one. It does not need one: a GraphQL server
-that speaks Fetch `Request` and `Response` mounts as a single route, and your services,
-middlewares and request context work with it unchanged.
-
-This guide uses [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server). The patterns on
-this page come from `examples/graphql` in the repository, where a test suite runs them against
-the real library. Snippets that name other tools, such as a data loader, are illustrations.
+`@suku/graphql` brings GraphQL to Suku in the same shape as REST. A resolver class looks like
+a [`@Routes` class](/docs/routes): services through the constructor, one field per resolver,
+and a schema that types the arguments.
 
 ```bash
-bun add graphql graphql-yoga
+bun add @suku/graphql graphql graphql-yoga
 ```
 
-## Mounting it
+`graphql` and [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server) are peer
+dependencies. An app that does not use GraphQL installs none of this.
 
-```ts title="graphql.ts"
-import { type RequestContext, route } from '@suku/core';
-import { createSchema, createYoga } from 'graphql-yoga';
+## A resolver class
 
-const yoga = createYoga<{ ctx: RequestContext }>({
-  schema: createSchema({ typeDefs, resolvers }),
-  graphqlEndpoint: '/graphql',
-  cors: false,
-});
+```ts title="books/books.resolver.ts"
+import { GraphqlResolver, mutation, query } from '@suku/graphql';
+import { z } from 'zod';
 
-export const graphql = route.all('/graphql', {
-  handle: ({ request, ctx }) => yoga.fetch(request, { ctx }),
-});
-```
+@GraphqlResolver({
+  typeDefs: /* GraphQL */ `
+    type Book {
+      id: ID!
+      title: String!
+    }
+    extend type Query {
+      books: [Book!]!
+      book(id: ID!): Book
+    }
+    extend type Mutation {
+      addBook(title: String!): Book!
+    }
+  `,
+})
+export class BooksResolver {
+  constructor(private readonly books: BooksService) {}
 
-```ts
-const app = await Suku.create({ routes: [graphql], services: [Books], adapter: nodeAdapter() });
-```
+  books = query({ handle: () => this.books.all() });
 
-Three details matter:
+  book = query({
+    args: z.object({ id: z.string() }),
+    handle: ({ args }) => this.books.find(args.id) ?? null,
+  });
 
-- **`route.all`**, because GraphQL uses both `GET` and `POST` on one path.
-- **No `body` schema on the route.** A request body can be read once, and Yoga must be the one
-  to read it.
-- **`cors: false`** on Yoga, if you use Suku's [CORS middleware](/docs/security/cors).
-  Otherwise two layers both write CORS headers.
-
-The second argument to `yoga.fetch` is how the Suku request context reaches your resolvers.
-
-## Services in resolvers
-
-Resolve services from the request's scope when building the GraphQL context. Resolvers then
-receive them by name, typed.
-
-```ts
-import type { ServiceOf } from '@suku/core';
-
-interface ServerContext {
-  ctx: RequestContext;
+  addBook = mutation({
+    args: z.object({ title: z.string().min(2) }),
+    handle: ({ args }) => this.books.add(args.title),
+  });
 }
+```
 
-interface GraphQLContext extends ServerContext {
-  books: ServiceOf<typeof Books>;
-  authors: ServiceOf<typeof AuthorLoader>;
-  viewer: Viewer | undefined;
+Side by side with the REST class for the same feature:
+
+```ts title="books/books.routes.ts"
+@Routes('/books')
+export class BooksRoutes {
+  constructor(private readonly books: BooksService) {}
+
+  list = route.get('/', { handle: () => this.books.all() });
+
+  create = route.post('/', {
+    body: z.object({ title: z.string().min(2) }),
+    handle: ({ body }) => this.books.add(body.title),
+  });
 }
+```
 
-const yoga = createYoga<ServerContext, Omit<GraphQLContext, keyof ServerContext>>({
-  schema: createSchema<GraphQLContext>({ typeDefs, resolvers }),
-  graphqlEndpoint: '/graphql',
-  cors: false,
-  context: ({ ctx }) => ({
-    books: ctx.provider.get(Books),
-    authors: ctx.provider.get(AuthorLoader),
-    viewer: ctx.get<Viewer>('viewer'),
-  }),
+## Adding it to an app
+
+A resolver class is registered like any service. The `graphql()` route finds every registered
+resolver by itself.
+
+```ts
+import { graphql } from '@suku/graphql';
+
+export const BooksFeature = feature('books', {
+  routes: [BooksRoutes],
+  services: [BooksService, BooksResolver],
+});
+
+const app = await Suku.create({
+  features: [BooksFeature],
+  routes: [graphql()],
+  adapter: nodeAdapter(),
 });
 ```
 
+The schema follows your features. Add a feature and its fields appear; remove it and they are
+gone, exactly as its routes would be.
+
+## Writing the schema
+
+Each class owns one slice of the schema, in GraphQL's own language.
+
+- Declare your types normally: `type Book { ... }`.
+- Add to the root types with `extend type Query`, `extend type Mutation` and
+  `extend type Subscription`. Suku declares the root types themselves.
+- A field's name is the class property's name. Use `name` when they must differ.
+
 ```ts
-const resolvers = {
-  Query: {
-    books: (_parent, _args, { books }) => books.all(),
-    book: (_parent, { id }, { books }) => books.find(id) ?? null,
-  },
-  Book: {
-    author: (book, _args, { authors }) => authors.load(book.authorId),
-  },
-};
+allBooks = query({ name: 'books', handle: () => this.books.all() });
 ```
 
-The same `Books` service can back a REST route beside the GraphQL one. They share one
-instance, so a GraphQL mutation is visible to a REST read immediately.
+Every field you resolve must appear in a class's `typeDefs`, and a field defined twice is an
+error.
+
+## What a resolver receives
+
+One object, as in a [handler](/docs/handlers).
+
+| Field | Value |
+| --- | --- |
+| `args` | The field's arguments: the schema's output, or the raw arguments without one. |
+| `parent` | The object the field belongs to. `undefined` for queries and mutations. |
+| `ctx` | The [request context](/docs/request-context): cookies, headers, shared state. |
+| `info` | GraphQL's resolve info. |
+| services | One field per entry in `services`. |
+
+### Arguments
+
+Give a resolver an `args` schema and they are validated and typed.
 
 ```ts
-export const listBooks = route.get('/books', {
-  services: { books: Books },
-  handle: ({ books }) => books.all(),
+addBook = mutation({
+  args: z.object({ title: z.string().min(2), year: z.number().int().optional() }),
+  handle: ({ args }) => this.books.add(args.title, args.year),   // string, number | undefined
 });
 ```
 
-### Per-request services and data loaders
+GraphQL already checks the argument types declared in the schema. The `args` schema adds what
+GraphQL cannot express, such as a minimum length. A failure is returned as a GraphQL error:
 
-`ctx.provider` is the request's own scope, so a [scoped service](/docs/dependency-injection)
-is created once per GraphQL request and shared by every resolver in it. That is exactly the
-lifetime a data loader needs: batch and cache within one request, start fresh on the next.
+```json
+{
+  "errors": [{
+    "message": "Invalid arguments for Mutation.addBook",
+    "extensions": { "code": "BAD_USER_INPUT", "issues": [{ "path": "title", "message": "..." }] }
+  }]
+}
+```
+
+### Fields on your own types
+
+Use `objectType` for a field that needs its own resolver, such as a relation. The type
+parameter is the shape of the parent object.
+
+```ts
+import { objectType } from '@suku/graphql';
+
+const BookType = objectType<Book>('Book');
+
+@GraphqlResolver({ typeDefs: 'extend type Book { author: Author! }  type Author { id: ID! name: String! }' })
+export class BookAuthorResolver {
+  author = BookType.field({
+    services: { authors: AuthorLoader },
+    handle: ({ parent, authors }) => authors.load(parent.authorId),
+  });
+}
+```
+
+## Services
+
+Services the whole class needs come through the constructor. A resolver class is a singleton,
+so request-scoped services are asked for per resolver, the same rule as a `@Routes` class.
+
+```ts
+me = query({
+  services: { currentUser: CurrentUser },        // scoped: one per request
+  handle: ({ currentUser }) => currentUser.profile(),
+});
+```
+
+A [scoped service](/docs/dependency-injection) is created once per GraphQL request and shared
+by every resolver in it. That is the lifetime a data loader needs: batch and cache within one
+request, start fresh on the next.
 
 ```ts
 export const AuthorLoader = service('author-loader', {
@@ -113,145 +186,159 @@ export const AuthorLoader = service('author-loader', {
 });
 ```
 
-No per-request wiring is needed in the GraphQL layer. The container handles it.
-
 ## Authentication
 
-Authenticate in a Suku [middleware](/docs/middlewares), the same one your REST routes use, and
-read the result when building the context.
+Authenticate in a Suku [middleware](/docs/middlewares), the one your REST routes use, and read
+the result in resolvers.
 
 ```ts
-export const authenticate = middleware(async (ctx, next) => {
+const authenticate = middleware(async (ctx, next) => {
   const token = bearerToken(ctx.headers.get('authorization'));
   if (token) ctx.set('viewer', await tokens.verify(token).catch(() => undefined));
   return next();
 });
 
-export const graphql = route.all('/graphql', {
-  middlewares: [authenticate],
-  handle: ({ request, ctx }) => yoga.fetch(request, { ctx }),
-});
+Suku.create({ features, routes: [graphql()], middlewares: [authenticate] });
 ```
-
-Let unauthenticated requests through and decide in the resolvers, since a GraphQL schema
-usually mixes public and private fields.
 
 ```ts
 import { GraphQLError } from 'graphql';
 
-addBook: (_parent, args, { books, viewer }) => {
-  if (viewer?.role !== 'editor') {
-    throw new GraphQLError('Only editors can add books', { extensions: { code: 'FORBIDDEN' } });
-  }
-  return books.add(args.title, args.authorId);
-},
+addBook = mutation({
+  args: AddBook,
+  handle: ({ args, ctx }) => {
+    if (ctx.get<Viewer>('viewer')?.role !== 'editor') {
+      throw new GraphQLError('Only editors can add books', { extensions: { code: 'FORBIDDEN' } });
+    }
+    return this.books.add(args.title);
+  },
+});
 ```
-
-To require authentication for the whole API instead, throw `UnauthorizedException` from the
-middleware.
 
 ## Cookies and headers
 
-Resolvers have the request context, so they can use everything a
-[handler](/docs/handlers) can.
+`ctx` works as it does in a handler.
 
 ```ts
-login: async (_parent, { email, password }, { ctx, sessions }) => {
-  const session = await sessions.create(email, password);
-  ctx.cookies.set('session', session.id, { maxAge: 604_800 });
-  return true;
-},
+login = mutation({
+  args: Login,
+  services: { sessions: Sessions },
+  handle: async ({ args, ctx, sessions }) => {
+    const session = await sessions.create(args.email, args.password);
+    ctx.cookies.set('session', session.id, { maxAge: 604_800 });
+    return true;
+  },
+});
 ```
-
-Cookies and headers set this way are added to the response Yoga produces.
-
-## Errors
-
-GraphQL has its own error model, and Yoga applies it. Suku's
-[error handlers](/docs/errors) are not involved for anything that happens inside a GraphQL
-operation.
-
-| Situation | What the client receives |
-| --- | --- |
-| An invalid or malformed query | `200`, with `errors` in the body |
-| A resolver throws `GraphQLError` | `200`, with your message and `extensions` |
-| A resolver throws anything else | `200`, with the message masked by Yoga |
-| An unsupported method such as `PUT` | `405`, from Yoga |
-| A Suku middleware throws before Yoga runs | The normal Suku error response |
-
-Throw `GraphQLError` for errors a client should see. Anything else is treated as a bug and
-hidden, the same principle Suku applies to REST.
 
 ## Subscriptions
 
-Yoga serves subscriptions over server-sent events, which is an ordinary streamed response.
-Nothing extra is needed on the Suku side.
+The handler is an async generator, and each value it yields is one event.
 
 ```ts
-const resolvers = {
-  Subscription: {
-    countdown: {
-      async *subscribe(_parent, { from }) {
-        for (let i = from; i >= 0; i--) yield { countdown: i };
-      },
-    },
+countdown = subscription({
+  args: z.object({ from: z.number().int().min(0).max(60) }),
+  handle: async function* ({ args }) {
+    for (let i = args.from; i >= 0; i--) yield i;
   },
-};
+});
 ```
 
-A client asks for them with `Accept: text/event-stream`. WebSocket transports are a separate
-server and are outside what a route can mount.
+They are served over server-sent events. A client asks with `Accept: text/event-stream`.
 
-## GraphiQL
+## Errors
 
-Opening `/graphql` in a browser shows GraphiQL, Yoga's in-browser IDE.
+GraphQL has its own error model. Suku's [error handlers](/docs/errors) are not involved inside
+a GraphQL operation.
 
-<Callout type="warn" title="It conflicts with strict security headers">
+| Situation | What the client receives |
+| --- | --- |
+| An invalid query | `200`, with `errors` in the body |
+| A resolver throws `GraphQLError` | `200`, with your message and `extensions` |
+| Arguments fail their schema | `200`, with code `BAD_USER_INPUT` and the issues |
+| A resolver throws anything else | `200`, with the detail hidden |
+| A middleware rejects before GraphQL runs | The normal Suku error response |
+
+Throw `GraphQLError` for errors a client should see. Anything else is treated as a bug and
+masked.
+
+## Options
+
+```ts
+graphql({
+  path: '/graphql',
+  graphiql: false,
+  maskedErrors: true,
+  yoga: { plugins: [] },
+});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `path` | `/graphql` | Where the API is served. |
+| `graphiql` | off in production | The in-browser IDE. |
+| `maskedErrors` | `true` | Hide unexpected errors from clients. |
+| `yoga` | | Further GraphQL Yoga options, such as plugins. |
+
+<Callout type="warn" title="GraphiQL and strict security headers">
   GraphiQL is an HTML page with inline scripts. The default policy of
   [`securityHeaders`](/docs/security/security-headers) forbids those, so the page will be
-  blank. Either turn GraphiQL off, which is right for production, or loosen the policy for
-  that route in development.
+  blank. Loosen the policy in development, or leave GraphiQL off.
 </Callout>
 
+### Failing at startup
+
+The schema is built on the first request. To catch a mistake before the server listens, build
+it yourself.
+
 ```ts
-createYoga({ schema, graphiql: process.env.NODE_ENV !== 'production' });
+import { createGraphqlSchema } from '@suku/graphql';
+
+const app = await Suku.create({ features, routes: [graphql()], adapter });
+createGraphqlSchema(app.provider);     // throws GraphqlSetupError if anything is wrong
+await app.listen(3000);
 ```
+
+It reports a resolver with no fields, a field defined twice, an unregistered service, and a
+schema that does not match its resolvers.
 
 ## What applies and what does not
 
-| Suku feature | With a mounted GraphQL server |
+| Suku feature | With GraphQL |
 | --- | --- |
-| Services and lifetimes | Works. Resolve them from `ctx.provider`. |
-| Middlewares | Work: authentication, CORS, rate limiting, security headers. |
+| Services and lifetimes | Work, through the constructor and `services`. |
+| Features | Work. The schema is assembled from registered resolvers. |
+| App-level middlewares | Work: authentication, CORS, rate limiting, security headers. |
 | `ctx.cookies`, `ctx.setHeader` | Work, from any resolver. |
-| Route schemas (`body`, `query`) | Do not apply. The GraphQL schema validates instead. |
-| `onError` and Suku's error format | Do not apply inside an operation. |
-| `bodyLimit` | Does not apply, because Yoga reads the request itself. |
+| Feature-level middlewares and `onError` | Do not apply. GraphQL is one route. |
+| `bodyLimit` | Does not apply. Yoga reads the request itself. |
 | The route table | One entry for the whole GraphQL API. |
 
-### Limiting request size
+[`rateLimit`](/docs/security/rate-limiting) counts requests, and one GraphQL request can do a
+great deal of work. Add a query depth or complexity limit through `yoga.plugins`.
 
-Since `bodyLimit` is not involved, cap the size with a middleware on the route.
+## Limits
+
+- **Schema-first only.** The schema is written in SDL. There is no code-first type system and
+  there are no decorators on fields.
+- **Resolver classes are singletons.** A scoped resolver class is rejected with an error
+  pointing to the `services` option.
+- **Return types are not checked.** TypeScript does not verify that a resolver returns what
+  the SDL declares. A GraphQL code generator can add that.
+- **Server-sent events only** for subscriptions. WebSocket transports are a separate server.
+
+## Without the package
+
+`@suku/graphql` is a thin layer. Any GraphQL server that speaks Fetch mounts on a route by
+hand, which is also how to use a different GraphQL library.
 
 ```ts
-const maxBody = (bytes: number) =>
-  middleware((ctx, next) => {
-    if (Number(ctx.headers.get('content-length') ?? 0) > bytes) throw new PayloadTooLargeException();
-    return next();
-  });
+const yoga = createYoga<{ ctx: RequestContext }>({ schema, graphqlEndpoint: '/graphql', cors: false });
 
-route.all('/graphql', { middlewares: [maxBody(100_000)], handle });
+export const graphqlRoute = route.all('/graphql', {
+  handle: ({ request, ctx }) => yoga.fetch(request, { ctx }),
+});
 ```
 
-This checks the declared length, which is enough behind a reverse proxy that enforces it.
-
-### Rate limiting
-
-[`rateLimit`](/docs/security/rate-limiting) counts requests, and one GraphQL request can do a
-great deal of work. Add a query depth or complexity limit in the GraphQL layer as well; Yoga
-has plugins for both.
-
-## Other libraries
-
-The same approach works for any server that exposes a Fetch handler: build it once, call it
-from a `route.all`, and pass `ctx` through. Only GraphQL Yoga is covered by tests here.
+Leave the route without a `body` schema, since the server must read the request itself.
+`examples/graphql` in the repository is a complete app built this way.
