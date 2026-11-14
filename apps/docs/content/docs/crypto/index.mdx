@@ -1,0 +1,116 @@
+---
+title: Crypto overview
+description: What @suku/crypto offers and which tool fits which job.
+icon: KeyRound
+---
+
+`@suku/crypto` is a small set of security helpers built on the Web Crypto API. It has no
+dependencies, runs on Node 22+, Bun and edge runtimes, and works with or without the rest of
+Suku.
+
+```bash
+bun add @suku/crypto
+```
+
+<Callout type="warn">
+  This package has not had an independent security audit. It implements no cryptography of
+  its own: every operation is done by the platform, and the package adds safe defaults and
+  input checking around it.
+</Callout>
+
+## Importing
+
+Use the default export, which carries every function:
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const hash = await sukuCrypto.hashPassword(password);
+const token = sukuCrypto.randomToken();
+```
+
+Each function is also a named export, which lets a bundler drop the ones you do not use:
+
+```ts
+import { hashPassword, randomToken } from '@suku/crypto';
+```
+
+They are the same functions. These pages use the default export.
+
+## Choosing the right tool
+
+Most mistakes come from using the wrong tool, not from using a tool badly.
+
+| You need to | Use | Why |
+| --- | --- | --- |
+| Let a client prove who it is on each request | [JWT](/docs/crypto/jwt) | Verified without a database lookup. |
+| Let other services verify your tokens | [JWT](/docs/crypto/jwt) with a key pair | They hold only the public key. |
+| Store a password | [`hashPassword`](/docs/crypto/passwords) | Slow on purpose, salted, upgradeable. |
+| Send a value the client may read but not change | [`createSigner`](/docs/crypto/signed-and-sealed) | Tamper-proof, still readable. |
+| Send a value the client must not read | [`createSealer`](/docs/crypto/signed-and-sealed) | Encrypted and tamper-proof, with expiry. |
+| Create a session id, API key or reset token | `randomToken()` | 256 bits from the system's secure source. |
+| Fingerprint a file or cache key | `sha256()` | Fast. Never for passwords. |
+| Compare two secrets | `timingSafeEqual()` | Does not leak where they differ. |
+
+### Signed, sealed, or a JWT?
+
+| | Signed value | Sealed value | JWT |
+| --- | --- | --- | --- |
+| Client can read it | Yes | No | Yes |
+| Client can change it | No | No | No |
+| Built-in expiry | No | Optional `ttl` | Yes, by default |
+| Verifiable by another service | Only with the shared secret | Only with the shared secret | Yes, with a public key |
+| Typical use | Cookie value, webhook, link | Encrypted cookie, OAuth state, reset link | API authentication |
+
+A JWT's payload is only encoded, not encrypted. Anyone holding the token can read it.
+
+## Everything in the package
+
+| Area | Functions |
+| --- | --- |
+| Tokens | `createJwt`, `bearerToken`, `decodeJwtUnverified` |
+| Passwords | `hashPassword`, `verifyPassword`, `needsRehash` |
+| Signed values | `createSigner` |
+| Encrypted values | `createSealer` |
+| Random | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt` |
+| Hashing | `sha256`, `sha512`, `digest` |
+| Encoding and comparison | `base64urlEncode`, `base64urlDecode`, `hexEncode`, `timingSafeEqual` |
+
+## Secrets
+
+Every helper that takes a secret requires at least 32 bytes and refuses anything shorter.
+Generate one per purpose and keep it in your environment.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+console.log(sukuCrypto.randomToken(32));   // run once, paste into your secret store
+```
+
+Validate them at startup with [configuration](/docs/configuration), so a missing secret stops
+the app before it serves a request.
+
+```ts
+export const Env = defineConfig(
+  'env',
+  z.object({
+    JWT_SECRET: z.string().min(43),
+    COOKIE_SECRET: z.string().min(43),
+  }),
+);
+```
+
+## Errors
+
+Functions that verify something you control return a plain result: `verifyPassword` gives
+`true` or `false`, and `unpack` and `unseal` give the value or `undefined`. They never throw
+on bad input.
+
+`jwt.verify` throws a `JwtError` with a `code`, because the reason matters for logging.
+Whatever the code, respond to the client with a plain `401`. See
+[best practices](/docs/crypto/best-practices#do-not-explain-failures-to-the-client).
+
+## Not included
+
+Encrypted JWTs (JWE), fetching keys from an identity provider (JWKS), OAuth and OpenID
+Connect flows, token revocation lists, and Argon2 or bcrypt.

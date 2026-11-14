@@ -1,0 +1,149 @@
+---
+title: Best practices
+description: The decisions that matter more than the code.
+icon: ShieldCheck
+---
+
+The functions in `@suku/crypto` are hard to misuse on their own. These are the choices around
+them that decide whether a system is actually safe.
+
+## Secrets
+
+**Generate them; never invent them.** A secret is `randomToken(32)`, not a phrase.
+
+**One secret per purpose.** Use different secrets for JWTs, cookies and webhooks. If one
+leaks, the others still hold.
+
+**Keep them out of the repository.** Load them from the environment or a secret manager, and
+validate them at startup with [`defineConfig`](/docs/configuration) so a missing one stops the
+app immediately.
+
+**Plan rotation before you need it.** Every helper accepts previous secrets:
+
+1. Add the new secret as the main one and the current one under `previousSecrets`.
+2. Deploy. New values use the new secret; old ones still verify.
+3. Wait for the longest lifetime you issue to pass.
+4. Remove the old secret.
+
+Rotate at once if a secret may have leaked, and treat everything it signed as untrusted.
+
+## Tokens
+
+**Keep access tokens short-lived.** Fifteen minutes is a common choice. A JWT cannot be
+revoked, so its lifetime is how long a stolen one stays useful.
+
+**Put nothing sensitive in the payload.** It is encoded, not encrypted. A user id and a role
+are fine. An email address, a permission list that reveals your internals, or anything
+personal is not.
+
+**Always set `issuer`, and `audience` when you have more than one consumer.** They stop a
+token minted for one service from being accepted by another that shares the key.
+
+**Use a key pair once a second service verifies.** With a shared secret, every verifier can
+also forge tokens.
+
+**Re-check what matters.** A token says what was true when it was issued. For a destructive
+or high-value action, load the user and confirm they are still active and still allowed.
+
+**Never decide anything from `decodeJwtUnverified`.** It exists for logging.
+
+### Where the client keeps a token
+
+| Storage | Readable by page scripts | Sent automatically | Main risk |
+| --- | --- | --- | --- |
+| `HttpOnly` cookie | No | Yes | Cross-site requests, so set `SameSite` |
+| `localStorage` | Yes | No | Any script injected into the page can take it |
+| Memory only | Yes, while the page is open | No | Lost on reload |
+
+For browsers, an `HttpOnly`, `Secure`, `SameSite` cookie is the safer default. For mobile
+apps and other servers, use the platform's secure storage and the `Authorization` header.
+
+## Passwords
+
+**Accept long passwords and do not impose composition rules.** Require a minimum length of
+about ten characters and cap the maximum at a few hundred. Rules such as "one symbol, one
+digit" make passwords easier to guess, not harder.
+
+**Give one answer for a wrong email and a wrong password**, and do the same work in both
+cases. See [logging in](/docs/crypto/passwords#logging-in).
+
+**Rate-limit by account and by address.** Slow hashing protects a stolen database. It does
+not stop someone guessing against your login route.
+
+**Never log, email or return a password.** Check that request logging skips authentication
+routes.
+
+**Sign out other sessions when a password changes.**
+
+## Do not explain failures to the client
+
+`JwtError` carries a code such as `expired` or `invalid_signature`. Log it. Do not send it.
+
+```ts
+try {
+  ctx.set('user', await tokens.verify(token));
+} catch (error) {
+  log.debug('token rejected', { code: error instanceof JwtError ? error.code : 'unknown' });
+  throw new UnauthorizedException();     // same response for every cause
+}
+```
+
+Detailed errors tell an attacker which part of a forged token to fix next. The one common
+exception is letting a client know its token has expired so it can refresh, and even that
+can be inferred from any `401`.
+
+The same applies everywhere: "invalid email or password", "this link is invalid or has
+expired".
+
+## Comparing and generating
+
+**Compare secrets with `timingSafeEqual`**, never with `===`. Ordinary comparison stops at
+the first different character, and the time it takes reveals how much matched.
+
+**Use the `random*` functions for anything security-related.** `Math.random()` is
+predictable.
+
+**Store a hash of any token you issue**, not the token: refresh tokens, API keys, one-time
+codes. `sha256` is right for long random values; only passwords need `hashPassword`.
+
+## Signed and sealed values
+
+**Give every sealer a `purpose`.** It stops a value made for one feature being replayed
+against another.
+
+**Always set a `ttl`** unless you have a reason not to. A link that works forever will
+eventually be found in someone's old mailbox.
+
+**Record single-use values server-side**, or bind them to state that changes when they are
+used, as the [reset-link example](/docs/crypto/use-cases#password-reset-links) does.
+
+**Verify webhooks against the raw body**, before parsing it.
+
+## Transport and headers
+
+These tools assume TLS. A token sent over plain HTTP is a token given away.
+
+- Serve everything over HTTPS and set `Strict-Transport-Security`.
+- Mark cookies `HttpOnly`, `Secure` and `SameSite`.
+- Do not put tokens in URLs. They end up in logs, browser history and referrer headers.
+  Reset and verification links are the exception, which is why they must be short-lived and
+  single-use.
+
+## A short checklist
+
+- [ ] Every secret is random, at least 32 bytes, unique to its purpose, and outside the repository.
+- [ ] Access tokens last minutes, and refresh tokens are stored hashed and can be deleted.
+- [ ] `issuer` is set on every JWT instance.
+- [ ] Login gives one error message and does equal work for known and unknown accounts.
+- [ ] Login, registration, reset and code-entry routes are rate-limited.
+- [ ] Authentication failures return a plain `401` with no cause.
+- [ ] Cookies are `HttpOnly`, `Secure` and `SameSite`.
+- [ ] Sealed values have a `purpose` and a `ttl`.
+- [ ] Webhooks are verified against the raw body.
+- [ ] There is a written procedure for rotating each secret.
+
+## Limits of this package
+
+It has not had an independent security audit. It does not provide rate limiting, CSRF
+protection, account lockout, multi-factor authentication or audit logging. Those belong in
+your application, and several are as important as anything on this page.
