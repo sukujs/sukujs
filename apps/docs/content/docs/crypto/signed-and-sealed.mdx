@@ -1,0 +1,125 @@
+---
+title: Signed and sealed values
+description: Tamper-proof and encrypted values for cookies, links and webhooks.
+icon: Stamp
+---
+
+Sometimes you hand a value to a client and need it back unchanged: a session cookie, a link
+in an email, the `state` of an OAuth redirect. Two tools cover it.
+
+| | `createSigner` | `createSealer` |
+| --- | --- | --- |
+| The client can read the value | Yes | No |
+| The client can change the value | No | No |
+| Can expire | No, add your own timestamp | Yes, with `ttl` |
+| Holds | A string | Any JSON value |
+| Method | HMAC-SHA-256 | AES-256-GCM |
+
+Use a signer when the content is not sensitive. Use a sealer when it is, or when you want
+expiry built in.
+
+## Signing
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const signer = sukuCrypto.createSigner(env.COOKIE_SECRET);
+
+const packed = await signer.pack('user.42');      // "user.42.3kV9...": value plus signature
+await signer.unpack(packed);                      // "user.42"
+await signer.unpack(packed.replace('42', '1'));   // undefined
+```
+
+`unpack` returns the original value, or `undefined` if anything was altered. It never throws.
+
+For data that travels separately from its signature, such as a webhook body and a header,
+use `sign` and `verify`.
+
+```ts
+const signature = await signer.sign(body);
+await signer.verify(body, signature);   // true or false, compared in constant time
+```
+
+Signatures are base64url. For a provider that sends hex, see
+[verifying webhooks](/docs/crypto/use-cases#verifying-webhooks).
+
+## Sealing
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const sealer = sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'session' });
+
+const sealed = await sealer.seal({ userId: 42, roles: ['admin'] }, { ttl: '7d' });
+// "v1.pX0c...": unreadable and URL-safe
+
+await sealer.unseal<{ userId: number; roles: string[] }>(sealed);   // the object, or undefined
+```
+
+`unseal` returns `undefined` if the value was altered, has expired, was sealed with another
+secret, or was sealed for another purpose.
+
+Each call to `seal` uses a fresh random nonce, so sealing the same value twice gives two
+different strings. Nothing about the content leaks from the output, except its approximate
+length.
+
+### Purpose
+
+`purpose` ties a value to a single use. Without it, a value sealed for one feature could be
+replayed against another that shares the secret.
+
+```ts
+const reset = sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'password-reset' });
+const invite = sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'team-invite' });
+
+await invite.unseal(await reset.seal({ userId: 42 }));   // undefined
+```
+
+Give every use its own purpose. It costs nothing and removes a whole class of mistake.
+
+### Expiry
+
+`ttl` is enforced when unsealing. An expired value is indistinguishable from an invalid one.
+
+```ts
+await sealer.seal(payload, { ttl: '30m' });
+```
+
+A sealed value cannot be revoked before it expires. For anything that must be single-use,
+also record it server-side. See
+[password reset links](/docs/crypto/use-cases#password-reset-links).
+
+## Cookies
+
+Suku returns Fetch `Response` objects, so a cookie is a header.
+
+```ts
+route.post('/session', {
+  body: Login,
+  handle: async ({ body }) => {
+    const user = await authenticate(body);
+    const value = await sealer.seal({ userId: user.id }, { ttl: '7d' });
+    return Response.json(
+      { ok: true },
+      { headers: { 'set-cookie': `session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800` } },
+    );
+  },
+});
+```
+
+Always set `HttpOnly`, `Secure` and `SameSite`. Keep the cookie's `Max-Age` in step with the
+`ttl`.
+
+## Rotating the secret
+
+```ts
+sukuCrypto.createSigner(env.COOKIE_SECRET, { previousSecrets: [env.COOKIE_SECRET_OLD] });
+sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'session', previousSecrets: [env.APP_SECRET_OLD] });
+```
+
+New values use the current secret. Old values keep working until you remove the previous one.
+
+## Size
+
+A sealed value is about a third larger than its JSON, plus roughly 50 characters. Browsers cap a
+cookie near 4,096 bytes, so store identifiers, not whole records.

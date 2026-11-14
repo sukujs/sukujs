@@ -1,0 +1,180 @@
+---
+title: JSON Web Tokens
+description: Signing and verifying tokens, algorithms, keys, claims and rotation.
+icon: Ticket
+---
+
+A JWT is a signed statement such as "this request is from user 42, until 10:15". The server
+that issues it signs it; any server holding the right key can check it without a database
+lookup.
+
+## Creating an instance
+
+`createJwt` returns a signer and verifier bound to one algorithm and one set of keys. Create
+it once and reuse it.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const jwt = sukuCrypto.createJwt<{ role: 'user' | 'admin' }>({
+  secret: env.JWT_SECRET,
+  issuer: 'my-api',
+  audience: 'my-web-app',
+  expiresIn: '15m',
+});
+```
+
+In a Suku app, make it a [service](/docs/dependency-injection) so routes and middlewares can
+ask for it.
+
+```ts title="auth/tokens.ts"
+export const Tokens = service('tokens', {
+  services: { env: Env },
+  create: ({ env }) =>
+    sukuCrypto.createJwt<{ role: 'user' | 'admin' }>({ secret: env.JWT_SECRET, issuer: 'my-api', expiresIn: '15m' }),
+});
+```
+
+## Signing
+
+```ts
+const token = await jwt.sign({ role: 'admin' }, { subject: user.id });
+```
+
+`sign` adds `iat` (issued at), `exp` (expiry), and the configured `iss` and `aud`.
+
+| Sign option | Claim | Meaning |
+| --- | --- | --- |
+| `subject` | `sub` | Who the token is about, usually the user id. |
+| `expiresIn` | `exp` | Overrides the instance's lifetime for this token. |
+| `notBefore` | `nbf` | The token is rejected until this much time has passed. |
+| `jwtId` | `jti` | A unique id, if you track individual tokens. |
+
+Durations are seconds, or strings such as `30s`, `15m`, `12h`, `7d`.
+
+## Verifying
+
+```ts
+import sukuCrypto, { JwtError } from '@suku/crypto';
+
+try {
+  const payload = await jwt.verify(token);
+  payload.sub;    // "42"
+  payload.role;   // "admin"
+} catch (error) {
+  if (error instanceof JwtError) log.debug('token rejected', { code: error.code });
+  throw new UnauthorizedException();
+}
+```
+
+`verify` returns the payload only if every check passes.
+
+| Order | Check | Code on failure |
+| --- | --- | --- |
+| 1 | Three well-formed parts, under 8,192 characters | `malformed` |
+| 2 | The header's algorithm equals the configured one | `algorithm_mismatch` |
+| 3 | The signature | `invalid_signature` |
+| 4 | `exp` is present and not passed | `invalid_claim`, `expired` |
+| 5 | `nbf` has passed, `iat` is not in the future | `not_active`, `invalid_claim` |
+| 6 | Issuer and audience, when configured | `invalid_claim` |
+| 7 | Your `schema`, when given | `invalid_claim` |
+
+The algorithm is fixed when you create the instance and is never taken from the token. That
+is what defeats two classic attacks: tokens declaring `alg: none`, and tokens signed with
+HMAC using an RSA public key as the secret.
+
+### Reading the token from a request
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const token = sukuCrypto.bearerToken(ctx.headers.get('authorization'));   // undefined if absent or malformed
+```
+
+## Choosing an algorithm
+
+| Situation | Algorithm | Keys |
+| --- | --- | --- |
+| One service signs and verifies | `HS256` (the default) | One shared secret. |
+| Other services or third parties verify | `ES256` or `EdDSA` | Private key signs, public key verifies. |
+| An existing system requires RSA | `RS256` or `PS256` | 2048-bit keys or larger. |
+
+With a shared secret, anything that can verify a token can also forge one. Use a key pair as
+soon as a second service needs to verify.
+
+```ts
+// The auth service signs.
+const issuer = sukuCrypto.createJwt({ algorithm: 'ES256', privateKey: env.JWT_PRIVATE_KEY, publicKey: env.JWT_PUBLIC_KEY, issuer: 'auth' });
+
+// Every other service only verifies, and holds no secret.
+const verifier = sukuCrypto.createJwt({ algorithm: 'ES256', publicKey: env.JWT_PUBLIC_KEY, issuer: 'auth' });
+```
+
+Keys may be PEM strings, JWK objects or `CryptoKey`s. PEM must be PKCS#8 for private keys and
+SPKI for public keys.
+
+```bash
+# ES256 key pair
+openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out private.pem
+openssl ec -in private.pem -pubout -out public.pem
+
+# Convert a legacy "BEGIN RSA PRIVATE KEY" file
+openssl pkcs8 -topk8 -nocrypt -in legacy.pem -out private.pem
+```
+
+## Typed and validated payloads
+
+The type parameter describes the payload for TypeScript. A `schema` also checks it at
+runtime, which matters when tokens may come from an older version of your app.
+
+```ts
+const Claims = z.object({ sub: z.string(), role: z.enum(['user', 'admin']) });
+
+const jwt = sukuCrypto.createJwt({ secret: env.JWT_SECRET, schema: Claims });
+const { role } = await jwt.verify(token);   // 'user' | 'admin', checked
+```
+
+## Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `algorithm` | `HS256` | HS, RS, PS and ES at 256, 384 or 512, or `EdDSA`. |
+| `secret` | | For HS. At least 32, 48 or 64 bytes for HS256, HS384, HS512. |
+| `privateKey`, `publicKey` | | For the other algorithms. |
+| `expiresIn` | `1h` | `false` issues tokens that never expire and accepts them. |
+| `issuer` | | Written as `iss`, and required to match on verify. |
+| `audience` | | Written as `aud`. On verify, any one configured value must match. |
+| `clockTolerance` | `0` | Seconds of clock skew allowed between servers. |
+| `schema` | | A Standard Schema for the payload. |
+| `keyId` | | Written to the header as `kid`. |
+| `previousSecrets`, `previousPublicKeys` | | Old keys accepted for verifying only. |
+| `maxTokenLength` | `8192` | Longer tokens are rejected before any work is done. |
+
+## Rotating keys
+
+Add the new key as the main one and move the old one to the "previous" list. New tokens are
+signed with the new key; old tokens keep verifying until they expire.
+
+```ts
+sukuCrypto.createJwt({ secret: env.JWT_SECRET, previousSecrets: [env.JWT_SECRET_OLD] });
+```
+
+Once the longest token lifetime has passed, remove the old key.
+
+## Inspecting a token
+
+`decodeJwtUnverified` reads the header and payload without checking anything. Its output is
+attacker-controlled. It is for logging and debugging, never for a decision.
+
+```ts
+const { header, payload } = sukuCrypto.decodeJwtUnverified(token);
+```
+
+## What a JWT cannot do
+
+- **It cannot be revoked.** It is valid until it expires. Keep access tokens short-lived.
+- **It hides nothing.** The payload is readable by anyone who has the token.
+- **It does not replace a session store** when you need to log a user out everywhere at once.
+
+See [use cases](/docs/crypto/use-cases#login-with-access-and-refresh-tokens) for a complete
+login flow that handles all three.

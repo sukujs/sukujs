@@ -1,0 +1,307 @@
+---
+title: Use cases
+description: Complete, working patterns for the things people build with these tools.
+icon: Lightbulb
+---
+
+Each example uses Suku's own [routes](/docs/routes), [services](/docs/dependency-injection)
+and [middlewares](/docs/middlewares). `Users`, `Sessions` and similar names stand for your own
+data services.
+
+## Login with access and refresh tokens
+
+The standard shape for an API: a short-lived JWT the client sends on every request, and a
+long-lived random token it exchanges for a new one.
+
+| | Access token | Refresh token |
+| --- | --- | --- |
+| What it is | A JWT | A random string |
+| Lifetime | Minutes | Days or weeks |
+| Checked by | Verifying the signature | Looking it up in your database |
+| Can be revoked | No | Yes, delete the row |
+
+```ts title="auth/auth.routes.ts"
+import { UnauthorizedException, route } from '@suku/core';
+import sukuCrypto from '@suku/crypto';
+
+const REFRESH_DAYS = 30;
+
+async function issue(user: User, tokens: ServiceOf<typeof Tokens>, sessions: Sessions) {
+  const refreshToken = sukuCrypto.randomToken();
+  // Store only a hash. A leaked database must not yield usable tokens.
+  await sessions.create({
+    userId: user.id,
+    tokenHash: await sukuCrypto.sha256(refreshToken),
+    expiresAt: Date.now() + REFRESH_DAYS * 86_400_000,
+  });
+  return {
+    accessToken: await tokens.sign({ role: user.role }, { subject: user.id }),
+    refreshToken,
+  };
+}
+
+export const login = route.post('/auth/login', {
+  body: z.object({ email: z.email(), password: z.string().max(200) }),
+  services: { users: Users, sessions: Sessions, tokens: Tokens },
+  status: 200,
+  handle: async ({ body, users, sessions, tokens }) => {
+    const user = await users.findByEmail(body.email);
+    const ok = await sukuCrypto.verifyPassword(body.password, user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !ok) throw new UnauthorizedException('Invalid email or password');
+    return issue(user, tokens, sessions);
+  },
+});
+
+export const refresh = route.post('/auth/refresh', {
+  body: z.object({ refreshToken: z.string().min(40).max(100) }),
+  services: { users: Users, sessions: Sessions, tokens: Tokens },
+  status: 200,
+  handle: async ({ body, users, sessions, tokens }) => {
+    const session = await sessions.findByHash(await sukuCrypto.sha256(body.refreshToken));
+    if (!session || session.expiresAt < Date.now()) throw new UnauthorizedException();
+    // Rotate: each refresh token works once.
+    await sessions.delete(session.id);
+    const user = await users.findById(session.userId);
+    if (!user) throw new UnauthorizedException();
+    return issue(user, tokens, sessions);
+  },
+});
+
+export const logout = route.post('/auth/logout', {
+  body: z.object({ refreshToken: z.string() }),
+  services: { sessions: Sessions },
+  handle: async ({ body, sessions }) => {
+    await sessions.deleteByHash(await sukuCrypto.sha256(body.refreshToken));
+  },
+});
+```
+
+A plain `sha256` is right for the refresh token, because it is 256 random bits and cannot be
+guessed. Passwords are the opposite and need [`hashPassword`](/docs/crypto/passwords).
+
+## Protecting routes
+
+One middleware verifies the token and shares the result. A second, built with `allow`,
+checks roles declared on the route.
+
+```ts title="auth/authenticate.ts"
+import { Inject, type Middleware, type Next, RequestContext, Service, type ServiceOf, UnauthorizedException, allow } from '@suku/core';
+import sukuCrypto, { type JwtPayload } from '@suku/crypto';
+
+export type CurrentUser = JwtPayload<{ role: 'user' | 'admin' }>;
+
+@Service()
+export class Authenticate implements Middleware {
+  constructor(@Inject(Tokens) private readonly tokens: ServiceOf<typeof Tokens>) {}
+
+  async use(ctx: RequestContext, next: Next) {
+    const token = sukuCrypto.bearerToken(ctx.headers.get('authorization'));
+    if (!token) throw new UnauthorizedException();
+    try {
+      ctx.set('user', await this.tokens.verify(token));
+    } catch {
+      throw new UnauthorizedException();
+    }
+    return next();
+  }
+}
+
+export const requireRole = allow((ctx) => {
+  const roles = (ctx.route?.meta.roles as string[] | undefined) ?? [];
+  const user = ctx.get<CurrentUser>('user');
+  return roles.length === 0 || (user !== undefined && roles.includes(user.role));
+});
+```
+
+```ts
+@Routes('/reports', { middlewares: [Authenticate, requireRole] })
+export class ReportsRoutes {
+  list = route.get('/', { handle: ({ ctx }) => reportsFor(ctx.get<CurrentUser>('user')!.sub) });
+
+  remove = route.delete('/:id', {
+    meta: { roles: ['admin'] },
+    handle: ({ params }) => deleteReport(params.id),
+  });
+}
+```
+
+## Password reset links
+
+The link carries an encrypted, expiring payload, so there is no reset-token table to manage.
+Binding it to the current password hash makes it single-use: once the password changes, the
+link stops working.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const Reset = service('reset-links', {
+  services: { env: Env },
+  create: ({ env }) => sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'password-reset' }),
+});
+
+export const requestReset = route.post('/auth/forgot', {
+  body: z.object({ email: z.email() }),
+  services: { users: Users, reset: Reset, mail: Mailer },
+  status: 202,
+  handle: async ({ body, users, reset, mail }) => {
+    const user = await users.findByEmail(body.email);
+    if (user) {
+      const token = await reset.seal({ id: user.id, v: await sukuCrypto.sha256(user.passwordHash) }, { ttl: '30m' });
+      await mail.sendReset(user.email, `https://app.example.com/reset?token=${token}`);
+    }
+    // Same answer either way, so the route does not reveal who has an account.
+  },
+});
+
+export const performReset = route.post('/auth/reset', {
+  body: z.object({ token: z.string().max(1000), password: z.string().min(10).max(200) }),
+  services: { users: Users, reset: Reset, sessions: Sessions },
+  handle: async ({ body, users, reset, sessions }) => {
+    const data = await reset.unseal<{ id: string; v: string }>(body.token);
+    const user = data && (await users.findById(data.id));
+    if (!user || data.v !== (await sukuCrypto.sha256(user.passwordHash))) {
+      throw new BadRequestException('This link is invalid or has expired');
+    }
+    await users.setPasswordHash(user.id, await sukuCrypto.hashPassword(body.password));
+    await sessions.deleteAllFor(user.id);   // sign out everywhere
+  },
+});
+```
+
+## Verifying webhooks
+
+A provider signs the raw request body with a secret you share. Verify against the exact bytes
+received, before parsing.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+export const paymentsWebhook = route.post('/webhooks/payments', {
+  services: { env: Env, orders: Orders },
+  handle: async ({ ctx, env, orders }) => {
+    const raw = await ctx.request.text();
+    const signature = ctx.headers.get('x-signature') ?? '';
+    if (!(await sukuCrypto.createSigner(env.WEBHOOK_SECRET).verify(raw, signature))) {
+      throw new UnauthorizedException();
+    }
+    await orders.handleEvent(JSON.parse(raw));
+  },
+});
+```
+
+Leave the route without a `body` schema, so nothing reads the body before you do.
+
+`verify` expects a base64url signature. Many providers send hex with a prefix, as in
+`sha256=ab12...`. Convert yours to the same form and compare in constant time.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const expected = `sha256=${sukuCrypto.hexEncode(sukuCrypto.base64urlDecode(await sukuCrypto.createSigner(secret).sign(raw)))}`;
+if (!sukuCrypto.timingSafeEqual(expected, ctx.headers.get('x-hub-signature-256') ?? '')) {
+  throw new UnauthorizedException();
+}
+```
+
+If the provider includes a timestamp in what it signs, reject events more than a few minutes
+old, so a captured request cannot be replayed later.
+
+## Encrypted cookie sessions
+
+For a server-rendered app, a sealed cookie is a session with no session table.
+
+```ts
+const Session = service('session-cookie', {
+  services: { env: Env },
+  create: ({ env }) => sukuCrypto.createSealer(env.COOKIE_SECRET, { purpose: 'session' }),
+});
+
+function readCookie(header: string | null, name: string): string | undefined {
+  return header
+    ?.split(';')
+    .map((part) => part.trim().split('='))
+    .find(([key]) => key === name)?.[1];
+}
+
+@Service()
+export class CookieAuth implements Middleware {
+  constructor(@Inject(Session) private readonly session: ServiceOf<typeof Session>) {}
+
+  async use(ctx: RequestContext, next: Next) {
+    const cookie = readCookie(ctx.headers.get('cookie'), 'session');
+    const data = cookie ? await this.session.unseal<{ userId: string }>(cookie) : undefined;
+    if (!data) throw new UnauthorizedException();
+    ctx.set('userId', data.userId);
+    return next();
+  }
+}
+```
+
+The trade-off is the same as with JWTs: a sealed cookie cannot be revoked before its `ttl`.
+Keep the lifetime short, or keep a server-side list of revoked session ids.
+
+## API keys
+
+Show the key once, store only its hash, and look it up by that hash.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+export const createApiKey = route.post('/api-keys', {
+  middlewares: [Authenticate],
+  services: { keys: ApiKeys },
+  handle: async ({ ctx, keys }) => {
+    const key = `sk_${sukuCrypto.randomToken()}`;
+    await keys.create({ userId: ctx.get<CurrentUser>('user')!.sub, hash: await sukuCrypto.sha256(key), prefix: key.slice(0, 7) });
+    return { key };   // the only time it is ever shown
+  },
+});
+
+export const apiKeyAuth = middleware(async (ctx, next) => {
+  const key = ctx.headers.get('x-api-key');
+  const record = key ? await ctx.provider.get(ApiKeys).findByHash(await sukuCrypto.sha256(key)) : undefined;
+  if (!record) throw new UnauthorizedException();
+  ctx.set('userId', record.userId);
+  return next();
+});
+```
+
+A recognisable prefix such as `sk_` lets secret scanners catch keys committed by mistake, and
+storing the first few characters lets users tell their keys apart.
+
+## One-time codes
+
+For email or SMS verification, generate the code without bias, store only a hash, and limit
+attempts. A six-digit code has a million possibilities, so the attempt limit is what makes
+it safe.
+
+```ts
+import sukuCrypto from '@suku/crypto';
+
+const code = String(sukuCrypto.randomInt(0, 1_000_000)).padStart(6, '0');
+await codes.save({ userId, hash: await sukuCrypto.sha256(`${userId}:${code}`), expiresAt: Date.now() + 10 * 60_000, attempts: 0 });
+
+// Later
+const entry = await codes.find(userId);
+if (!entry || entry.expiresAt < Date.now() || entry.attempts >= 5) throw new BadRequestException('Code expired');
+await codes.incrementAttempts(userId);
+if (!sukuCrypto.timingSafeEqual(entry.hash, await sukuCrypto.sha256(`${userId}:${submitted}`))) throw new BadRequestException('Wrong code');
+await codes.delete(userId);
+```
+
+## OAuth state
+
+The `state` parameter must come back unchanged, and should be tied to the browser that
+started the flow. A sealed value does both without storage.
+
+```ts
+const State = sukuCrypto.createSealer(env.APP_SECRET, { purpose: 'oauth-state' });
+
+const nonce = sukuCrypto.randomToken(16);
+const state = await State.seal({ nonce, returnTo: '/dashboard' }, { ttl: '10m' });
+// Set `nonce` in an HttpOnly cookie, then redirect to the provider with `state`.
+
+// In the callback:
+const data = await State.unseal<{ nonce: string; returnTo: string }>(query.state);
+if (!data || !sukuCrypto.timingSafeEqual(data.nonce, cookieNonce)) throw new BadRequestException('Invalid state');
+```
