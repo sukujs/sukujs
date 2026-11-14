@@ -69,7 +69,7 @@ need them.
 Anything that can call a fetch handler can host Suku through `app.handle`.
 
 ```ts
-export default { fetch: app.handle };   // Cloudflare Workers, Deno.serve, ...
+export default { fetch: (request: Request) => app.handle(request) };   // Cloudflare Workers, Deno, ...
 ```
 
 Official adapters for those runtimes are not published yet. For VPS (PM2, systemd), Docker

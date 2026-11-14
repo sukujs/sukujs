@@ -1,70 +1,156 @@
 ---
 title: Deployment
-description: Run a Suku app on a VPS, Docker, Cloudflare Workers, or Vercel.
+description: Run a Suku app on a VPS, in Docker, on Cloudflare Workers, or on Vercel.
 icon: Rocket
 ---
 
-Suku's kernel is a Fetch `Request` → `Response` function. On a VPS or in Docker you call
-`app.listen()` with a Node or Bun adapter. On Cloudflare and Vercel you export `app.handle`
-and let the platform call it.
+Suku's kernel is a Fetch `Request` → `Response` function, and there are two ways to host it.
+
+- **A long-lived process.** On a VPS or in Docker you call `app.listen()` with the Node or Bun
+  adapter.
+- **A platform that calls you.** On Cloudflare Workers and Vercel you pass each request to
+  `app.handle` and never listen.
+
+| Host | How Suku runs | Use when |
+| --- | --- | --- |
+| [VPS + PM2](#vps-with-pm2) | `listen()` under a process manager | A simple always-on API, several Node workers |
+| [VPS + systemd](#vps-with-systemd) | `listen()` under a unit file | No extra runtime, tight control of the OS |
+| [Docker Compose](#docker-compose) | `listen()` in a container | Reproducible deploys, several services together |
+| [Cloudflare Workers](#cloudflare-workers) | `app.handle` | Low latency everywhere, no servers |
+| [Vercel](#vercel) | `app.handle` in a function | Preview deploys next to a front end |
 
 ## Before you deploy
 
+### Validate configuration at startup
+
+Load the environment through [`defineConfig`](/docs/configuration). A missing or malformed
+variable then stops the process before it listens, and your process manager reports the
+failure instead of serving errors.
+
+```ts title="src/main.ts"
+const app = await Suku.create({ features: [Env.load(), AppFeature], adapter: nodeAdapter() });
+const env = app.get(Env);
+```
+
 ### Build for Node
 
-Node cannot run TypeScript decorators. Bundle (or compile) before start:
+Node cannot run TypeScript decorators, so bundle before you start.
 
 ```bash
 bun build src/main.ts --target node --outdir dist
 node dist/main.js
 ```
 
-Bun can run `src/main.ts` directly in production if you prefer.
+- Bun reads `experimentalDecorators` and `emitDecoratorMetadata` from your `tsconfig.json`, so
+  constructor injection keeps working in the bundle.
+- The bundle contains your dependencies. `dist/main.js` runs on its own, without
+  `node_modules`.
+- Packages with native code cannot be bundled. Keep them out with `--external`, and ship
+  `node_modules` for those: `bun build src/main.ts --target node --outdir dist --external pg-native`.
+- The output is an ES module. Set `"type": "module"` in `package.json`.
+
+Bun can also run `src/main.ts` directly in production, with no build step.
 
 ### Bind the right host
 
-`app.listen(3000)` listens on `0.0.0.0`. Behind a reverse proxy, bind loopback only:
+`app.listen(3000)` listens on `0.0.0.0`, which is what a container needs. Behind a reverse
+proxy on the same machine, bind loopback so nothing reaches the app except through the proxy.
 
 ```ts
-await app.listen({ port: 3000, hostname: '127.0.0.1' });
+await app.listen({ port: env.PORT, hostname: '127.0.0.1' });
 ```
 
 ### Shut down cleanly
 
-Stop accepting connections, finish in-flight work, then dispose singletons:
+On `SIGTERM`, `app.close()` stops accepting connections, lets requests in flight finish, then
+disposes singletons such as a database pool. Add a deadline so one stuck request cannot block
+a deploy.
 
-```ts
-const server = await app.listen(env.PORT);
+```ts title="src/main.ts"
+const server = await app.listen({ port: env.PORT, hostname: '127.0.0.1' });
 console.log(`listening on ${server.url}`);
 
+let closing = false;
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    void app.close().then(() => process.exit(0));
+    if (closing) return;
+    closing = true;
+    const deadline = setTimeout(() => void app.close({ force: true }), 10_000);
+    void app.close().finally(() => {
+      clearTimeout(deadline);
+      process.exit(0);
+    });
   });
 }
 ```
 
-`app.close({ force: true })` also drops open connections.
+`app.close({ force: true })` also drops connections that are still open. Keep the deadline
+shorter than the time your process manager waits before it kills the process: 30 seconds
+below for systemd, 10 seconds by default for `docker stop`.
 
-### Health check
+### Health checks
 
-Expose a cheap route your process manager or load balancer can hit:
+Expose a cheap route for your process manager or load balancer.
 
 ```ts
-const health = route.get('/health', { handle: () => ({ ok: true }) });
+const health = route.get('/health', { handle: () => ({ status: 'ok' }) });
 ```
+
+If the app uses a database, add a separate readiness route that checks it. See
+[health checks](/docs/database#health-checks).
+
+### Behind a proxy
+
+Almost every deployment has a proxy or load balancer in front. Three things change, and none
+of them is automatic.
+
+- **The client address is the proxy's.** `ctx.remoteAddress` is the socket's peer. Tell the
+  rate limiter how many proxies you run, or every user shares one counter.
+
+  ```ts
+  rateLimit({ limit: 300, window: '1m', trustProxy: 1 });
+  ```
+
+  Set this only when a proxy really is in front. `X-Forwarded-For` is a header anyone can
+  send. See [rate limiting](/docs/security/rate-limiting#behind-a-proxy).
+
+- **The `Host` header must be preserved.** [CSRF](/docs/security/csrf) origin mode compares
+  the request's `Origin` with its `Host`. Nginx and Apache replace `Host` unless you tell them
+  not to. The configurations below do.
+
+- **`ctx.url` says `http`.** TLS ends at the proxy, so the app sees plain HTTP. Build public
+  links from a configured base URL, not from `ctx.url`.
+
+### Several processes
+
+PM2 cluster mode, more than one container, and every serverless platform run several copies
+of your app. Each copy has its own memory.
+
+- The default rate-limit store is per process, so a limit of 100 becomes 100 per copy. Use a
+  shared store. See [more than one instance](/docs/security/rate-limiting#more-than-one-instance).
+- Each copy opens its own database pool. See
+  [pool size](/docs/database#connections-and-pool-size).
+- Anything cached in a singleton is cached once per copy.
+
+### Deploy order
+
+1. Install dependencies and build.
+2. Run database [migrations](/docs/database#migrations).
+3. Start or reload the app.
+4. Check `/health` before sending traffic.
 
 ---
 
 ## VPS with PM2
 
-Works for Node or Bun on a Linux VPS. Put Nginx, Caddy or Apache in front for TLS (see
-[Reverse proxy](#reverse-proxy) below).
+Works for Node or Bun on a Linux VPS. Put Caddy, Nginx or Apache in front for TLS. See
+[Reverse proxy](#reverse-proxy).
 
-### 1. Build and start script
+### 1. Build and start scripts
 
 ```json title="package.json"
 {
+  "type": "module",
   "scripts": {
     "build": "bun build src/main.ts --target node --outdir dist",
     "start": "node dist/main.js"
@@ -80,26 +166,27 @@ module.exports = {
     {
       name: 'api',
       script: 'dist/main.js',
-      instances: 'max', // or 1 for Bun / sticky sessions
-      exec_mode: 'cluster', // Node only; use fork for Bun
+      instances: 'max', // one worker per CPU core
+      exec_mode: 'cluster', // Node only
+      kill_timeout: 15000, // longer than the shutdown deadline in main.ts
+      max_memory_restart: '512M',
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
       },
-      max_memory_restart: '512M',
     },
   ],
 };
 ```
 
-For Bun instead of a bundle:
+Cluster mode shares one port between the workers. Read [several processes](#several-processes)
+before you turn it on. To run on Bun instead, use one process in fork mode:
 
 ```js
 {
   name: 'api',
-  script: 'bun',
-  args: 'run src/main.ts',
-  interpreter: 'none',
+  script: 'src/main.ts',
+  interpreter: 'bun',
   instances: 1,
   exec_mode: 'fork',
   env: { PORT: 3000 },
@@ -110,31 +197,34 @@ For Bun instead of a bundle:
 
 ```bash
 git pull
-bun install --production
+bun install --frozen-lockfile
 bun run build
-pm2 start ecosystem.config.cjs
+# run database migrations here
+pm2 startOrReload ecosystem.config.cjs
 pm2 save
-pm2 startup   # enable on boot
 ```
 
-Useful commands: `pm2 logs api`, `pm2 reload api` (zero-downtime on Node cluster),
-`pm2 restart api`.
+Run `pm2 startup` once so the app comes back after a reboot. `pm2 reload` restarts cluster
+workers one at a time, so the API stays up. Logs are in `pm2 logs api`.
 
 ---
 
 ## VPS with systemd
 
-No PM2 — a unit file owns the process.
+No process manager to install: a unit file owns the process, restarts it, and collects its
+logs.
 
 ```ini title="/etc/systemd/system/suku-api.service"
 [Unit]
 Description=Suku API
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=www-data
 WorkingDirectory=/var/www/api
+Environment=NODE_ENV=production
 EnvironmentFile=/var/www/api/.env
 ExecStart=/usr/bin/node dist/main.js
 Restart=on-failure
@@ -142,15 +232,18 @@ RestartSec=5
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Hardening (optional)
+# Hardening
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-For Bun, set `ExecStart=/usr/local/bin/bun run src/main.ts`.
+For Bun, set `ExecStart=/usr/local/bin/bun run src/main.ts`. Make `.env` readable only by the
+service user: `chmod 600 /var/www/api/.env`.
 
 ```bash
 sudo systemctl daemon-reload
@@ -159,22 +252,24 @@ sudo systemctl status suku-api
 journalctl -u suku-api -f
 ```
 
-Reload after a deploy:
+After a deploy:
 
 ```bash
-bun run build
+bun install --frozen-lockfile && bun run build
 sudo systemctl restart suku-api
 ```
 
-Use a [reverse proxy](#reverse-proxy) in front for TLS.
+A restart drops the port for a moment. Requests in flight finish first, because of the
+shutdown handler, but new ones are refused until the process is back. For no gap at all, run
+two units on different ports behind the proxy and restart them one at a time.
 
 ---
 
 ## Reverse proxy
 
-Bind the app to loopback (`127.0.0.1:3000`) and terminate TLS at the proxy. Forward
-`Host`, `X-Forwarded-For` and `X-Forwarded-Proto` so `@sukujs/security` rate limits and CSRF
-see the real client. Point trusted-proxy options at this hop.
+Bind the app to loopback (`127.0.0.1:3000`) and end TLS at the proxy. Each configuration below
+keeps the original `Host` and adds `X-Forwarded-For`. See [behind a proxy](#behind-a-proxy)
+for what the app needs on its side.
 
 <Tabs items={['Caddy', 'Nginx', 'Apache']}>
   <Tab value="Caddy">
@@ -187,9 +282,6 @@ see the real client. Point trusted-proxy options at this hop.
     ```
 
     Headers are set for you. Reload with `caddy reload --config /etc/caddy/Caddyfile`.
-
-    With Docker Compose, add a Caddy service and proxy to `api:3000` on the compose network
-    instead of `127.0.0.1`.
   </Tab>
   <Tab value="Nginx">
     ```nginx title="/etc/nginx/sites-available/api"
@@ -197,17 +289,26 @@ see the real client. Point trusted-proxy options at this hop.
       listen 443 ssl http2;
       server_name api.example.com;
 
-      # ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
-      # ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+      ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+      # Keep this in step with Suku's bodyLimit.
+      client_max_body_size 1m;
 
       location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Real-IP $remote_addr;
       }
+    }
+
+    server {
+      listen 80;
+      server_name api.example.com;
+      return 301 https://$host$request_uri;
     }
     ```
 
@@ -215,9 +316,12 @@ see the real client. Point trusted-proxy options at this hop.
     sudo ln -s /etc/nginx/sites-available/api /etc/nginx/sites-enabled/
     sudo nginx -t && sudo systemctl reload nginx
     ```
+
+    For streamed responses, such as server-sent events, add `proxy_buffering off;` to the
+    location.
   </Tab>
   <Tab value="Apache">
-    Enable the proxy modules, then add a vhost:
+    Enable the proxy modules, then add a vhost.
 
     ```bash
     sudo a2enmod proxy proxy_http headers ssl
@@ -228,19 +332,18 @@ see the real client. Point trusted-proxy options at this hop.
       ServerName api.example.com
 
       SSLEngine on
-      # SSLCertificateFile    /etc/letsencrypt/live/api.example.com/fullchain.pem
-      # SSLCertificateKeyFile /etc/letsencrypt/live/api.example.com/privkey.pem
+      SSLCertificateFile    /etc/letsencrypt/live/api.example.com/fullchain.pem
+      SSLCertificateKeyFile /etc/letsencrypt/live/api.example.com/privkey.pem
 
       ProxyPreserveHost On
       ProxyPass        / http://127.0.0.1:3000/
       ProxyPassReverse / http://127.0.0.1:3000/
 
       RequestHeader set X-Forwarded-Proto "https"
-      RequestHeader set X-Forwarded-Port "443"
     </VirtualHost>
     ```
 
-    Apache sets `X-Forwarded-For` when acting as a proxy. Enable and reload:
+    Apache adds `X-Forwarded-For` itself when it proxies.
 
     ```bash
     sudo a2ensite api
@@ -254,6 +357,8 @@ see the real client. Point trusted-proxy options at this hop.
 ## Docker Compose
 
 ### Dockerfile
+
+The bundle carries its dependencies, so the final image needs only Node and one file.
 
 ```dockerfile title="Dockerfile"
 # syntax=docker/dockerfile:1
@@ -269,22 +374,36 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 COPY --from=build /app/package.json ./
-COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
 ```
 
-Skip the Node stage and run Bun if you prefer a single-runtime image:
+If you marked packages `--external`, also copy `node_modules` into the runner.
 
-```dockerfile
+```text title=".dockerignore"
+node_modules
+dist
+.git
+.env
+```
+
+In a container the app must listen on `0.0.0.0`, not loopback, or the port mapping reaches
+nothing. Use the exec form of `CMD`, as above, so `SIGTERM` reaches Node and the shutdown
+handler runs.
+
+To run on Bun with no build step:
+
+```dockerfile title="Dockerfile"
 FROM oven/bun:1
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 COPY . .
+ENV NODE_ENV=production
 ENV PORT=3000
+USER bun
 EXPOSE 3000
 CMD ["bun", "run", "src/main.ts"]
 ```
@@ -295,28 +414,36 @@ CMD ["bun", "run", "src/main.ts"]
 services:
   api:
     build: .
-    ports:
-      - '3000:3000'
     env_file: .env
     environment:
       PORT: 3000
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 15s
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 30s
       timeout: 3s
       retries: 3
-```
 
-```bash
-docker compose up -d --build
-docker compose logs -f api
-```
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: app
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-Put [Caddy, Nginx or Apache](#reverse-proxy) in the same compose file for TLS, or terminate TLS
-at your cloud load balancer. With Caddy as a sibling service:
-
-```yaml
   caddy:
     image: caddy:2
     ports:
@@ -326,8 +453,10 @@ at your cloud load balancer. With Caddy as a sibling service:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     depends_on: [api]
+    restart: unless-stopped
 
 volumes:
+  db_data:
   caddy_data:
 ```
 
@@ -337,78 +466,146 @@ api.example.com {
 }
 ```
 
+Only Caddy publishes ports. The API and the database are reachable on the compose network
+alone. `depends_on` with `service_healthy` starts the API after PostgreSQL accepts
+connections, which matters because Suku [fails fast](/docs/database#startup-and-shutdown) when
+the database is not there.
+
+```bash
+docker compose up -d --build
+docker compose logs -f api
+```
+
 ---
 
 ## Cloudflare Workers
 
-There is no `@sukujs/platform-cloudflare` yet. Workers already speak Fetch, so export
-`app.handle`.
+Workers already speak Fetch, so there is no adapter: pass each request to `app.handle`.
+`@sukujs/core`, `@sukujs/crypto` and `@sukujs/security` use only Web APIs and run without the
+`nodejs_compat` flag.
 
 ### Entry
 
 ```ts title="src/worker.ts"
-import { Suku, route } from '@sukujs/core';
-import { z } from 'zod';
+import { route, Suku } from '@sukujs/core';
 
 const hello = route.get('/hello/:name', {
   handle: ({ params }) => ({ message: `Hello, ${params.name}` }),
 });
 
-const app = await Suku.create({
-  routes: [hello],
-  // no adapter — Workers call handle(), they do not listen()
-});
+// No adapter: Workers call handle(), they do not listen().
+const app = await Suku.create({ routes: [hello] });
 
 export default {
-  fetch: app.handle,
+  fetch: (request: Request) => app.handle(request),
 };
 ```
 
-For bindings (secrets, KV, D1), create the app once and close over `env` in a wrapper, or
-resolve config inside a middleware from request-scoped state you attach yourself.
+Write `fetch` as a function that passes only the request. Workers call it with
+`(request, env, ctx)`, and `app.handle` takes its own second argument.
+
+### Bindings and secrets
+
+Variables, secrets, KV and D1 arrive in `env` with the first request, not at import time. So
+create the app on the first request and keep it. [`defineConfig`](/docs/configuration)
+validates the bindings like any other source.
+
+```ts title="src/worker.ts"
+import { defineConfig, Suku, type SukuApplication } from '@sukujs/core';
+import { z } from 'zod';
+import { AppFeature } from './app';
+
+export const Env = defineConfig('env', z.object({ JWT_SECRET: z.string().min(32) }));
+
+let app: Promise<SukuApplication> | undefined;
+
+const createApp = async (env: Record<string, unknown>) =>
+  Suku.create({ features: [await Env.load({ ...env }), AppFeature] });
+
+export default {
+  async fetch(request: Request, env: Record<string, unknown>): Promise<Response> {
+    app ??= createApp(env);
+    const { handle } = await app;
+    const remoteAddress = request.headers.get('cf-connecting-ip') ?? undefined;
+    return handle(request, remoteAddress ? { remoteAddress } : undefined);
+  },
+};
+```
+
+Routes then take `Env` as a service, as they do everywhere else. Passing `cf-connecting-ip`
+as `remoteAddress` gives the rate limiter the real client address, with no `trustProxy`.
+
+### Constructor injection
+
+Wrangler bundles with esbuild, which does not emit decorator metadata. A `@Routes` class or a
+`@Service` with constructor parameters then fails at startup with "no type metadata was
+emitted". Pick one of two fixes.
+
+**List the dependencies.** No build step, and it works with any bundler.
+
+```ts
+@Routes('/users')
+export class UsersRoutes {
+  static inject = [UsersService];
+
+  constructor(private readonly users: UsersService) {}
+}
+```
+
+**Or bundle with Bun first**, which does emit the metadata, and point Wrangler at the result.
+
+```bash
+bun build src/worker.ts --target browser --format esm --outfile dist/worker.js
+```
+
+Classless `route.*` and `service()` need neither.
 
 ### Wrangler
 
-```toml title="wrangler.toml"
-name = "suku-api"
-main = "src/worker.ts"
-compatibility_date = "2024-11-01"
-compatibility_flags = ["nodejs_compat"]
-
-[build]
-command = "bun run build:worker"
-```
-
-Bundle so decorator metadata survives (plain `route.*` apps need less ceremony):
-
-```bash
-bun build src/worker.ts --outfile dist/worker.js --target bun
-# or: wrangler deploy with a bundler plugin that keeps experimentalDecorators
+```jsonc title="wrangler.jsonc"
+{
+  "name": "suku-api",
+  "main": "src/worker.ts", // or dist/worker.js when you bundle with Bun
+  "compatibility_date": "2026-11-01"
+}
 ```
 
 ```bash
+npx wrangler dev      # run locally in the Workers runtime
+npx wrangler secret put JWT_SECRET
 npx wrangler deploy
 ```
 
-<Callout type="warn">
-  Avoid Node-only APIs (`fs`, `node:http`, native addons). Prefer Web Crypto — `@sukujs/crypto`
-  is built for edge. Official Cloudflare adapter and first-class binding helpers are not
-  published yet.
-</Callout>
+### What is different on Workers
+
+- **No Node-only APIs.** `fs`, `node:http` and native addons are not available.
+- **Many short-lived instances.** The default rate-limit store is per instance, so it limits
+  little here. Use a [shared store](/docs/security/rate-limiting#more-than-one-instance) or
+  Cloudflare's own rate limiting rules.
+- **CPU time is limited.** `hashPassword` is slow on purpose and can exceed the CPU limit of
+  the free plan. Check your plan's limit before you hash passwords in a Worker.
+- **Nothing calls `app.close()`.** `dispose` does not run, so do not rely on it.
+- **Databases.** Use an HTTP driver, D1, or Hyperdrive. See
+  [serverless and edge](/docs/database#serverless-and-edge).
 
 ---
 
 ## Vercel
 
-Same idea as Workers: no `listen()`, export a Fetch handler. Use a catch-all serverless
-function so every path reaches Suku.
+The same idea as Workers: no `listen()`, one function that passes every request to Suku.
+Use the Node.js runtime, which Vercel recommends over the Edge runtime.
 
-### App module
+<Callout>
+  The Workers and Node sections on this page were run against the published packages. This
+  one follows Vercel's documentation for the `fetch` export and has not been run by our tests.
+</Callout>
+
+### App
 
 ```ts title="src/app.ts"
-import { Suku, route } from '@sukujs/core';
+import { route, Suku } from '@sukujs/core';
 
-const health = route.get('/health', { handle: () => ({ ok: true }) });
+const health = route.get('/health', { handle: () => ({ status: 'ok' }) });
 const hello = route.get('/hello/:name', {
   handle: ({ params }) => ({ message: `Hello, ${params.name}` }),
 });
@@ -416,24 +613,22 @@ const hello = route.get('/hello/:name', {
 export const app = await Suku.create({ routes: [health, hello] });
 ```
 
-### Serverless entry
+### Function
 
-```ts title="api/[[...path]].ts"
+Keep one function for the whole API. A file per endpoint would build a separate function for
+each and start each one cold.
+
+```ts title="api/index.ts"
 import { app } from '../src/app';
 
-export const config = { runtime: 'edge' }; // or omit for Node
-
 export default {
-  async fetch(request: Request): Promise<Response> {
-    return app.handle(request);
-  },
+  fetch: (request: Request) => app.handle(request),
 };
 ```
 
-On the Node runtime, ensure your build emits decorator metadata if you use `@Routes` /
-constructor injection. Edge prefers plain `route.*` handlers and Web APIs only.
+### Routing
 
-### Project config
+Send every path to that function.
 
 ```json title="vercel.json"
 {
@@ -442,24 +637,39 @@ constructor injection. Edge prefers plain `route.*` handlers and Web APIs only.
 ```
 
 ```bash
+vercel dev            # run locally
 vercel deploy --prod
 ```
 
-Set secrets in the Vercel project environment. Long-lived sockets, local disk, and heavy
-startup work are a poor fit for serverless — keep cold starts small or prefer a VPS / Docker
-host for always-on workloads.
+### What is different on Vercel
+
+- **Set `"type": "module"`** in `package.json`, so the function is an ES module and top-level
+  `await` works.
+- **No `paths` aliases.** Vercel compiles TypeScript with your `tsconfig.json` but does not
+  support path mappings. Use relative imports.
+- **Constructor injection.** If startup fails with "no type metadata was emitted", list
+  dependencies with `static inject`, as in the [Workers section](#constructor-injection).
+- **Environment variables** come from the project settings and are in `process.env`, so
+  `Env.load()` works unchanged.
+- **Instances come and go.** The notes on [several processes](#several-processes) and
+  [serverless databases](/docs/database#serverless-and-edge) apply.
+
+Long-lived connections, local disk and heavy startup work fit poorly here. For an always-on
+API, a VPS or a container is simpler.
 
 ---
 
-## Choosing a host
+## Checklist
 
-| Host | How Suku runs | Use when |
-| --- | --- | --- |
-| VPS + PM2 | `listen()` + process manager | Simple always-on API, Node cluster |
-| VPS + systemd | `listen()` + unit file | No extra runtime deps, tight OS control |
-| Docker Compose | `listen()` in a container | Reproducible deploys, multi-service stacks |
-| Cloudflare Workers | `app.handle` | Edge latency, global distribution |
-| Vercel | `app.handle` in a function | Preview deploys, serverless APIs |
+- Configuration is validated at startup, and secrets come from the environment.
+- The app binds `127.0.0.1` behind a local proxy, and `0.0.0.0` in a container.
+- `SIGTERM` calls `app.close()`, with a deadline shorter than the process manager's.
+- `/health` exists and the platform checks it.
+- TLS ends at a proxy that preserves `Host`, and `trustProxy` matches the number of proxies.
+- Rate limits use a shared store when more than one copy runs.
+- Migrations run before the new version starts.
+- [Security headers](/docs/security/security-headers) and [CORS](/docs/security/cors) are
+  configured for the public origin.
 
-See [Node and Bun](/docs/platforms) for adapters, `listen` / `close`, and writing your own
-adapter.
+See [Node and Bun](/docs/platforms) for the adapters, `listen` and `close`, and writing your
+own adapter.

@@ -183,45 +183,178 @@ and throws inside the transaction to roll it back while keeping that response.
 
 Keep these transactions short. Do not call other services over the network while one is open.
 
+## From tests to production
+
+The guides run on in-process databases so the tests need no server. In production you change
+the driver in the connection service and nothing else. The repository, the routes and the
+error mapping stay as they are.
+
+| Library | Tested here with | In production, typically | Migrations |
+| --- | --- | --- | --- |
+| Drizzle | `drizzle-orm/bun-sqlite` | `drizzle-orm/node-postgres`, `postgres-js` or `mysql2` | `drizzle-kit migrate` |
+| Prisma | `@prisma/adapter-libsql` | `@prisma/adapter-pg` | `prisma migrate deploy` |
+| TypeORM | `sqljs` | `postgres` or `mysql` | `typeorm migration:run -d data-source.js` |
+| Sequelize | `sqlite` | `postgres` or `mysql` | `sequelize-cli db:migrate` |
+| sqlkit | PGlite executor | `PostgresAdapter` over a `pg` pool | any SQL migration tool |
+| Kysely | PGlite dialect | `PostgresDialect` over a `pg` pool | `kysely-ctl migrate` or its `Migrator` |
+
+One thing does change with the database: how a unique violation is reported. Check the table
+in [step 3](#3-database-errors-become-domain-errors) when you switch.
+
 ## Guidelines
 
-**Configuration.** Validate the connection string at startup with
-[`defineConfig`](/docs/configuration), so a missing one stops the app before it listens.
+### Configuration
+
+Validate the connection string at startup with [`defineConfig`](/docs/configuration), so a
+missing one stops the app before it listens.
 
 ```ts
-export const Env = defineConfig('env', z.object({ DATABASE_URL: z.url() }));
+export const Env = defineConfig(
+  'env',
+  z.object({
+    DATABASE_URL: z.url(),
+    DATABASE_POOL_SIZE: z.coerce.number().int().min(1).default(10),
+  }),
+);
 ```
 
-**One pool per process.** The connection service is a singleton. Never open a connection per
-request.
+Keep the URL in the environment or a secret store, never in the repository. Give the app its
+own database user that can read and write rows but cannot alter tables. Migrations run as a
+different user.
 
-**Do not scope the connection.** A scoped connection service would connect on every request.
+### Connections and pool size
+
+**One pool per process.** The connection service is a singleton. Never open a connection per
+request, and never make the connection service `scoped`: it would connect on every request.
 Scope only things that are truly per request, such as a transaction handle.
 
-**Run migrations separately.** Run them as a deploy step, not when the app starts. Several
-instances starting at once would race, and a slow migration would fail health checks.
-`synchronize` and `sync()` are for tests and prototypes only.
+**Size the pool for the whole fleet.** Every instance of your app has its own pool.
 
-**Pool size.** Total connections are the pool size times the number of instances. Keep that
-under your database's limit, with room for migrations and consoles.
+```text
+connections used = pool size × instances (PM2 workers, containers, replicas)
+```
 
-**Health checks.** Give the connection service a `ping()` and call it from a route.
+Keep that under the database's connection limit, with room for migrations and a console. Ten
+connections on each of eight PM2 workers is eighty. If the number gets large, put a pooler
+such as PgBouncer in front of PostgreSQL and keep the per-instance pool small.
+
+### Timeouts
+
+A stuck query should fail, not hold a connection forever. Set limits in the driver. With `pg`:
 
 ```ts
-route.get('/health', {
-  services: { db: Database },
-  handle: async ({ db }) => ({ database: (await db.ping()) ? 'up' : 'down' }),
+const pool = new Pool({
+  connectionString: env.DATABASE_URL,
+  max: env.DATABASE_POOL_SIZE,
+  connectionTimeoutMillis: 5_000, // waiting for a free connection
+  idleTimeoutMillis: 30_000, // closing idle connections
+  statement_timeout: 10_000, // the server cancels a statement after 10 s
 });
 ```
 
-**Timeouts.** Set a statement timeout in the driver. A stuck query should fail, not hold a
-connection forever.
+Other drivers have the same three ideas under other names: how long to wait for a connection,
+how long an idle one lives, and how long one statement may run.
+
+<Callout>
+  The pool options above are `pg`'s and are not run by the test suite, because they need a
+  PostgreSQL server. The health check and pagination below are tested in `examples/database`.
+</Callout>
+
+### Startup and shutdown
+
+**Fail fast at startup.** The async feature in [step 1](#1-a-service-owns-the-connection)
+awaits the connection, so `Suku.create` rejects when the database is unreachable and the
+process exits before it accepts traffic. Let your process manager restart it. Do not add a
+retry loop that hides a wrong URL.
+
+**Close in order.** `app.close()` stops accepting requests, lets the ones in flight finish,
+then disposes singletons. That is when `dispose` closes the pool, so no request loses its
+connection halfway. Wire it to `SIGTERM` as shown in
+[deployment](/docs/deployment#shut-down-cleanly).
+
+### Health checks
+
+Use two routes. **Liveness** says the process is running and must not touch the database, or
+a database outage would make your orchestrator restart healthy processes. **Readiness** says
+this instance can serve traffic, and does check the database.
+
+```ts
+export const health = route.get('/health', { handle: () => ({ status: 'ok' }) });
+
+export const ready = route.get('/ready', {
+  services: { db: Database },
+  handle: async ({ db }) => {
+    if (!(await db.ping())) throw new ServiceUnavailableException('Database is not reachable');
+    return { status: 'ready' };
+  },
+});
+```
+
+`ping()` runs `select 1` and returns `false` instead of throwing. A `503` from `/ready` takes
+the instance out of rotation until the database is back.
+
+### Migrations
+
+Run them as a deploy step, before the new version starts, never when the app boots. Several
+instances starting at once would race, and a slow migration would fail health checks.
+`synchronize` and `sync()` are for tests and prototypes only.
+
+During a rolling deploy the old and the new version run against the same schema for a while,
+so make each migration compatible with the version before it. To rename a column: add the new
+one, deploy code that writes both, backfill, deploy code that reads the new one, then drop the
+old one.
+
+### Pagination
+
+Never return a whole table. Validate the page in the route's `query` schema and cap the limit.
+Keyset pagination, "rows after this id", stays fast however deep the page is, unlike `OFFSET`.
+
+```ts
+const Page = z.object({
+  after: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const listUsers = route.get('/users', {
+  query: Page,
+  services: { users: UsersRepository },
+  handle: async ({ query, users }) => {
+    const rows = await users.listAfter(query.after, query.limit + 1);
+    const items = rows.slice(0, query.limit);
+    return { items, next: rows.length > query.limit ? items.at(-1)!.id : null };
+  },
+});
+```
+
+Asking for one row more than the limit tells you whether there is a next page without a
+second `count` query.
+
+### Queries
 
 **Never build SQL from input.** Use your library's parameters. The route's
 [schemas](/docs/validation) reject malformed input, and parameters stop injection.
 
 **Do not return rows directly.** Give routes a `response` schema, so a new column such as a
 password hash cannot leak. See [validation](/docs/validation#responses).
+
+**Watch for queries in a loop.** Loading a list and then one related row per item is one query
+plus one per row. Load the related rows in a single query with a join or an `IN` list.
+
+**Stop work nobody is waiting for.** `request.signal` aborts when the client disconnects.
+Pass it to drivers that accept one for long reports and exports.
+
+### Serverless and edge
+
+On Cloudflare Workers and Vercel there is no long-lived process, so the rules change:
+
+- Many instances run at once, each with its own pool. Set the pool size to `1` and let a
+  pooler hold the real connections: Hyperdrive on Cloudflare, PgBouncer, or your provider's
+  pooled connection string.
+- Workers cannot open raw TCP sockets from most Node drivers without extra setup. Prefer an
+  HTTP or WebSocket driver, such as the ones from Neon, Turso or PlanetScale, or D1.
+- Nothing calls `app.close()`, so `dispose` never runs. Do not rely on it to flush anything.
+- Create the app once per instance, not per request. See
+  [deployment](/docs/deployment#cloudflare-workers).
 
 ## Testing
 
@@ -235,4 +368,18 @@ const app = await Suku.create({
 ```
 
 For tests that should exercise real SQL, an in-process database needs no server: SQLite for
-most libraries, or PGlite for PostgreSQL. That is how this repository tests every guide.
+most libraries, or PGlite for PostgreSQL. That is how this repository tests every guide. Give
+each test its own database, in memory or in a temporary file, so tests can run in parallel
+and never see each other's rows.
+
+## Production checklist
+
+- The connection string is validated at startup and comes from the environment.
+- The connection service is a singleton registered with `factory`, and has `dispose`.
+- Pool size times instances is below the database's connection limit.
+- Connection, idle and statement timeouts are set.
+- Migrations run as a deploy step and are compatible with the previous version.
+- `/health` does not touch the database and `/ready` does.
+- List routes are paginated with a capped limit.
+- Routes that return rows have a `response` schema.
+- `SIGTERM` calls `app.close()`.
