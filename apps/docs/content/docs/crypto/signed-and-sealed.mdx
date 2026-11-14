@@ -91,24 +91,28 @@ also record it server-side. See
 
 ## Cookies
 
-Suku returns Fetch `Response` objects, so a cookie is a header.
-
 ```ts
 route.post('/session', {
   body: Login,
-  handle: async ({ body }) => {
+  status: 200,
+  handle: async ({ body, ctx }) => {
     const user = await authenticate(body);
-    const value = await sealer.seal({ userId: user.id }, { ttl: '7d' });
-    return Response.json(
-      { ok: true },
-      { headers: { 'set-cookie': `session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800` } },
-    );
+    ctx.cookies.set('session', await sealer.seal({ userId: user.id }, { ttl: '7d' }), { maxAge: 604_800 });
+    return { ok: true };
+  },
+});
+
+route.get('/me', {
+  handle: async ({ ctx }) => {
+    const session = await sealer.unseal<{ userId: string }>(ctx.cookies.get('session') ?? '');
+    if (!session) throw new UnauthorizedException();
+    return users.find(session.userId);
   },
 });
 ```
 
-Always set `HttpOnly`, `Secure` and `SameSite`. Keep the cookie's `Max-Age` in step with the
-`ttl`.
+`ctx.cookies.set` defaults to `HttpOnly`, `Secure` and `SameSite=Lax`. Keep the cookie's
+`maxAge` in step with the `ttl`. See [handlers](/docs/handlers#cookies) for the options.
 
 ## Rotating the secret
 

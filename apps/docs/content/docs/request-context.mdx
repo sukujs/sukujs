@@ -18,7 +18,11 @@ get it as `ctx`, and scoped services can inject it.
 | `remoteAddress` | The peer's IP address from the adapter. Behind a proxy, the proxy's. |
 | `provider` | The request's DI scope. |
 | `body()` | The parsed body, read once and cached. |
+| `cookies` | `get`, `has`, `all` for the request; `set`, `delete` for the response. |
+| `setHeader(name, value)`, `responseHeaders` | Headers to add to the response. |
 | `set(key, value)`, `get(key)` | A per-request state bag. |
+
+See [handlers](/docs/handlers) for worked examples of each.
 
 ## Injecting it
 

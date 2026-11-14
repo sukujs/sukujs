@@ -5,6 +5,7 @@
     "getting-started",
     "---Fundamentals---",
     "routes",
+    "handlers",
     "features",
     "dependency-injection",
     "request-context",

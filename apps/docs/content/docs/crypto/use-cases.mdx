@@ -216,19 +216,12 @@ const Session = service('session-cookie', {
   create: ({ env }) => sukuCrypto.createSealer(env.COOKIE_SECRET, { purpose: 'session' }),
 });
 
-function readCookie(header: string | null, name: string): string | undefined {
-  return header
-    ?.split(';')
-    .map((part) => part.trim().split('='))
-    .find(([key]) => key === name)?.[1];
-}
-
 @Service()
 export class CookieAuth implements Middleware {
   constructor(@Inject(Session) private readonly session: ServiceOf<typeof Session>) {}
 
   async use(ctx: RequestContext, next: Next) {
-    const cookie = readCookie(ctx.headers.get('cookie'), 'session');
+    const cookie = ctx.cookies.get('session');
     const data = cookie ? await this.session.unseal<{ userId: string }>(cookie) : undefined;
     if (!data) throw new UnauthorizedException();
     ctx.set('userId', data.userId);

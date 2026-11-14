@@ -366,14 +366,15 @@ export function createKernel(
           return await handleError(error, ctx, compiled);
         }
       };
-      return middlewares.length
+      const response = middlewares.length
         ? await runMiddlewares(middlewares, ctx, final, (error) =>
             handleError(error, ctx, compiled),
           )
         : await final();
+      return ctx.finalize(response);
     } catch (error) {
       // Thrown by a middleware itself.
-      return await handleError(error, ctx, compiled);
+      return ctx.finalize(await handleError(error, ctx, compiled));
     } finally {
       try {
         await scope.dispose();

@@ -26,6 +26,7 @@ export { Suku, SukuApplication, type SukuOptions } from './application.js';
 export { assertMediaType, type BodyOptions, parseBody } from './body.js';
 export { ConfigError, ConfigToken, defineConfig } from './config.js';
 export { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
+export { type CookieOptions, Cookies, parseCookies, serializeCookie } from './cookies.js';
 export {
   type Feature,
   type FeatureOptions,
