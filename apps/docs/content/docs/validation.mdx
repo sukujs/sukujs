@@ -1,0 +1,100 @@
+---
+title: Validation
+description: Validate bodies, queries and parameters with any Standard Schema library.
+icon: BadgeCheck
+---
+
+Suku validates through the [Standard Schema](https://standardschema.dev) interface. Zod,
+Valibot, ArkType and Effect Schema all implement it, so they work without adapters and Suku
+depends on none of them.
+
+Pass a schema where a pipe would go.
+
+```ts
+import { z } from 'zod';
+import type { Infer } from '@suku/core';
+
+export const CreateUser = z.object({
+  name: z.string().min(2),
+  email: z.email(),
+});
+export type CreateUser = Infer<typeof CreateUser>;
+
+@Post()
+create(@Body(CreateUser) dto: CreateUser) {
+  return this.users.create(dto);
+}
+```
+
+Invalid input never reaches the handler.
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed for body",
+  "error": "Bad Request",
+  "issues": [
+    { "path": "name", "message": "Too small: expected string to have >=2 characters" },
+    { "path": "email", "message": "Invalid email address" }
+  ]
+}
+```
+
+Nested paths are joined with dots, for example `address.zip`.
+
+## Queries and parameters
+
+Query values arrive as strings, so use your library's coercion.
+
+```ts
+export const ListUsers = z.object({
+  q: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+@Get()
+list(@Query(ListUsers) query: Infer<typeof ListUsers>) {}
+
+@Get(':id')
+get(@Param('id', z.coerce.number().int().positive()) id: number) {}
+```
+
+The handler receives the schema's **output**, so defaults and transforms are applied.
+
+## Other libraries
+
+<Tabs items={['Zod', 'Valibot', 'ArkType']}>
+  <Tab value="Zod">
+    ```ts
+    import { z } from 'zod';
+    const CreateUser = z.object({ name: z.string().min(2) });
+    ```
+  </Tab>
+  <Tab value="Valibot">
+    ```ts
+    import * as v from 'valibot';
+    const CreateUser = v.object({ name: v.pipe(v.string(), v.minLength(2)) });
+    ```
+  </Tab>
+  <Tab value="ArkType">
+    ```ts
+    import { type } from 'arktype';
+    const CreateUser = type({ name: 'string >= 2' });
+    ```
+  </Tab>
+</Tabs>
+
+All three go straight into `@Body(CreateUser)`.
+
+## Outside the pipeline
+
+```ts
+import { validate, ValidationPipe } from '@suku/core';
+
+const user = await validate(CreateUser, input);      // throws ValidationException
+
+@Body('name', new ValidationPipe(z.string().min(2))) name: string
+```
+
+`ValidationException` extends `BadRequestException` and carries `issues`, which an
+[exception filter](/docs/exception-filters) can reshape.

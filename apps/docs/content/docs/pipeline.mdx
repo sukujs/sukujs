@@ -1,0 +1,120 @@
+---
+title: Pipeline and middleware
+description: The order a request travels through, and middleware around it.
+icon: Workflow
+---
+
+Every request passes through the same stages.
+
+```text
+middleware → guards → interceptors → pipes → handler
+                                              ↓
+middleware ← exception filters ← interceptors ←
+```
+
+| Stage | Job | Attach with |
+| --- | --- | --- |
+| [Middleware](#middleware) | Wrap the whole request, matched or not. | `@UseMiddleware`, module `middleware`, `app.use()` |
+| [Guards](/docs/guards) | Decide whether the handler may run. | `@UseGuards` |
+| [Interceptors](/docs/interceptors) | Wrap the handler call and its result. | `@UseInterceptors` |
+| [Pipes](/docs/pipes) | Transform and validate arguments. | `@UsePipes`, parameter decorators |
+| [Exception filters](/docs/exception-filters) | Turn errors into responses. | `@UseFilters` |
+
+## Three ways to write a piece
+
+Every piece can be a class, an instance or a plain function.
+
+```ts
+@UseGuards(RolesGuard)                           // class: resolved from the request scope
+@UseGuards(new ApiKeyGuard('secret'))            // instance
+@UseGuards((ctx) => ctx.headers.has('x-token'))  // function
+```
+
+Classes are registered as services automatically and may inject anything, including the
+`RequestContext` when declared `@Injectable({ lifetime: 'scoped' })`.
+
+## Where to attach
+
+```ts
+@Controller('orders')
+@UseGuards(AuthGuard)            // every handler in the class
+export class OrdersController {
+  @Post()
+  @UseGuards(AdminGuard)         // this handler only
+  create() {}
+}
+```
+
+Globally, pass them to `Suku.create` or add them afterwards.
+
+```ts
+const app = await Suku.create({
+  imports: [AppModule],
+  middleware: [RequestLogger],
+  guards: [AuthGuard],
+  interceptors: [TimingInterceptor],
+  pipes: [TrimPipe],
+  filters: [DomainErrorFilter],
+});
+
+app.use(cors);
+app.useGlobalGuards(new ThrottleGuard());
+```
+
+<Callout>
+  A class passed to `app.use()` or `app.useGlobal*()` must already be registered, because the
+  container is built by then. Pass classes through the `Suku.create` options, or pass an
+  instance.
+</Callout>
+
+Order is global, then module, then class, then method. Exception filters run the other way,
+most specific first.
+
+## Middleware
+
+Middleware receives the context and a `next` function. It runs for every request, including
+those that match no route.
+
+```ts
+import type { Middleware, Next, RequestContext } from '@suku/core';
+
+@Injectable()
+export class RequestLogger implements Middleware {
+  constructor(private readonly log: Logger) {}
+
+  async use(ctx: RequestContext, next: Next<Response>) {
+    const started = performance.now();
+    const res = await next();
+    this.log.info(`${ctx.method} ${ctx.url.pathname} -> ${res.status}`, {
+      ms: performance.now() - started,
+    });
+    return res;
+  }
+}
+```
+
+`next()` always resolves to a `Response`. Errors and 404s are rendered before control returns
+to middleware, so a CORS or request-id middleware can decorate every response.
+
+```ts
+const cors: MiddlewareFn = async (ctx, next) => {
+  if (ctx.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+  const res = await next();
+  res.headers.set('access-control-allow-origin', '*');
+  return res;
+};
+```
+
+Return without calling `next()` to short-circuit. Calling it twice is an error.
+
+### Module middleware
+
+Middleware on a module applies to that module's own controllers, not to the modules it
+imports.
+
+```ts
+export const AdminModule = defineModule({
+  controllers: [AdminController],
+  middleware: [auditTrail],
+});
+```

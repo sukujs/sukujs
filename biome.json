@@ -6,7 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.output",
+      "!**/.source",
+      "!**/.tanstack",
+      "!**/.nitro",
+      "!**/routeTree.gen.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -41,5 +50,17 @@
         "useImportType": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/docs/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    }
+  ]
 }

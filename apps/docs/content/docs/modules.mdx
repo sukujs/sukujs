@@ -1,0 +1,109 @@
+---
+title: Modules
+description: Group controllers and services with typed, plain-object modules.
+icon: Package
+---
+
+A module groups the controllers and services of one feature. In Suku a module is a plain
+object returned by `defineModule()`. There is no class and no decorator.
+
+```ts title="users.module.ts"
+import { defineModule, scoped, singleton } from '@suku/core';
+
+export const UsersModule = defineModule({
+  name: 'users',
+  controllers: [UsersController],
+  services: [singleton(UsersService), scoped(UnitOfWork)],
+});
+```
+
+## Options
+
+| Option | Meaning |
+| --- | --- |
+| `name` | Shown in error messages. Optional. |
+| `imports` | Other modules to include. |
+| `controllers` | Controller classes that this module owns. |
+| `services` | Service registrations. `providers` is accepted as an alias. |
+| `middleware` | Middleware applied to this module's controllers only. |
+| `exports` | Recorded for documentation. Not enforced, see below. |
+
+## Registering services
+
+Entries in `services` can take three forms.
+
+```ts
+services: [
+  UsersService,                              // a bare class: singleton
+  singleton(Logger, ConsoleLogger),          // a typed helper
+  { provide: Cache, useClass: RedisCache },  // a NestJS-style object
+]
+```
+
+The typed helpers are the recommended form because the implementation is checked against the
+token.
+
+```ts
+singleton(Logger, ConsoleLogger);    // ok: ConsoleLogger extends Logger
+singleton(Logger, UsersService);     // compile error
+value(CONFIG, { port: '3000' });     // compile error if CONFIG is InjectionToken<{ port: number }>
+```
+
+| Helper | Registers |
+| --- | --- |
+| `singleton(token, impl?)` | One instance for the app. |
+| `scoped(token, impl?)` | One instance per request. |
+| `transient(token, impl?)` | A new instance on every resolve. |
+| `value(token, instance)` | An existing value. Never disposed by the container. |
+| `factory(token, fn, lifetime?)` | The result of `fn(provider)`. Singleton by default. |
+| `alias(token, existing)` | Resolves to whatever `existing` resolves to. |
+
+## Parameterised modules
+
+A module that takes options is a function. There is no `forRoot`.
+
+```ts
+export const MailModule = (options: MailOptions) =>
+  defineModule({
+    name: 'mail',
+    services: [value(MAIL_OPTIONS, options), singleton(Mailer)],
+  });
+
+defineModule({ imports: [MailModule({ from: 'hi@example.com' })] });
+```
+
+Modules are compared by identity. Calling the function twice creates two modules, so call it
+once and share the result when several modules import it.
+
+## Inline root
+
+The root does not need its own module. `Suku.create` accepts module options and application
+options in one object.
+
+```ts
+const app = await Suku.create({
+  imports: [UsersModule, BillingModule],
+  services: [singleton(Logger, ConsoleLogger)],
+  adapter: nodeAdapter(),
+  globalPrefix: '/api',
+});
+```
+
+## One flat container
+
+Every service from every module lands in a single collection, as in .NET. Any service can be
+injected anywhere, and `exports` is not enforced. This is a deliberate difference from NestJS,
+whose per-module injectors are the heaviest part of its runtime.
+
+When two modules register the same token, the last registration wins for `get()`, and
+`getAll()` returns every one.
+
+## Coming from NestJS
+
+`@Module()` on a class still works, and such classes can be mixed with `defineModule` objects
+in `imports`.
+
+```ts
+@Module({ controllers: [UsersController], providers: [UsersService] })
+export class UsersModule {}
+```

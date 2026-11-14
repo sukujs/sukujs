@@ -1,0 +1,152 @@
+---
+title: Dependency injection
+description: Lifetimes, scopes, tokens, keyed services, validation and disposal.
+icon: Boxes
+---
+
+`@suku/di` is a container modelled on .NET's. Services are registered in one
+`ServiceCollection` with an explicit lifetime, and resolved from a `ServiceProvider`. Inside
+an application `Suku.create` builds both for you. The package also works alone.
+
+```ts
+import { Injectable, ServiceCollection } from '@suku/di';
+
+@Injectable()
+class Database {}
+
+@Injectable()
+class UsersRepository {
+  constructor(private readonly db: Database) {}
+}
+
+const provider = new ServiceCollection()
+  .addSingleton(Database)
+  .addScoped(UsersRepository)
+  .build({ validateOnBuild: true });
+
+const scope = provider.createScope();
+scope.get(UsersRepository);
+await scope.dispose();
+```
+
+## Lifetimes
+
+| Lifetime | Instances | Typical use |
+| --- | --- | --- |
+| `singleton` | One for the application. | Configuration, connection pools, stateless services. |
+| `scoped` | One per scope. Suku opens a scope for every request. | Unit of work, current user, request-bound state. |
+| `transient` | One per resolve. | Cheap, stateful helpers. |
+
+Resolving a scoped service from the root provider throws. Create a scope first.
+
+## Tokens
+
+A token identifies a registration. Classes are their own tokens.
+
+Interfaces do not exist at runtime, so use an **abstract class** where .NET would use an
+interface.
+
+```ts
+export abstract class Cache {
+  abstract get(key: string): Promise<string | undefined>;
+}
+
+@Injectable()
+export class RedisCache extends Cache { /* ... */ }
+
+services: [singleton(Cache, RedisCache)];
+
+class Uses {
+  constructor(private readonly cache: Cache) {}   // no decorator needed
+}
+```
+
+For values with no class, use an `InjectionToken` and `@Inject`.
+
+```ts
+export const CONFIG = new InjectionToken<{ port: number }>('CONFIG');
+
+services: [value(CONFIG, { port: 3000 })];
+
+class Server {
+  constructor(@Inject(CONFIG) private readonly config: { port: number }) {}
+}
+```
+
+`@Optional()` yields `undefined` instead of throwing when nothing is registered.
+
+## Keyed services
+
+Register several implementations of one token under keys.
+
+```ts
+services: [
+  singleton(Storage, S3Storage, { key: 's3' }),
+  singleton(Storage, DiskStorage, { key: 'disk' }),
+];
+
+class Uploader {
+  constructor(@Inject(Storage, 's3') private readonly storage: Storage) {}
+}
+```
+
+## Several registrations of one token
+
+`get()` returns the last registration. `getAll()` returns every one, in order, which suits
+plugin lists.
+
+```ts
+provider.getAll(HealthCheck).map((check) => check.run());
+```
+
+## Startup validation [#captive-dependencies]
+
+`Suku.create` builds the container with `validateOnBuild`, so mistakes surface before the
+server listens.
+
+| Problem | Error |
+| --- | --- |
+| A constructor needs a service that is not registered. | `MissingServiceError` |
+| Services depend on each other in a loop. | `CircularDependencyError` |
+| A singleton depends on a scoped service. | `CaptiveDependencyError` |
+| A parameter's type is an interface or primitive with no `@Inject`. | `UnresolvableParameterError` |
+
+A **captive dependency** is a long-lived service holding a short-lived one: a singleton that
+captures a scoped unit of work would keep the first request's instance forever. The messages
+include the resolution chain.
+
+```text
+Captive dependency: OrdersController (singleton) depends on UnitOfWork (scoped).
+```
+
+## Disposal
+
+When a scope or the root provider is disposed, the instances it created are disposed newest
+first. A service takes part by having any of `dispose()`, `onDispose()`, `[Symbol.dispose]()`
+or `[Symbol.asyncDispose]()`.
+
+```ts
+@Injectable()
+class UnitOfWork {
+  async dispose() {
+    await this.connection.release();
+  }
+}
+```
+
+Values registered with `value()` are never disposed, because the container did not create
+them. Providers support `await using`.
+
+## The provider is injectable
+
+A class may ask for the `ServiceProvider` and receives the scope it is being resolved in.
+
+```ts
+class JobRunner {
+  constructor(private readonly provider: ServiceProvider) {}
+
+  run(job: Constructor<Job>) {
+    return this.provider.get(job).execute();
+  }
+}
+```

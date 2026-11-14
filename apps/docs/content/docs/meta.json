@@ -1,0 +1,29 @@
+{
+  "title": "Suku",
+  "pages": [
+    "index",
+    "getting-started",
+    "---Fundamentals---",
+    "modules",
+    "controllers",
+    "dependency-injection",
+    "request-context",
+    "---Pipeline---",
+    "pipeline",
+    "guards",
+    "interceptors",
+    "pipes",
+    "exception-filters",
+    "---Techniques---",
+    "validation",
+    "configuration",
+    "logging",
+    "testing",
+    "---Platforms---",
+    "platforms",
+    "---Guides---",
+    "from-nestjs",
+    "from-dotnet",
+    "performance"
+  ]
+}

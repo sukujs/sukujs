@@ -1,0 +1,80 @@
+---
+title: Coming from .NET
+description: The container you know, in TypeScript.
+icon: ArrowRightLeft
+---
+
+`@suku/di` follows `Microsoft.Extensions.DependencyInjection` closely. If you know
+`IServiceCollection` and `IServiceProvider`, you know most of it.
+
+| .NET | Suku |
+| --- | --- |
+| `IServiceCollection` | `ServiceCollection` |
+| `services.AddSingleton<IFoo, Foo>()` | `services.addSingleton(Foo, FooImpl)` or `singleton(Foo, FooImpl)` |
+| `AddScoped`, `AddTransient` | `addScoped`, `addTransient` |
+| `TryAddSingleton` | `tryAddSingleton` |
+| `AddKeyedSingleton<T>(key)` | `addKeyedSingleton(T, key, Impl)` |
+| `[FromKeyedServices(key)]` | `@Inject(T, key)` |
+| `services.Replace(...)` | `services.replace(...)` |
+| `BuildServiceProvider(validateScopes, validateOnBuild)` | `build({ validateScopes, validateOnBuild })` |
+| `GetRequiredService<T>()` | `provider.get(T)` |
+| `GetService<T>()` | `provider.getOptional(T)` |
+| `GetServices<T>()` | `provider.getAll(T)` |
+| `CreateScope()` | `provider.createScope()` |
+| `IDisposable`, `IAsyncDisposable` | `dispose()`, `[Symbol.dispose]`, `[Symbol.asyncDispose]` |
+| `IOptions<T>` | `defineConfig(name, schema)` |
+| `ILogger` | `Logger` |
+| `HttpContext` | `RequestContext` |
+| Middleware `(context, next)` | Middleware `(ctx, next)` |
+| `[ApiController]`, `[HttpGet("{id}")]` | `@Controller()`, `@Get(':id')` |
+| Action filters | Guards and interceptors |
+| Exception filters | Exception filters |
+
+## Interfaces become abstract classes
+
+TypeScript interfaces are erased at compile time, so they cannot be tokens. Use an abstract
+class in the same role.
+
+```ts
+export abstract class IClock {
+  abstract now(): Date;
+}
+
+services.addSingleton(IClock, SystemClock);
+
+class Invoices {
+  constructor(private readonly clock: IClock) {}
+}
+```
+
+## Same rules, same errors
+
+- The last registration for a token wins; `getAll` returns them all in order.
+- Resolving a scoped service from the root provider throws.
+- A singleton that depends on a scoped service is rejected as a captive dependency.
+- Disposal runs in reverse order of creation. Instances you registered yourself are left alone.
+
+## Controllers are singletons by default
+
+In ASP.NET Core a controller is created per request. In Suku it is a singleton unless you ask
+otherwise, which is the NestJS convention and avoids an allocation per request.
+
+```ts
+@Controller({ path: 'orders', lifetime: 'scoped' })
+```
+
+## The composition root
+
+`Suku.create` plays the part of `Program.cs`.
+
+```ts
+const app = await Suku.create({
+  imports: [OrdersModule],
+  services: [singleton(IClock, SystemClock)],
+  configureServices: (services) => services.addScoped(UnitOfWork),
+  adapter: nodeAdapter(),
+});
+
+app.use(requestLogging);
+await app.listen(5000);
+```

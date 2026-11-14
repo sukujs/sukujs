@@ -1,0 +1,59 @@
+---
+title: Performance
+description: Measured overhead on Bun and Node, and where it comes from.
+icon: Gauge
+---
+
+Suku ships a benchmark harness in the repository's `benchmarks` folder. It starts each server,
+warms it up, and measures it with autocannon against a raw server on the same runtime.
+
+## Numbers
+
+Measured on an Apple Silicon laptop, 64 connections, `GET /users/:id` returning JSON.
+
+| Target | Requests per second | Against raw |
+| --- | --- | --- |
+| Raw `Bun.serve` | 112,000 | baseline |
+| Suku app on Bun | 113,000 | parity |
+| Raw `node:http` | 77,000 | baseline |
+| Suku app on Node | 47,000 | about 60% |
+
+These are from a single machine with visible run-to-run variation. Treat them as a ratio, not
+as a promise for your hardware.
+
+## Reading them
+
+**On Bun the framework is free.** Bun's server is already built on Fetch `Request` and
+`Response`, so the adapter passes requests straight through.
+
+**On Node the cost is the Fetch objects.** Node's native server uses its own request and
+response types. Creating a `Request` and a `Response` for every call is what costs
+throughput, spread across their construction rather than in one hot spot.
+
+**The framework itself is cheap.** Module resolution, the per-request DI scope, parameter
+extraction and JSON serialisation together add about 2% over a bare adapter with a
+hand-written router.
+
+## What Suku does about it
+
+- The Node adapter writes a response's original string or bytes directly, with a
+  `Content-Length`, instead of draining its stream.
+- A request scope allocates its caches only when a scoped service is actually resolved.
+- The URL is parsed only if something reads `ctx.url`.
+- Routes, parameter resolvers and pipeline chains are compiled once at startup.
+
+## Running the benchmark
+
+```bash
+bun run build
+node --experimental-strip-types benchmarks/run.ts --duration 10
+```
+
+Pass `--runtime node` or `--runtime bun` to measure one runtime, and `--path` to change the
+route. Autocannon must be on your `PATH`.
+
+## Choosing a runtime
+
+If raw throughput on a single core is the constraint, run on Bun. If you need Node, the
+overhead is the price of a web-standard API, and most services spend far longer in the
+database than in the framework.

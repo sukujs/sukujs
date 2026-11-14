@@ -1,0 +1,65 @@
+---
+title: Exception filters
+description: Turn thrown errors into responses.
+icon: Bug
+---
+
+Without a filter, an `HttpException` renders its own response and anything else becomes a
+`500` reported to the [logger](/docs/logging). A filter replaces that for the errors it
+handles.
+
+```ts
+import { Catch, type ExceptionFilter } from '@suku/core';
+
+@Catch(InsufficientFunds)
+export class InsufficientFundsFilter implements ExceptionFilter {
+  catch(error: unknown) {
+    const e = error as InsufficientFunds;
+    return Response.json({ code: 'insufficient_funds', missing: e.missing }, { status: 422 });
+  }
+}
+```
+
+```ts
+@Controller('payments')
+@UseFilters(InsufficientFundsFilter)
+export class PaymentsController {}
+```
+
+`@Catch` limits a filter to the listed error types. Without it the filter sees every error.
+
+## Passing an error on
+
+Return `undefined` to let the next filter, or the default rendering, handle it.
+
+```ts
+const notFoundPage: FilterFn = (error, ctx) =>
+  ctx.route === undefined ? new Response('Nothing here', { status: 404 }) : undefined;
+```
+
+## Order
+
+Filters run most specific first: method, class, then global. The first to return a response
+wins.
+
+Global filters also see unmatched routes and errors thrown by middleware.
+
+```ts
+await Suku.create({ imports: [AppModule], filters: [ProblemDetailsFilter] });
+```
+
+If a filter itself throws, the client receives a `500` and the failure is logged.
+
+## A problem-details filter
+
+```ts
+export class ProblemDetailsFilter implements ExceptionFilter {
+  catch(error: unknown, ctx: RequestContext) {
+    const status = error instanceof HttpException ? error.status : 500;
+    return Response.json(
+      { type: 'about:blank', title: defaultMessage(status), status, instance: ctx.url.pathname },
+      { status, headers: { 'content-type': 'application/problem+json' } },
+    );
+  }
+}
+```

@@ -1,0 +1,68 @@
+---
+title: Request context
+description: The object that describes the request in flight.
+icon: FileInput
+---
+
+Every request gets one `RequestContext`. Guards, interceptors, pipes, filters and middleware
+receive it, handlers can ask for it with `@Ctx()`, and scoped services can inject it.
+
+| Member | Value |
+| --- | --- |
+| `request` | The Fetch `Request`. |
+| `method`, `headers` | Shortcuts to the request's. |
+| `url` | A parsed `URL`, created on first use. |
+| `params` | Decoded route parameters. |
+| `route` | `{ method, path, controller, handler }`, or `undefined` when nothing matched. |
+| `provider` | The request's DI scope. |
+| `body()` | The parsed body, read once and cached. |
+| `set(key, value)`, `get(key)` | A per-request state bag. |
+| `getMetadata(key)` | Values attached with `@SetMetadata`. |
+
+## Injecting it
+
+```ts
+@Injectable({ lifetime: 'scoped' })
+export class CurrentUser {
+  readonly id: string | undefined;
+
+  constructor(ctx: RequestContext) {
+    this.id = ctx.headers.get('x-user-id') ?? undefined;
+  }
+}
+```
+
+Only scoped and transient services can inject the context. A singleton that tries is a
+captive dependency.
+
+## Sharing state
+
+Middleware and guards usually compute something that handlers need.
+
+```ts
+const authenticate: MiddlewareFn = async (ctx, next) => {
+  ctx.set('user', await verify(ctx.headers.get('authorization')));
+  return next();
+};
+
+export const User = createParamDecorator('User', (_data, ctx) => ctx.get('user'));
+```
+
+## The body
+
+`ctx.body()` parses by content type and caches the result, so middleware and `@Body()` share
+one read.
+
+| Content type | Result |
+| --- | --- |
+| `application/json`, `*+json` | The parsed value. Malformed JSON is a `400`. |
+| `application/x-www-form-urlencoded` | An object. Repeated keys become arrays. |
+| `multipart/form-data` | A `FormData`. |
+| `text/*`, or none | A string. |
+| Anything else | A `Uint8Array`. |
+
+Bodies over the limit get `413`. The limit is 1 MiB unless set.
+
+```ts
+await Suku.create({ imports: [AppModule], bodyLimit: 5 * 1024 * 1024 });
+```

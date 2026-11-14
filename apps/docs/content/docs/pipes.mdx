@@ -1,0 +1,72 @@
+---
+title: Pipes
+description: Transform and validate handler arguments.
+icon: Funnel
+---
+
+A pipe receives one argument and returns the value the handler should get. Throwing rejects
+the request.
+
+```ts
+@Get(':id')
+get(@Param('id', ParseIntPipe) id: number) {
+  return this.users.find(id);    // id is a number
+}
+```
+
+```text
+GET /users/abc
+400 {"statusCode":400,"message":"Validation failed for param \"id\": an integer is expected","error":"Bad Request"}
+```
+
+## Built-in pipes
+
+| Pipe | Result |
+| --- | --- |
+| `ParseIntPipe` | An integer. |
+| `ParseFloatPipe` | A finite number. |
+| `ParseBoolPipe` | `true` or `false`, from `true`, `false`, `1`, `0`. |
+| `ParseUUIDPipe` | The string, if it is a UUID. |
+| `new ParseEnumPipe(['asc', 'desc'])` | One of the listed values. |
+| `new DefaultValuePipe(1)` | The default when the value is missing or empty. |
+
+Pipes on one parameter run left to right.
+
+```ts
+@Get()
+list(
+  @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  @Query('sort', new DefaultValuePipe('asc'), new ParseEnumPipe(['asc', 'desc'])) sort: string,
+) {}
+```
+
+For anything richer than a single value, [validate with a schema](/docs/validation).
+
+## Writing a pipe
+
+```ts
+import type { ArgumentMetadata, Pipe } from '@suku/core';
+
+export class TrimPipe implements Pipe {
+  transform(value: unknown, _metadata: ArgumentMetadata) {
+    return typeof value === 'string' ? value.trim() : value;
+  }
+}
+```
+
+`ArgumentMetadata` describes the argument.
+
+| Field | Value |
+| --- | --- |
+| `kind` | `Param`, `Query`, `Body`, or a custom decorator's name. |
+| `data` | The decorator's argument, such as the parameter name. |
+| `type` | The TypeScript type of the handler parameter, when emitted. |
+| `index` | Position in the handler's parameter list. |
+| `ctx` | The request context. |
+
+A function works too: `@Query('q', (v) => String(v).toLowerCase())`.
+
+## Scope
+
+`@UsePipes` on a class or method, or `pipes` in `Suku.create`, applies a pipe to every
+parameter in scope. Order is global, class, method, then the parameter's own pipes.

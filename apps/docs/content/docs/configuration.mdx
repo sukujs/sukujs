@@ -1,0 +1,71 @@
+---
+title: Configuration
+description: Validated, typed configuration that fails fast at startup.
+icon: Settings
+---
+
+`defineConfig` pairs a name with a schema and returns a typed injection token.
+
+```ts title="config.ts"
+import { defineConfig } from '@suku/core';
+import { z } from 'zod';
+
+export const Env = defineConfig(
+  'env',
+  z.object({
+    PORT: z.coerce.number().int().positive().default(3000),
+    DATABASE_URL: z.url(),
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  }),
+);
+```
+
+Import `Env.load()` to validate the environment when the application starts.
+
+```ts
+const app = await Suku.create({ imports: [Env.load(), UsersModule], adapter: nodeAdapter() });
+await app.listen(app.get(Env).PORT);
+```
+
+Inject it with the token.
+
+```ts
+import type { Infer } from '@suku/core';
+
+@Injectable()
+export class Database {
+  constructor(@Inject(Env) private readonly env: Infer<typeof Env.schema>) {}
+}
+```
+
+## Failing fast
+
+If the environment is invalid, `Suku.create` rejects before anything listens, and every
+problem is listed at once.
+
+```text
+ConfigError: Invalid configuration "env":
+  - PORT: Invalid input: expected number, received NaN
+  - DATABASE_URL: Invalid input: expected string, received undefined
+```
+
+## Other sources
+
+`load()` reads `process.env` by default. Pass any object instead.
+
+```ts
+Env.load({ ...process.env, ...(await readSecrets()) });
+```
+
+`Env.parse()` validates and returns the value without creating a module, for scripts that run
+outside the container.
+
+## Several configs
+
+Define one per concern. Each is its own token.
+
+```ts
+export const Mail = defineConfig('mail', z.object({ SMTP_URL: z.url() }));
+
+imports: [Env.load(), Mail.load()];
+```

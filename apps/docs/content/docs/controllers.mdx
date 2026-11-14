@@ -1,0 +1,137 @@
+---
+title: Controllers
+description: Routes, parameters, return values and status codes.
+icon: Route
+---
+
+A controller is a class decorated with `@Controller()`. Its methods become routes.
+
+```ts
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@suku/core';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get()
+  list(@Query('q') q?: string) {
+    return this.users.search(q);
+  }
+
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.users.find(id);
+  }
+
+  @Post()
+  create(@Body() body: { name: string }) {
+    return this.users.create(body.name);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    this.users.remove(id);
+  }
+}
+```
+
+## Routing
+
+Method decorators: `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@Head`, `@Options` and
+`@All`. Paths join the controller prefix, the global prefix and the method path.
+
+| Pattern | Matches |
+| --- | --- |
+| `users/me` | That exact path. |
+| `users/:id` | One segment, available as `id`. |
+| `files/*path` | The rest of the path, including nothing. |
+
+Static segments win over parameters, and parameters win over wildcards. The router
+backtracks: with `users/me` and `users/:id/settings` both registered, `/users/me/settings`
+matches the second with `id` set to `me`. Trailing slashes are ignored, and `HEAD` falls back
+to the `GET` handler.
+
+A request for a known path with the wrong method gets `405` and an `Allow` header. An unknown
+path gets `404`. Two handlers on the same method and path fail at startup.
+
+## Parameters
+
+| Decorator | Value |
+| --- | --- |
+| `@Param('id')` | One route parameter. `@Param()` gives all of them. |
+| `@Query('page')` | One query value. `@Query()` gives an object; repeated keys become arrays. |
+| `@Body()` | The parsed body. `@Body('name')` picks one property. |
+| `@Headers('authorization')` | One header. `@Headers()` gives the `Headers` object. |
+| `@Req()` | The Fetch `Request`. |
+| `@Ctx()` | The [request context](/docs/request-context). |
+
+Each accepts [pipes](/docs/pipes) and [schemas](/docs/validation) after its first argument:
+`@Param('id', ParseIntPipe)`, `@Body(CreateUser)`.
+
+Write your own with `createParamDecorator`.
+
+```ts
+export const CurrentUser = createParamDecorator('CurrentUser', (_data, ctx) => ctx.get('user'));
+
+@Get('me')
+me(@CurrentUser() user: User) {
+  return user;
+}
+```
+
+## Return values
+
+| Returned | Response |
+| --- | --- |
+| An object or array | JSON. |
+| A string | `text/plain`. |
+| `undefined` or `null` | `204 No Content`. |
+| `Uint8Array` or `ArrayBuffer` | `application/octet-stream`. |
+| `ReadableStream`, `Blob`, `FormData` | Passed to `Response` as the body. |
+| A `Response` | Sent as it is. |
+
+The default status is `200`, or `201` for `POST`. Handlers may be `async`.
+
+```ts
+@Post()
+@HttpCode(202)
+@Header('cache-control', 'no-store')
+enqueue(@Body() job: Job) {
+  return this.queue.add(job);
+}
+
+@Get('old')
+@Redirect('/users', 301)
+old() {}
+```
+
+A handler under `@Redirect` can return `{ url, status }` to choose the target per request.
+
+## Errors
+
+Throw an `HttpException` subclass to produce an error response.
+
+```ts
+throw new NotFoundException(`User ${id} not found`);
+// 404 {"statusCode":404,"message":"User 7 not found","error":"Not Found"}
+```
+
+Classes exist for the common statuses, including `BadRequestException`,
+`UnauthorizedException`, `ForbiddenException`, `ConflictException` and
+`UnprocessableEntityException`. Any other thrown value becomes a `500` and is passed to the
+[logger](/docs/logging). Customise both with [exception filters](/docs/exception-filters).
+
+## Lifetime
+
+Controllers are singletons. Ask for one instance per request when the controller needs
+request-scoped services.
+
+```ts
+@Controller({ path: 'orders', lifetime: 'scoped' })
+export class OrdersController {
+  constructor(private readonly uow: UnitOfWork) {}
+}
+```
+
+A singleton controller that depends on a scoped service is a captive dependency, and Suku
+refuses to start. See [dependency injection](/docs/dependency-injection#captive-dependencies).

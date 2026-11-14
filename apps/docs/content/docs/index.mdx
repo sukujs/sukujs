@@ -1,0 +1,80 @@
+---
+title: Introduction
+description: What Suku is, what it borrows, and where it differs.
+icon: BookOpen
+---
+
+Suku is a lightweight TypeScript backend framework. It keeps the parts of NestJS that
+developers like, decorated controllers and a predictable request pipeline, and replaces the
+dependency injection underneath with a container modelled on
+`Microsoft.Extensions.DependencyInjection`.
+
+```ts title="main.ts"
+import { Controller, Get, Param, Suku, defineModule, singleton } from '@suku/core';
+import { Injectable } from '@suku/di';
+import { nodeAdapter } from '@suku/platform-node';
+
+@Injectable()
+class UsersService {
+  find(id: string) {
+    return { id, name: 'Ada' };
+  }
+}
+
+@Controller('users')
+class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.users.find(id);
+  }
+}
+
+const UsersModule = defineModule({
+  controllers: [UsersController],
+  services: [singleton(UsersService)],
+});
+
+const app = await Suku.create({ imports: [UsersModule], adapter: nodeAdapter() });
+await app.listen(3000);
+```
+
+## What you get
+
+<Cards>
+  <Card title="A real container" href="/docs/dependency-injection">
+    Singleton, scoped and transient lifetimes, a scope per request, keyed services, and
+    startup validation of missing services, cycles and captive dependencies.
+  </Card>
+  <Card title="Typed modules" href="/docs/modules">
+    Modules are plain objects from `defineModule()`. Registrations are checked against their
+    tokens at compile time.
+  </Card>
+  <Card title="A familiar pipeline" href="/docs/pipeline">
+    Middleware, guards, interceptors, pipes and exception filters, as classes, instances or
+    plain functions.
+  </Card>
+  <Card title="Validation without lock-in" href="/docs/validation">
+    Any Standard Schema library works in `@Body(schema)`: Zod, Valibot, ArkType.
+  </Card>
+</Cards>
+
+## Packages
+
+| Package | Purpose | Minified |
+| --- | --- | --- |
+| `@suku/di` | The container. Usable on its own, without HTTP. | 13 KB |
+| `@suku/core` | Modules, controllers, router, pipeline, validation, config, logger. | 24 KB |
+| `@suku/platform-node` | Adapter for `node:http`. | 2 KB |
+| `@suku/platform-bun` | Adapter for `Bun.serve`. | under 1 KB |
+
+None of them has a runtime dependency.
+
+## Status
+
+<Callout type="warn" title="Pre-release">
+  Suku is under active development and the packages are not published to npm yet. The API on
+  these pages matches the `main` branch. Lifecycle hooks and a dedicated testing package are
+  planned and not documented here.
+</Callout>

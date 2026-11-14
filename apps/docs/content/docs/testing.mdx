@@ -1,0 +1,81 @@
+---
+title: Testing
+description: Test the whole app in process, without a socket.
+icon: FlaskConical
+---
+
+`app.handle()` takes a Fetch `Request` and returns the `Response` the server would send. No
+port is opened, so tests are fast and can run in parallel.
+
+```ts title="users.test.ts"
+import { expect, test } from 'bun:test';
+import { Suku } from '@suku/core';
+import { UsersModule } from './users.module.js';
+
+test('GET /users/:id', async () => {
+  const app = await Suku.create({ imports: [UsersModule] });
+
+  const res = await app.handle(new Request('http://test/users/1'));
+
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ id: '1', name: 'Ada Lovelace' });
+});
+```
+
+No adapter is needed. The whole pipeline runs: middleware, guards, pipes, filters and the
+request scope.
+
+## Replacing services
+
+`configureServices` runs after the modules are scanned and before the container is built.
+
+```ts
+const app = await Suku.create({
+  imports: [OrdersModule],
+  configureServices: (services) =>
+    services
+      .replace(singleton(PaymentGateway, FakeGateway))
+      .replace(singleton(Logger, SilentLogger)),
+});
+```
+
+`replace` removes every registration for the token and adds yours.
+
+## Requests with bodies
+
+```ts
+const res = await app.handle(
+  new Request('http://test/users', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Grace' }),
+  }),
+);
+expect(res.status).toBe(201);
+```
+
+## Testing a service alone
+
+The container needs no HTTP.
+
+```ts
+import { ServiceCollection } from '@suku/di';
+
+const provider = new ServiceCollection()
+  .addSingleton(Clock, FixedClock)
+  .addSingleton(InvoiceService)
+  .build({ validateOnBuild: true });
+
+expect(provider.get(InvoiceService).dueDate()).toBe('2026-12-01');
+```
+
+## Checking registered routes
+
+```ts
+expect(app.routes.map((r) => `${r.method} ${r.path}`)).toContain('GET /users/:id');
+```
+
+<Callout>
+  A `@suku/testing` package with a module builder and request helpers is planned. Everything
+  on this page works today with the core packages.
+</Callout>

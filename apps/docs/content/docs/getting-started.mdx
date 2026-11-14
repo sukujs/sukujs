@@ -1,0 +1,142 @@
+---
+title: Getting started
+description: Set up the compiler, write a first module, and run it on Bun or Node.
+icon: Rocket
+---
+
+<Callout type="warn">
+  The packages are not on npm yet. Until the first release, clone the
+  [repository](https://github.com/sukujs/sukujs) and work inside its workspace, or link the
+  packages locally.
+</Callout>
+
+<Steps>
+<Step>
+
+### Install
+
+```bash
+bun add @suku/core @suku/di @suku/platform-bun
+```
+
+Use `@suku/platform-node` instead of, or alongside, the Bun adapter when you deploy on Node.
+
+</Step>
+<Step>
+
+### Configure TypeScript
+
+Constructor injection reads parameter types at runtime, which needs TypeScript's decorator
+metadata.
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+```
+
+<Callout type="error" title="Turn off type-only import rewriting">
+  Lint rules that rewrite imports used only as types into `import type` erase the class that
+  injection needs, and the parameter compiles to `Object`. Disable Biome's
+  `style/useImportType` and ESLint's `consistent-type-imports`. Suku reports this at startup as
+  an `UnresolvableParameterError` naming the parameter.
+</Callout>
+
+</Step>
+<Step>
+
+### Write a service and a controller
+
+```ts title="src/users.ts"
+import { Controller, Get, NotFoundException, Param } from '@suku/core';
+import { Injectable } from '@suku/di';
+
+@Injectable()
+export class UsersService {
+  private readonly users = new Map([['1', { id: '1', name: 'Ada Lovelace' }]]);
+
+  find(id: string) {
+    return this.users.get(id);
+  }
+}
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
+
+  @Get(':id')
+  get(@Param('id') id: string) {
+    const user = this.users.find(id);
+    if (!user) throw new NotFoundException(`User ${id} not found`);
+    return user;
+  }
+}
+```
+
+</Step>
+<Step>
+
+### Declare a module and start the app
+
+```ts title="src/main.ts"
+import { Suku, defineModule, singleton } from '@suku/core';
+import { bunAdapter } from '@suku/platform-bun';
+import { UsersController, UsersService } from './users.js';
+
+const UsersModule = defineModule({
+  name: 'users',
+  controllers: [UsersController],
+  services: [singleton(UsersService)],
+});
+
+const app = await Suku.create({ imports: [UsersModule], adapter: bunAdapter() });
+const server = await app.listen(3000);
+console.log(`listening on ${server.url}`);
+```
+
+</Step>
+<Step>
+
+### Run it
+
+<Tabs items={['Bun', 'Node']}>
+  <Tab value="Bun">
+    Bun runs TypeScript and emits decorator metadata itself.
+
+    ```bash
+    bun run src/main.ts
+    ```
+  </Tab>
+  <Tab value="Node">
+    Node cannot execute decorators, so compile first, with `tsc` or by bundling. Swap
+    `bunAdapter()` for `nodeAdapter()`.
+
+    ```bash
+    bun build src/main.ts --target node --outdir dist
+    node dist/main.js
+    ```
+  </Tab>
+</Tabs>
+
+```bash
+curl localhost:3000/users/1
+# {"id":"1","name":"Ada Lovelace"}
+```
+
+</Step>
+</Steps>
+
+## Next
+
+<Cards>
+  <Card title="Modules" href="/docs/modules" />
+  <Card title="Controllers" href="/docs/controllers" />
+  <Card title="Dependency injection" href="/docs/dependency-injection" />
+</Cards>

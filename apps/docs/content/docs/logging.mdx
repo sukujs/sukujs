@@ -1,0 +1,68 @@
+---
+title: Logging
+description: The injectable Logger and how to replace it.
+icon: ScrollText
+---
+
+`Logger` is an abstract class registered by default with a `ConsoleLogger`. Inject it
+anywhere.
+
+```ts
+import { Logger } from '@suku/core';
+
+@Injectable()
+export class BillingService {
+  constructor(private readonly log: Logger) {}
+
+  charge(order: Order) {
+    this.log.info('charging order', { orderId: order.id, amount: order.total });
+  }
+}
+```
+
+Methods are `debug`, `info`, `warn` and `error`. Each takes a message and an optional
+metadata object. `error` also accepts an `Error` and records its stack.
+
+## Level
+
+```ts
+const app = await Suku.create({ imports: [AppModule] });
+(app.get(Logger) as ConsoleLogger).level = 'debug';
+```
+
+Entries below the level are dropped. The default is `info`.
+
+## Replacing it
+
+Extend `Logger`, implement `log`, and register the class. Your registration wins over the
+default.
+
+```ts
+import pino from 'pino';
+
+@Injectable()
+export class PinoLogger extends Logger {
+  private readonly pino = pino();
+
+  log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+    this.pino[level](meta ?? {}, message);
+  }
+}
+
+await Suku.create({ imports: [AppModule], services: [singleton(Logger, PinoLogger)] });
+```
+
+`SilentLogger` discards everything, which is useful in tests.
+
+## Unhandled errors
+
+An error that is not an `HttpException` and that no filter handled is reported through the
+logger with the method and path, then answered with a `500`. To handle it yourself instead,
+pass `onError`.
+
+```ts
+await Suku.create({
+  imports: [AppModule],
+  onError: (error, ctx) => sentry.captureException(error, { extra: { path: ctx?.url.pathname } }),
+});
+```

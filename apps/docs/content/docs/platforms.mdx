@@ -1,0 +1,89 @@
+---
+title: Node and Bun
+description: Platform adapters, and running the same app on either runtime.
+icon: Server
+---
+
+The kernel is a function from a Fetch `Request` to a `Response`. An adapter connects it to a
+runtime's HTTP server.
+
+<Tabs items={['Bun', 'Node']}>
+  <Tab value="Bun">
+    ```ts
+    import { bunAdapter } from '@suku/platform-bun';
+
+    const app = await Suku.create({ imports: [AppModule], adapter: bunAdapter() });
+    await app.listen(3000);
+    ```
+
+    Bun runs TypeScript directly and emits decorator metadata, so no build step is needed.
+  </Tab>
+  <Tab value="Node">
+    ```ts
+    import { nodeAdapter } from '@suku/platform-node';
+
+    const app = await Suku.create({ imports: [AppModule], adapter: nodeAdapter() });
+    await app.listen(3000);
+    ```
+
+    Node cannot execute decorators. Compile with `tsc`, or bundle with
+    `bun build src/main.ts --target node --outdir dist`, then run the output. Node 22 or newer
+    is required.
+  </Tab>
+</Tabs>
+
+## One entry point for both
+
+```ts
+const adapter = typeof Bun !== 'undefined' ? bunAdapter() : nodeAdapter();
+```
+
+## Listening and closing
+
+```ts
+const server = await app.listen(3000);                       // 0.0.0.0:3000
+await app.listen({ port: 0, hostname: '127.0.0.1' });        // a free port, loopback only
+
+server.url;         // "http://127.0.0.1:53124"
+await app.close();  // stop accepting, finish in-flight requests, dispose singletons
+```
+
+`app.close({ force: true })` also drops connections that are still open.
+
+## Node adapter options
+
+```ts
+import { createServer } from 'node:https';
+
+nodeAdapter({
+  createServer: () => createServer({ key, cert }),
+  onError: (error) => new Response('Something broke', { status: 500 }),
+});
+```
+
+`getNodeRaw(request)` returns the underlying `IncomingMessage` and `ServerResponse` when you
+need them.
+
+## Other runtimes
+
+Anything that can call a fetch handler can host Suku through `app.handle`.
+
+```ts
+export default { fetch: app.handle };   // Cloudflare Workers, Deno.serve, ...
+```
+
+Official adapters for those runtimes are not published yet.
+
+## Writing an adapter
+
+```ts
+import type { PlatformAdapter } from '@suku/core';
+
+export const myAdapter = (): PlatformAdapter => ({
+  name: 'mine',
+  async serve(handler, { port = 3000, hostname = '0.0.0.0' } = {}) {
+    const server = startServer({ port, hostname, onRequest: handler });
+    return { hostname, port, url: `http://${hostname}:${port}`, close: () => server.stop() };
+  },
+});
+```
