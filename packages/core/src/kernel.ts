@@ -228,6 +228,7 @@ export function createKernel(
     list: readonly MiddlewareRef[],
     ctx: RequestContext,
     final: () => Promise<Response>,
+    render: (error: unknown) => Promise<Response>,
   ) {
     let reached = -1;
     const next = (index: number): Promise<Response> => {
@@ -236,7 +237,16 @@ export function createKernel(
       reached = index;
       if (index === list.length) return final();
       const mw = resolveMiddleware(list[index]!, ctx);
-      const step = () => next(index + 1);
+      // An error thrown further in is rendered before it returns here, so `next()` always
+      // yields a Response. Otherwise a 401 from an inner middleware would skip the outer
+      // ones on its way out and lose, for example, its CORS headers.
+      const step = async () => {
+        try {
+          return await next(index + 1);
+        } catch (error) {
+          return render(error);
+        }
+      };
       return Promise.resolve(typeof mw === 'function' ? mw(ctx, step) : mw.use(ctx, step));
     };
     return next(0);
@@ -326,7 +336,7 @@ export function createKernel(
       : new NotFoundException(message);
   }
 
-  const handle: FetchHandler = async (request) => {
+  const handle: FetchHandler = async (request, info) => {
     const pathname = pathnameOf(request.url);
     const match = router.match(request.method, pathname);
     const compiled = match?.handler;
@@ -337,6 +347,7 @@ export function createKernel(
       scope,
       compiled?.info,
       settings,
+      info?.remoteAddress,
     );
     contexts.set(scope, ctx);
     try {
@@ -355,7 +366,11 @@ export function createKernel(
           return await handleError(error, ctx, compiled);
         }
       };
-      return middlewares.length ? await runMiddlewares(middlewares, ctx, final) : await final();
+      return middlewares.length
+        ? await runMiddlewares(middlewares, ctx, final, (error) =>
+            handleError(error, ctx, compiled),
+          )
+        : await final();
     } catch (error) {
       // Thrown by a middleware itself.
       return await handleError(error, ctx, compiled);

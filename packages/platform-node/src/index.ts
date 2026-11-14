@@ -96,7 +96,8 @@ async function dispatch(
   let response: Response;
   try {
     request = toRequest(req, res);
-    response = await handler(request);
+    const remoteAddress = req.socket.remoteAddress;
+    response = await handler(request, remoteAddress === undefined ? undefined : { remoteAddress });
   } catch (error) {
     try {
       response = await onError(error, request ?? new Request('http://localhost/'));

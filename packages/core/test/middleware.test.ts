@@ -333,3 +333,43 @@ describe('body, config, logger', () => {
     await app.close();
   });
 });
+
+describe('errors from inner middlewares and the client address', () => {
+  test('an inner middleware that throws still passes back through outer ones as a Response', async () => {
+    const seen: number[] = [];
+    const app = await Suku.create({
+      routes: [
+        route.get('/private', {
+          middlewares: [
+            () => {
+              throw new UnauthorizedException();
+            },
+          ],
+          handle: () => 'secret',
+        }),
+      ],
+      middlewares: [
+        async (_ctx, next) => {
+          const res = await next();
+          seen.push(res.status);
+          res.headers.set('access-control-allow-origin', '*');
+          return res;
+        },
+      ],
+    });
+    const res = await app.handle(req('/private'));
+    expect(res.status).toBe(401);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(seen).toEqual([401]);
+  });
+
+  test('ctx.remoteAddress comes from the adapter and is undefined in process', async () => {
+    const app = await Suku.create({
+      routes: [route.get('/ip', { handle: ({ ctx }) => ({ ip: ctx.remoteAddress ?? null }) })],
+    });
+    expect(await (await app.handle(req('/ip'))).json()).toEqual({ ip: null });
+    expect(await (await app.handle(req('/ip'), { remoteAddress: '203.0.113.9' })).json()).toEqual({
+      ip: '203.0.113.9',
+    });
+  });
+});

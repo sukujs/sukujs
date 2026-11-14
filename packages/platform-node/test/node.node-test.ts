@@ -10,7 +10,7 @@ let seenRaw = false;
 
 before(async () => {
   server = await nodeAdapter({ onError: () => new Response('custom 500', { status: 500 }) }).serve(
-    async (req) => {
+    async (req, info) => {
       const url = new URL(req.url);
       seenRaw ||= getNodeRaw(req) !== undefined;
       switch (url.pathname) {
@@ -53,6 +53,8 @@ before(async () => {
         }
         case '/blob':
           return new Response(new Blob(['blob']));
+        case '/ip':
+          return Response.json({ ip: info?.remoteAddress });
         case '/throw':
           throw new Error('boom');
         default:
@@ -148,4 +150,9 @@ describe('nodeAdapter', () => {
     await s.close();
     await assert.rejects(fetch(s.url));
   });
+});
+
+test('passes the peer address to the handler', async () => {
+  const res = await fetch(`${server.url}/ip`);
+  assert.match(((await res.json()) as { ip: string }).ip, /127\.0\.0\.1/);
 });

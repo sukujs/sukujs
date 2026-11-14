@@ -37,6 +37,11 @@ export class RequestContext {
     /** Undefined when no route matched. */
     readonly route: RouteInfo | undefined,
     readonly settings: RequestSettings = DEFAULT_SETTINGS,
+    /**
+     * The peer's IP address from the platform adapter. Behind a reverse proxy this is the
+     * proxy's address; `undefined` when the request did not come through a socket (tests).
+     */
+    readonly remoteAddress?: string,
   ) {}
 
   get method(): string {
