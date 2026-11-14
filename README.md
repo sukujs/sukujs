@@ -57,12 +57,13 @@ const findOne = route.get('/users/:id', {
 
 ## Packages
 
-| Package               | What it is                                                                    |
-| --------------------- | ----------------------------------------------------------------------------- |
-| `@suku/core`          | Routes, features, middlewares, validation, config, logger                     |
-| `@suku/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation |
-| `@suku/platform-node` | `node:http` adapter                                                           |
-| `@suku/platform-bun`  | `Bun.serve` adapter                                                           |
+| Package               | What it is                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `@suku/core`          | Routes, features, middlewares, validation, config, logger                           |
+| `@suku/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation       |
+| `@suku/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own |
+| `@suku/platform-node` | `node:http` adapter                                                                 |
+| `@suku/platform-bun`  | `Bun.serve` adapter                                                                 |
 
 ## Development
 
