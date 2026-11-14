@@ -4,16 +4,9 @@ Zero-dependency crypto helpers on the Web Crypto API. Works on Node 22+, Bun and
 runtimes, with or without the rest of Suku.
 
 ```ts
-import {
-  createJwt,
-  hashPassword,
-  verifyPassword,
-  createSigner,
-  createSealer,
-  randomToken,
-} from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const jwt = createJwt<{ role: string }>({
+const jwt = sukuCrypto.createJwt<{ role: string }>({
   secret: env.JWT_SECRET,
   issuer: 'api',
   expiresIn: '15m',
@@ -21,11 +14,11 @@ const jwt = createJwt<{ role: string }>({
 const token = await jwt.sign({ role: 'admin' }, { subject: user.id });
 const payload = await jwt.verify(token); // throws JwtError if not trustworthy
 
-const stored = await hashPassword(password);
-await verifyPassword(password, stored); // true or false
+const stored = await sukuCrypto.hashPassword(password);
+await sukuCrypto.verifyPassword(password, stored); // true or false
 
-const signed = await createSigner(env.COOKIE_SECRET).pack('user.42'); // readable, tamper-proof
-const sealed = await createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
+const signed = await sukuCrypto.createSigner(env.COOKIE_SECRET).pack('user.42'); // readable, tamper-proof
+const sealed = await sukuCrypto.createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
 ```
 
 | Area                | API                                                                  |
@@ -45,18 +38,18 @@ Creates a signer/verifier bound to one algorithm and one set of keys. The algori
 at creation time and never read from a token.
 
 ```ts
-import { createJwt, randomToken } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
 // HMAC (default HS256) — secret must be at least 32 bytes for HS256
-const jwt = createJwt<{ role: string }>({
-  secret: env.JWT_SECRET, // or randomToken(32)
+const jwt = sukuCrypto.createJwt<{ role: string }>({
+  secret: env.JWT_SECRET, // or sukuCrypto.randomToken(32)
   issuer: 'api',
   audience: 'web',
   expiresIn: '15m', // default '1h'; use false for non-expiring tokens
 });
 
 // Asymmetric — sign with privateKey, verify with publicKey
-const rsa = createJwt({
+const rsa = sukuCrypto.createJwt({
   algorithm: 'RS256',
   privateKey: process.env.JWT_PRIVATE_PEM, // PKCS#8 PEM
   publicKey: process.env.JWT_PUBLIC_PEM, // SPKI PEM
@@ -64,7 +57,7 @@ const rsa = createJwt({
 });
 
 // Key rotation — old keys verify, never sign
-const rotated = createJwt({
+const rotated = sukuCrypto.createJwt({
   secret: env.JWT_SECRET,
   previousSecrets: [env.JWT_SECRET_OLD],
 });
@@ -83,7 +76,7 @@ const token = await jwt.sign(
     subject: user.id, // sets `sub`
     expiresIn: '5m', // override default lifetime
     notBefore: '30s', // rejected until then
-    jwtId: randomToken(16), // sets `jti`
+    jwtId: sukuCrypto.randomToken(16), // sets `jti`
   },
 );
 ```
@@ -109,9 +102,9 @@ try {
 Extracts the token from an `Authorization: Bearer <token>` header value.
 
 ```ts
-import { bearerToken } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const token = bearerToken(request.headers.get('authorization'));
+const token = sukuCrypto.bearerToken(request.headers.get('authorization'));
 if (!token) return Response.json({ error: 'unauthorized' }, { status: 401 });
 
 const payload = await jwt.verify(token);
@@ -123,9 +116,9 @@ Reads header and payload **without verifying anything**. Attacker-controlled —
 pick a key or to log; never to authorize.
 
 ```ts
-import { decodeJwtUnverified } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const { header, payload } = decodeJwtUnverified(token);
+const { header, payload } = sukuCrypto.decodeJwtUnverified(token);
 console.log(header.kid, payload.sub); // do not trust these for access control
 ```
 
@@ -138,13 +131,13 @@ has. If you can take a native dependency, Argon2id is stronger.
 ### `hashPassword`
 
 ```ts
-import { hashPassword } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const stored = await hashPassword(password);
+const stored = await sukuCrypto.hashPassword(password);
 // "$pbkdf2-sha256$i=600000$…"
 
 // Raise the work factor over time
-const stronger = await hashPassword(password, { iterations: 800_000 });
+const stronger = await sukuCrypto.hashPassword(password, { iterations: 800_000 });
 ```
 
 ### `verifyPassword`
@@ -152,9 +145,9 @@ const stronger = await hashPassword(password, { iterations: 800_000 });
 Returns `true` only on a match. Malformed stored values return `false`, never throw.
 
 ```ts
-import { verifyPassword } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-if (!(await verifyPassword(password, user.passwordHash))) {
+if (!(await sukuCrypto.verifyPassword(password, user.passwordHash))) {
   return Response.json({ error: 'invalid credentials' }, { status: 401 });
 }
 ```
@@ -165,11 +158,11 @@ if (!(await verifyPassword(password, user.passwordHash))) {
 successful login.
 
 ```ts
-import { hashPassword, needsRehash, verifyPassword } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-if (await verifyPassword(password, user.passwordHash)) {
-  if (needsRehash(user.passwordHash, { iterations: 800_000 })) {
-    user.passwordHash = await hashPassword(password, { iterations: 800_000 });
+if (await sukuCrypto.verifyPassword(password, user.passwordHash)) {
+  if (sukuCrypto.needsRehash(user.passwordHash, { iterations: 800_000 })) {
+    user.passwordHash = await sukuCrypto.hashPassword(password, { iterations: 800_000 });
   }
 }
 ```
@@ -182,10 +175,10 @@ links. The value stays readable; use `createSealer` to hide it. Secret must be �
 ### `createSigner`
 
 ```ts
-import { createSigner, randomToken } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const signer = createSigner(env.COOKIE_SECRET); // ≥ 32 bytes
-const rotated = createSigner(env.COOKIE_SECRET, {
+const signer = sukuCrypto.createSigner(env.COOKIE_SECRET); // ≥ 32 bytes
+const rotated = sukuCrypto.createSigner(env.COOKIE_SECRET, {
   previousSecrets: [env.COOKIE_SECRET_OLD],
   hash: 'SHA-256', // default
 });
@@ -216,14 +209,14 @@ change: encrypted cookies, OAuth state, password-reset payloads. Secret must be 
 ### `createSealer`
 
 ```ts
-import { createSealer } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const sealer = createSealer(env.COOKIE_SECRET, {
+const sealer = sukuCrypto.createSealer(env.COOKIE_SECRET, {
   purpose: 'session', // binds ciphertext to a use (default 'suku.seal')
   previousSecrets: [env.COOKIE_SECRET_OLD],
 });
 
-const reset = createSealer(env.COOKIE_SECRET, { purpose: 'reset' });
+const reset = sukuCrypto.createSealer(env.COOKIE_SECRET, { purpose: 'reset' });
 // a value sealed as 'session' cannot be opened with 'reset'
 ```
 
@@ -242,11 +235,11 @@ const session = await sealer.unseal<{ id: number; role: string }>(sealed);
 URL-safe random token. 32 bytes (256 bits) by default — session ids, reset tokens, API keys.
 
 ```ts
-import { randomToken } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const sessionId = randomToken(); // 32 bytes → base64url
-const apiKey = randomToken(32);
-const shortId = randomToken(16);
+const sessionId = sukuCrypto.randomToken(); // 32 bytes → base64url
+const apiKey = sukuCrypto.randomToken(32);
+const shortId = sukuCrypto.randomToken(16);
 ```
 
 ### `randomBytes`
@@ -254,10 +247,10 @@ const shortId = randomToken(16);
 Cryptographically secure random bytes (`Uint8Array`).
 
 ```ts
-import { randomBytes } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const salt = randomBytes(16);
-const iv = randomBytes(12);
+const salt = sukuCrypto.randomBytes(16);
+const iv = sukuCrypto.randomBytes(12);
 ```
 
 ### `randomHex`
@@ -265,18 +258,18 @@ const iv = randomBytes(12);
 Hex-encoded random bytes. 16 bytes by default.
 
 ```ts
-import { randomHex } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const requestId = randomHex(); // 32 hex chars
-const nonce = randomHex(8);
+const requestId = sukuCrypto.randomHex(); // 32 hex chars
+const nonce = sukuCrypto.randomHex(8);
 ```
 
 ### `randomUUID`
 
 ```ts
-import { randomUUID } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const id = randomUUID(); // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+const id = sukuCrypto.randomUUID(); // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
 ### `randomInt`
@@ -284,10 +277,10 @@ const id = randomUUID(); // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 Uniform integer in `[min, max)`, without modulo bias.
 
 ```ts
-import { randomInt } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const dice = randomInt(1, 7); // 1..6
-const index = randomInt(0, items.length);
+const dice = sukuCrypto.randomInt(1, 7); // 1..6
+const index = sukuCrypto.randomInt(0, items.length);
 ```
 
 ## Hashing and compare
@@ -299,10 +292,10 @@ Not for passwords — use `hashPassword`.
 Hex digests for content fingerprints and cache keys.
 
 ```ts
-import { sha256, sha512 } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const etag = await sha256(body);
-const fingerprint = await sha512(fileBytes);
+const etag = await sukuCrypto.sha256(body);
+const fingerprint = await sukuCrypto.sha512(fileBytes);
 ```
 
 ### `digest`
@@ -310,10 +303,10 @@ const fingerprint = await sha512(fileBytes);
 Raw digest bytes for a chosen algorithm.
 
 ```ts
-import { digest } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-const bytes = await digest('SHA-256', 'hello'); // Uint8Array
-const wide = await digest('SHA-512', buffer);
+const bytes = await sukuCrypto.digest('SHA-256', 'hello'); // Uint8Array
+const wide = await sukuCrypto.digest('SHA-512', buffer);
 ```
 
 ### `timingSafeEqual`
@@ -322,9 +315,9 @@ Constant-time compare for secrets you check yourself (API keys, tokens). Signatu
 this package are already verified in constant time.
 
 ```ts
-import { timingSafeEqual } from '@suku/crypto';
+import sukuCrypto from '@suku/crypto';
 
-if (!timingSafeEqual(providedApiKey, storedApiKey)) {
+if (!sukuCrypto.timingSafeEqual(providedApiKey, storedApiKey)) {
   return Response.json({ error: 'unauthorized' }, { status: 401 });
 }
 ```
