@@ -20,7 +20,10 @@ describe('metadata shim', () => {
         public b: B,
       ) {}
     }
-    expect(getMetadata('design:paramtypes', C)).toEqual([A, B]);
+    // Read through `Reflect`, as the container does: another test file in this process may
+    // have loaded reflect-metadata, in which case it holds the metadata instead of the shim.
+    const reflect = Reflect as unknown as { getMetadata(key: string, target: object): unknown };
+    expect(reflect.getMetadata('design:paramtypes', C)).toEqual([A, B]);
     expect(getConstructorParameters(C).map((p) => p.token)).toEqual([A, B]);
   });
 
@@ -71,5 +74,27 @@ describe('metadata shim', () => {
     }
     class Derived extends Base {}
     expect(getConstructorParameters(Derived).map((p) => p.token)).toEqual([Dep]);
+  });
+});
+
+describe('metadata shim: the surface reflect-metadata adopts', () => {
+  test('keys, inherited keys and deletion', async () => {
+    const { defineMetadata, deleteMetadata, getMetadataKeys, getOwnMetadata, getOwnMetadataKeys } =
+      await import('../src/metadata.js');
+    class Base {}
+    class Derived extends Base {}
+    defineMetadata('a', 1, Base);
+    defineMetadata('b', 2, Derived);
+    defineMetadata('p', 3, Derived.prototype, 'method');
+    expect(getOwnMetadataKeys(Derived)).toEqual(['b']);
+    expect(getMetadataKeys(Derived).sort()).toEqual(['a', 'b']);
+    expect(getOwnMetadataKeys(Derived.prototype, 'method')).toEqual(['p']);
+    expect(getOwnMetadataKeys(class {})).toEqual([]);
+    expect(deleteMetadata('b', Derived)).toBe(true);
+    expect(deleteMetadata('b', Derived)).toBe(false);
+    expect(getOwnMetadata('b', Derived)).toBeUndefined();
+    const R = Reflect as unknown as Record<string, unknown>;
+    for (const name of ['getMetadataKeys', 'getOwnMetadataKeys', 'deleteMetadata'])
+      expect(typeof R[name]).toBe('function');
   });
 });

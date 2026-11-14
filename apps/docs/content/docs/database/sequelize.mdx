@@ -1,0 +1,108 @@
+---
+title: Sequelize
+description: Sequelize as a Suku service.
+icon: Layers
+---
+
+This follows the [database pattern](/docs/database). The code is from `examples/database` and
+is tested there against SQLite running in process.
+
+```bash
+bun add sequelize pg
+```
+
+Install the driver for your database: `pg`, `mysql2`, `sqlite3` and so on.
+
+## Model and connection
+
+```ts title="db.ts"
+import { DataTypes, type InferAttributes, type InferCreationAttributes, Model, Sequelize } from 'sequelize';
+
+export class UserModel extends Model<InferAttributes<UserModel>, InferCreationAttributes<UserModel, { omit: 'id' }>> {
+  declare id: number;
+  declare name: string;
+  declare email: string;
+}
+
+export class SequelizeConnection {
+  constructor(readonly sequelize: Sequelize) {}
+
+  dispose() {
+    return this.sequelize.close();
+  }
+}
+
+export const DatabaseFeature = async () => {
+  const sequelize = new Sequelize(env.DATABASE_URL, { logging: false });
+  UserModel.init(
+    {
+      id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+      name: { type: DataTypes.STRING, allowNull: false },
+      email: { type: DataTypes.STRING, allowNull: false, unique: true },
+    },
+    { sequelize, tableName: 'users', timestamps: false },
+  );
+  await sequelize.authenticate();
+
+  return feature('database', {
+    services: [factory(SequelizeConnection, () => new SequelizeConnection(sequelize))],
+  });
+};
+```
+
+Use `declare` for model fields. A normal class field would shadow the getters Sequelize adds.
+
+## Repository
+
+```ts title="users.repository.ts"
+import { UniqueConstraintError } from 'sequelize';
+
+const plain = (model: UserModel): User => model.get({ plain: true });
+
+@Service()
+export class SequelizeUsers extends UsersRepository {
+  constructor(private readonly connection: SequelizeConnection) {
+    super();
+  }
+
+  async list() {
+    return (await UserModel.findAll({ order: [['id', 'ASC']] })).map(plain);
+  }
+
+  async create(input: NewUser) {
+    try {
+      return plain(await UserModel.create(input));
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+}
+```
+
+Return plain objects from the repository, not model instances. An instance carries methods and
+internal state that should not leave the data layer or be serialised.
+
+Sequelize gives a dedicated `UniqueConstraintError` on every database, so no error-code check
+is needed.
+
+## Transactions
+
+```ts
+async createMany(inputs: NewUser[]) {
+  return this.connection.sequelize.transaction(async (transaction) => {
+    const created = [];
+    for (const input of inputs) created.push(plain(await UserModel.create(input, { transaction })));
+    return created;
+  });
+}
+```
+
+Pass `{ transaction }` to every call inside the callback. A call without it runs outside the
+transaction, silently.
+
+## Notes
+
+- **`sync()` is for tests.** Use migrations, with `sequelize-cli` or `umzug`, in production.
+- **Models are global to the Sequelize instance.** `UserModel.init` binds the model to one
+  connection, so define models once, when the connection is created.

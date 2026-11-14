@@ -1,0 +1,133 @@
+---
+title: Other libraries
+description: Kysely, Mongoose, raw drivers, and how to adapt the pattern to anything else.
+icon: Blocks
+---
+
+The [database pattern](/docs/database) does not depend on the library. For one not covered
+here, answer four questions:
+
+1. **How does it connect, and how does it close?** That is the connection service and its
+   `dispose`.
+2. **Is connecting asynchronous?** If so, connect in an async feature, then register.
+3. **How does it report a unique violation?** Translate that into a domain error.
+4. **What does a transaction look like?** Use it inside a repository method.
+
+## Kysely
+
+Tested in `examples/database` against PostgreSQL running in process.
+
+```ts
+import { type Generated, Kysely, PostgresDialect } from 'kysely';
+import { Pool } from 'pg';
+
+interface Schema {
+  users: { id: Generated<number>; name: string; email: string };
+}
+
+export class KyselyConnection {
+  constructor(readonly db: Kysely<Schema>) {}
+
+  dispose() {
+    return this.db.destroy();
+  }
+}
+
+export const DatabaseFeature = () => {
+  const db = new Kysely<Schema>({
+    dialect: new PostgresDialect({ pool: new Pool({ connectionString: env.DATABASE_URL }) }),
+  });
+  return feature('database', { services: [factory(KyselyConnection, () => new KyselyConnection(db))] });
+};
+```
+
+```ts
+@Service()
+export class KyselyUsers extends UsersRepository {
+  constructor(private readonly connection: KyselyConnection) {
+    super();
+  }
+
+  list() {
+    return this.connection.db.selectFrom('users').selectAll().orderBy('id').execute();
+  }
+
+  async create(input: NewUser) {
+    try {
+      return await this.connection.db.insertInto('users').values(input).returningAll().executeTakeFirstOrThrow();
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') throw new DuplicateEmail(input.email);
+      throw error;
+    }
+  }
+
+  createMany(inputs: NewUser[]) {
+    return this.connection.db
+      .transaction()
+      .execute((trx) => trx.insertInto('users').values(inputs).returningAll().execute());
+  }
+}
+```
+
+The tests use a PGlite dialect in place of `PostgresDialect`. The repository is identical.
+
+## A raw driver
+
+No library is needed. A `pg` pool is a connection service already.
+
+```ts
+import { Pool } from 'pg';
+
+export class Postgres {
+  constructor(readonly pool: Pool) {}
+
+  query<T>(text: string, values: unknown[] = []) {
+    return this.pool.query(text, values).then((result) => result.rows as T[]);
+  }
+
+  ping() {
+    return this.pool.query('select 1').then(() => true, () => false);
+  }
+
+  dispose() {
+    return this.pool.end();
+  }
+}
+```
+
+Always pass values as parameters, never by building the SQL string.
+
+<Callout>
+  This raw-driver sketch and the Mongoose one below are not run by the test suite, because
+  they need a database server. They follow the same pattern as the tested guides.
+</Callout>
+
+## Mongoose and MongoDB
+
+The pattern carries over to document databases unchanged.
+
+```ts
+import mongoose from 'mongoose';
+
+export class Mongo {
+  constructor(readonly connection: mongoose.Connection) {}
+
+  dispose() {
+    return this.connection.close();
+  }
+}
+
+export const DatabaseFeature = async () => {
+  const connection = await mongoose.createConnection(env.MONGODB_URL).asPromise();
+  return feature('database', { services: [factory(Mongo, () => new Mongo(connection))] });
+};
+```
+
+Register models on that connection, not on the global `mongoose` object, so tests and several
+apps in one process stay isolated. A duplicate key is an error with `code === 11000`.
+
+## Redis and other stores
+
+Caches, queues and search clients are the same shape: a class that holds the client, a
+`dispose` that closes it, registered with `factory`. Nothing about the pattern is specific to
+SQL.
