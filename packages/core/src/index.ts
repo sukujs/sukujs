@@ -1,5 +1,16 @@
-// Typed registration helpers, re-exported so apps need only one import for module files.
-export { alias, factory, scoped, singleton, transient, value } from '@suku/di';
+// Typed registration helpers and DI decorators, re-exported so app files need one import.
+export {
+  alias,
+  factory,
+  Inject,
+  Injectable,
+  InjectionToken,
+  Optional,
+  scoped,
+  singleton,
+  transient,
+  value,
+} from '@suku/di';
 export type {
   CloseOptions,
   FetchHandler,
@@ -7,33 +18,19 @@ export type {
   PlatformAdapter,
   ServeOptions,
 } from './adapter.js';
-export { type InlineApp, Suku, SukuApplication, type SukuOptions } from './application.js';
-export { assertMediaType, Body, type BodyOptions, parseBody } from './body.js';
+export { Suku, SukuApplication, type SukuOptions } from './application.js';
+export { assertMediaType, type BodyOptions, parseBody } from './body.js';
 export { ConfigError, ConfigToken, defineConfig } from './config.js';
 export { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
 export {
-  All,
-  Controller,
-  type ControllerMetadata,
-  type ControllerOptions,
-  Delete,
-  Get,
-  getAllHandlers,
-  getControllerMetadata,
-  getHandlerMetadata,
-  type HandlerMetadata,
-  Head,
-  Header,
-  HttpCode,
-  type HttpMethod,
-  Options,
-  Patch,
-  Post,
-  Put,
-  Redirect,
-  type RouteMetadata,
-} from './controller.js';
-export * from './enhancers.js';
+  type Feature,
+  type FeatureOptions,
+  type FeatureRef,
+  feature,
+  isFeature,
+  type RouteEntry,
+  type ServiceEntry,
+} from './feature.js';
 export * from './http-errors.js';
 export {
   contextOf,
@@ -45,59 +42,40 @@ export {
 } from './kernel.js';
 export { ConsoleLogger, Logger, type LogLevel, SilentLogger } from './logger.js';
 export {
-  type DynamicModule,
-  defineModule,
-  getModuleMetadata,
-  isDynamicModule,
-  isModuleDefinition,
-  Module,
-  type ModuleDefinition,
-  type ModuleMetadata,
-  type ModuleOptions,
-  type ModuleRef,
-  type ServiceEntry,
-  servicesOf,
-} from './module.js';
+  allow,
+  type ErrorHandler,
+  type Middleware,
+  type MiddlewareFn,
+  type MiddlewareRef,
+  middleware,
+  type Next,
+} from './middleware.js';
+export { toResponse } from './response.js';
 export {
-  Ctx,
-  createParamDecorator,
-  getParamMetadata,
-  Headers,
-  Param,
-  type ParamMetadata,
-  type ParamResolver,
-  Query,
-  Req,
-} from './params.js';
-export {
-  Catch,
-  type ClassOrMethodDecorator,
-  getCatchTypes,
-  getClassEnhancers,
-  SetMetadata,
-  UseFilters,
-  UseGuards,
-  UseInterceptors,
-  UseMiddleware,
-  UsePipes,
-} from './pipeline.js';
-export {
-  DefaultValuePipe,
-  ParseBoolPipe,
-  ParseEnumPipe,
-  ParseFloatPipe,
-  ParseIntPipe,
-  ParseUUIDPipe,
-} from './pipes.js';
-export { type RedirectResult, toResponse } from './response.js';
+  type GroupOptions,
+  type HttpMethod,
+  isRoute,
+  isRouteGroup,
+  type PathParams,
+  type ResolvedServices,
+  type Route,
+  type RouteConfig,
+  type RouteGroup,
+  type RouteInput,
+  type RouteOptions,
+  redirect,
+  route,
+  type ServiceMap,
+} from './route.js';
 export { ALL_METHODS, RouteConflictError, type RouteMatch, Router } from './router.js';
 export {
-  ModuleError,
-  type ModuleId,
-  type ScannedModule,
-  type ScanResult,
-  scanModules,
-} from './scanner.js';
+  getRoutesMetadata,
+  isRoutesClass,
+  Routes,
+  type RoutesMetadata,
+  type RoutesOptions,
+} from './routes-class.js';
+export { FeatureError, type ScannedEntry, type ScanResult, scanFeatures } from './scanner.js';
 export {
   flattenIssues,
   type Infer,
@@ -109,7 +87,6 @@ export {
   type StandardSchema,
   ValidationException,
   type ValidationIssue,
-  ValidationPipe,
   validate,
 } from './schema.js';
 export { pathnameOf } from './url.js';

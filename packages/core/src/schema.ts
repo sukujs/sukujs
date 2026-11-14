@@ -1,4 +1,3 @@
-import type { ArgumentMetadata, Pipe } from './enhancers.js';
 import { BadRequestException } from './http-errors.js';
 
 /**
@@ -76,25 +75,4 @@ export async function validate<S extends StandardSchema>(
   const result = await schema['~standard'].validate(value);
   if (result.issues) throw new ValidationException(result.issues, where);
   return result.value as InferOutput<S>;
-}
-
-function describeArgument(m: ArgumentMetadata): string {
-  return m.data === undefined
-    ? m.kind.toLowerCase()
-    : `${m.kind.toLowerCase()} "${String(m.data)}"`;
-}
-
-/**
- * Validates a handler argument with a Standard Schema. Param decorators accept a schema
- * directly (`@Body(CreateUser)`, `@Query(ListQuery)`, `@Param('id', Id)`), which creates
- * this pipe for you.
- */
-export class ValidationPipe<S extends StandardSchema = StandardSchema>
-  implements Pipe<unknown, InferOutput<S>>
-{
-  constructor(readonly schema: S) {}
-
-  transform(value: unknown, metadata: ArgumentMetadata): Promise<InferOutput<S>> {
-    return validate(this.schema, value, describeArgument(metadata));
-  }
 }

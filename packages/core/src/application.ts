@@ -7,66 +7,38 @@ import type {
   ServeOptions,
 } from './adapter.js';
 import { RequestContext } from './context.js';
-import type { FilterRef, GuardRef, InterceptorRef, MiddlewareRef, PipeRef } from './enhancers.js';
 import {
-  collectEnhancerClasses,
+  type Feature,
+  type FeatureRef,
+  feature,
+  isFeature,
+  type RouteEntry,
+  type ServiceEntry,
+} from './feature.js';
+import {
   contextOf,
   createKernel,
   type Kernel,
   type KernelOptions,
   type RouteTableEntry,
-  registerEnhancerClasses,
 } from './kernel.js';
 import { ConsoleLogger, Logger } from './logger.js';
-import {
-  defineModule,
-  isDynamicModule,
-  isModuleDefinition,
-  type ModuleOptions,
-  type ModuleRef,
-} from './module.js';
-import { scanModules } from './scanner.js';
+import type { MiddlewareRef } from './middleware.js';
+import { scanFeatures } from './scanner.js';
 
 export interface SukuOptions extends KernelOptions {
   /** Required for `listen()`. `handle()` works without one, which is how tests run. */
   adapter?: PlatformAdapter;
+  /** Features that make up the app. */
+  features?: FeatureRef[];
+  /** Routes declared directly on the app, for small services that need no feature. */
+  routes?: RouteEntry[];
+  /** Services declared directly on the app. */
+  services?: ServiceEntry[];
   /** Container options. `validateOnBuild` defaults to `true` so misconfiguration fails at startup. */
   di?: ServiceProviderOptions;
   /** Last chance to add or replace services before the container is built. */
   configureServices?: (services: ServiceCollection) => void;
-}
-
-/**
- * An application declared in one object: module options and app options together, like a
- * .NET `Program.cs`. `Suku.create({ imports: [UsersModule], adapter: nodeAdapter() })`.
- */
-export type InlineApp = ModuleOptions & SukuOptions;
-
-const APP_OPTION_KEYS = [
-  'adapter',
-  'di',
-  'configureServices',
-  'globalPrefix',
-  'onError',
-  'bodyLimit',
-  'middleware',
-  'guards',
-  'interceptors',
-  'pipes',
-  'filters',
-] as const;
-
-function splitInline(inline: InlineApp): { root: ModuleRef; options: SukuOptions } {
-  const options: Record<string, unknown> = {};
-  const module: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(inline)) {
-    if ((APP_OPTION_KEYS as readonly string[]).includes(k)) options[k] = v;
-    else module[k] = v;
-  }
-  return {
-    root: defineModule({ name: 'root', ...(module as ModuleOptions) }),
-    options: options as SukuOptions,
-  };
 }
 
 export class SukuApplication {
@@ -79,28 +51,45 @@ export class SukuApplication {
     private readonly options: SukuOptions,
   ) {}
 
+  /**
+   * Builds an application, like a .NET `Program.cs`:
+   *
+   * ```ts
+   * const app = await Suku.create({ features: [UsersFeature], adapter: nodeAdapter() });
+   * ```
+   *
+   * A single root feature may be passed first: `Suku.create(AppFeature, { adapter })`.
+   */
+  static async create(options?: SukuOptions): Promise<SukuApplication>;
   static async create(
-    root: ModuleRef | InlineApp,
-    options: SukuOptions = {},
+    root: Feature | Promise<Feature>,
+    options?: SukuOptions,
+  ): Promise<SukuApplication>;
+  static async create(
+    a: Feature | Promise<Feature> | SukuOptions = {},
+    b: SukuOptions = {},
   ): Promise<SukuApplication> {
-    if (
-      typeof root === 'object' &&
-      root !== null &&
-      !(root instanceof Promise) &&
-      !isModuleDefinition(root) &&
-      !isDynamicModule(root)
-    ) {
-      const split = splitInline(root as InlineApp);
-      root = split.root;
-      options = { ...split.options, ...options };
+    let options: SukuOptions;
+    let imports: FeatureRef[];
+    if (a instanceof Promise || isFeature(a)) {
+      options = b;
+      imports = [a, ...(b.features ?? [])];
+    } else {
+      options = a;
+      imports = a.features ?? [];
     }
-    const scan = await scanModules(root as ModuleRef);
+    const root = feature('app', {
+      imports,
+      ...(options.routes ? { routes: options.routes } : {}),
+      ...(options.services ? { services: options.services } : {}),
+    });
+
+    const scan = await scanFeatures(root);
     scan.collection.addScoped(RequestContext, (sp) => {
       const ctx = contextOf(sp);
       if (!ctx) throw new Error('RequestContext is only available inside a request scope.');
       return ctx;
     });
-    registerEnhancerClasses(scan.collection, collectEnhancerClasses(scan, options));
     scan.collection.tryAddSingleton(Logger, ConsoleLogger);
     options.configureServices?.(scan.collection);
     const provider = scan.collection.build({ validateOnBuild: true, ...options.di });
@@ -127,42 +116,10 @@ export class SukuApplication {
     return this.provider.get(token);
   }
 
-  private addGlobal<T>(
-    kind: 'middleware' | 'guards' | 'interceptors' | 'pipes' | 'filters',
-    refs: T[],
-  ): this {
-    for (const ref of refs) {
-      if (
-        typeof ref === 'function' &&
-        ref.prototype !== undefined &&
-        !this.provider.has(ref as never)
-      ) {
-        const name = (ref as { name?: string }).name ?? 'class';
-        throw new Error(
-          `${name} is not registered. Pass it in Suku.create({ ${kind}: [${name}] }) so it is registered before the ` +
-            "container is built, add it to a module's services, or pass an instance instead.",
-        );
-      }
-      (this.kernel.globals[kind] as T[]).push(ref);
-    }
+  /** Adds app-level middlewares. They run for every request, matched or not. */
+  use(...middlewares: MiddlewareRef[]): this {
+    this.kernel.middlewares.push(...middlewares);
     return this;
-  }
-
-  /** Adds global middleware. Runs for every request, matched or not, before module and controller middleware. */
-  use(...middleware: MiddlewareRef[]): this {
-    return this.addGlobal('middleware', middleware);
-  }
-  useGlobalGuards(...guards: GuardRef[]): this {
-    return this.addGlobal('guards', guards);
-  }
-  useGlobalInterceptors(...interceptors: InterceptorRef[]): this {
-    return this.addGlobal('interceptors', interceptors);
-  }
-  useGlobalPipes(...pipes: PipeRef[]): this {
-    return this.addGlobal('pipes', pipes);
-  }
-  useGlobalFilters(...filters: FilterRef[]): this {
-    return this.addGlobal('filters', filters);
   }
 
   async listen(
