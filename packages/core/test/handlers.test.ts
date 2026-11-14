@@ -2,12 +2,19 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  Logger,
   NotFoundException,
   parseCookies,
   redirect,
   route,
+  SilentLogger,
   Suku,
   serializeCookie,
+  singleton,
+  TooManyRequestsException,
 } from '../src/index.js';
 
 const req = (path: string, init?: RequestInit) => new Request(`http://t.local${path}`, init);
@@ -272,5 +279,156 @@ describe('bodies in and out', () => {
     expect(
       ((await (await app.handle(req('/search?tag=a'))).json()) as { tags: string[] }).tags,
     ).toEqual(['a']);
+  });
+});
+
+// The patterns shown on the docs' Errors page.
+describe('status codes and exceptions', () => {
+  class PaymentRequiredException extends HttpException {
+    constructor(message = 'Payment required') {
+      super(402, message);
+    }
+  }
+  class QuotaExceededException extends HttpException {
+    constructor(
+      readonly limit: number,
+      readonly retryAfter: number,
+    ) {
+      super(
+        429,
+        { code: 'quota_exceeded', limit },
+        { headers: { 'retry-after': String(retryAfter) } },
+      );
+    }
+  }
+  class InsufficientFunds extends Error {
+    constructor(readonly missing: number) {
+      super('Insufficient funds');
+    }
+  }
+  class NotAHttpError extends Error {}
+
+  const appP = Suku.create({
+    services: [singleton(Logger, SilentLogger)],
+    onError: (error) => {
+      if (error instanceof InsufficientFunds) {
+        return Response.json(
+          { code: 'insufficient_funds', missing: error.missing },
+          { status: 422 },
+        );
+      }
+    },
+    routes: [
+      route.post('/jobs', { status: 202, handle: () => ({ queued: true }) }),
+      route.put('/items/:id', {
+        handle: ({ params }) =>
+          Response.json({ id: params.id }, { status: params.id === 'new' ? 201 : 200 }),
+      }),
+      route.get('/throw/:kind', {
+        handle: ({ params }) => {
+          switch (params.kind) {
+            case 'plain':
+              throw new HttpException(402, 'Subscription required');
+            case 'default':
+              throw new NotFoundException();
+            case 'object':
+              throw new ConflictException({ code: 'email_taken', field: 'email' });
+            case 'headers':
+              throw new TooManyRequestsException('Slow down', { headers: { 'retry-after': '30' } });
+            case 'custom':
+              throw new PaymentRequiredException();
+            case 'shaped':
+              throw new QuotaExceededException(100, 60);
+            case 'domain':
+              throw new InsufficientFunds(25);
+            case 'teapot':
+              throw new HttpException(418);
+            case 'unknown-code':
+              throw new HttpException(499, 'Client closed');
+            default:
+              throw new NotAHttpError('secret detail');
+          }
+        },
+      }),
+    ],
+  });
+  const get = async (path: string) => {
+    const res = await (await appP).handle(req(path));
+    return { status: res.status, body: await res.json(), headers: res.headers };
+  };
+
+  test('success statuses: route option and returned Response', async () => {
+    const app = await appP;
+    expect((await app.handle(req('/jobs', { method: 'POST' }))).status).toBe(202);
+    expect((await app.handle(req('/items/new', { method: 'PUT' }))).status).toBe(201);
+    expect((await app.handle(req('/items/7', { method: 'PUT' }))).status).toBe(200);
+  });
+
+  test('HttpException with any status, default messages, object bodies and headers', async () => {
+    expect(await get('/throw/plain')).toMatchObject({
+      status: 402,
+      body: { statusCode: 402, message: 'Subscription required', error: 'Payment Required' },
+    });
+    expect((await get('/throw/default')).body).toEqual({
+      statusCode: 404,
+      message: 'Not Found',
+      error: 'Not Found',
+    });
+    expect(await get('/throw/object')).toMatchObject({
+      status: 409,
+      body: { code: 'email_taken', field: 'email' },
+    });
+    const limited = await get('/throw/headers');
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('30');
+    expect((await get('/throw/teapot')).body).toEqual({
+      statusCode: 418,
+      message: "I'm a teapot",
+      error: "I'm a teapot",
+    });
+    expect((await get('/throw/unknown-code')).body).toEqual({
+      statusCode: 499,
+      message: 'Client closed',
+      error: 'HTTP 499',
+    });
+  });
+
+  test('custom classes: a new status, a custom shape, and a domain error mapped by onError', async () => {
+    expect(await get('/throw/custom')).toMatchObject({
+      status: 402,
+      body: { statusCode: 402, message: 'Payment required', error: 'Payment Required' },
+    });
+    const quota = await get('/throw/shaped');
+    expect(quota).toMatchObject({ status: 429, body: { code: 'quota_exceeded', limit: 100 } });
+    expect(quota.headers.get('retry-after')).toBe('60');
+    expect(await get('/throw/domain')).toMatchObject({
+      status: 422,
+      body: { code: 'insufficient_funds', missing: 25 },
+    });
+  });
+
+  test('anything else is a 500 that reveals nothing; exceptions expose status and body', async () => {
+    expect(await get('/throw/other')).toMatchObject({
+      status: 500,
+      body: { statusCode: 500, message: 'Internal Server Error', error: 'Internal Server Error' },
+    });
+    const e = new QuotaExceededException(5, 10);
+    expect([e instanceof HttpException, e.status, e.limit, e.getBody()]).toEqual([
+      true,
+      429,
+      5,
+      { code: 'quota_exceeded', limit: 5 },
+    ]);
+    expect(new ForbiddenException('No').getBody()).toEqual({
+      statusCode: 403,
+      message: 'No',
+      error: 'Forbidden',
+    });
+    // The Error message never becomes the text "undefined" for object bodies.
+    expect(new ConflictException({ code: 'email_taken' }).message).toBe('Conflict');
+    expect(new ConflictException({ code: 'x', message: 'Already used' }).message).toBe(
+      'Already used',
+    );
+    expect(new NotFoundException().message).toBe('Not Found');
   });
 });
