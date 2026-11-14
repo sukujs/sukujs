@@ -76,6 +76,16 @@ const findOne = route.get('/users/:id', {
 | `@sukujs/platform-node` | `node:http` adapter                                                                 |
 | `@sukujs/platform-bun`  | `Bun.serve` adapter                                                                 |
 
+Current release: **0.1.0** on npm under [`@sukujs`](https://www.npmjs.com/org/sukujs).
+
+## Install
+
+```bash
+bun add @sukujs/core @sukujs/platform-bun zod
+# or on Node:
+bun add @sukujs/core @sukujs/platform-node zod
+```
+
 ## Development
 
 ```bash

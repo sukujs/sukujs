@@ -96,7 +96,7 @@ function Home() {
           <div>
             <SukuMark className="mb-6 size-12" />
             <p className="mb-4 inline-flex rounded-full border bg-fd-card px-3 py-1 text-xs font-medium text-fd-muted-foreground">
-              Pre-release · Node 22+ and Bun
+              v0.1.0 · Node 22+ and Bun
             </p>
             <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
               Room to spare<span className="text-fd-primary">.</span>
