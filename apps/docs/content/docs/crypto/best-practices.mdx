@@ -67,8 +67,9 @@ digit" make passwords easier to guess, not harder.
 **Give one answer for a wrong email and a wrong password**, and do the same work in both
 cases. See [logging in](/docs/crypto/passwords#logging-in).
 
-**Rate-limit by account and by address.** Slow hashing protects a stolen database. It does
-not stop someone guessing against your login route.
+**Rate-limit by account and by address**, with [`rateLimit`](/docs/security/rate-limiting).
+Slow hashing protects a stolen database. It does not stop someone guessing against your
+login route.
 
 **Never log, email or return a password.** Check that request logging skips authentication
 routes.
@@ -144,6 +145,6 @@ These tools assume TLS. A token sent over plain HTTP is a token given away.
 
 ## Limits of this package
 
-It has not had an independent security audit. It does not provide rate limiting, CSRF
-protection, account lockout, multi-factor authentication or audit logging. Those belong in
-your application, and several are as important as anything on this page.
+It has not had an independent security audit. Rate limiting, CSRF protection, CORS and security headers are in
+[`@suku/security`](/docs/security). Account lockout, multi-factor authentication and audit
+logging belong in your application.

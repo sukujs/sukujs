@@ -1,0 +1,105 @@
+---
+title: CSRF protection
+description: Stop other websites from acting as your logged-in users.
+icon: ShieldAlert
+---
+
+When a browser holds a session cookie for your site, it sends that cookie with every request
+to you, including one triggered by a form on someone else's page. Cross-site request forgery
+uses that to make a logged-in user perform an action they did not intend.
+
+## Do you need it?
+
+| How clients authenticate | CSRF protection |
+| --- | --- |
+| A cookie the browser sends automatically | Needed |
+| An `Authorization` header your code adds | Not needed. Another site cannot add it. |
+| No authentication | Not needed |
+
+## Origin mode
+
+```ts
+import { csrf } from '@suku/security';
+
+Suku.create({ middlewares: [csrf()] });
+```
+
+The default mode needs no tokens, cookies or changes to your front end. Browsers attach
+headers to every request that say where it came from, and a page cannot forge them. For each
+state-changing request, the middleware:
+
+1. Allows it if `Sec-Fetch-Site` is `same-origin` or `none`.
+2. Otherwise allows it if `Origin` is in `allowedOrigins`, or names the same host as the request.
+3. Allows it if neither header is present, because that is not a browser making a cross-site
+   request.
+4. Rejects everything else with `403`.
+
+`GET`, `HEAD` and `OPTIONS` are never checked, so they must never change state.
+
+### A front end on another origin
+
+```ts
+csrf({ allowedOrigins: ['https://app.example.com'] });
+```
+
+A front end on a sibling subdomain counts as cross-origin and must be listed. Sibling
+subdomains are not trusted automatically, because one compromised or user-controlled
+subdomain would then defeat the protection.
+
+### Skipping routes
+
+Requests from other servers, such as webhooks, carry no session cookie and are verified
+another way.
+
+```ts
+csrf({ skip: (ctx) => ctx.url.pathname.startsWith('/webhooks/') });
+```
+
+## Token mode
+
+Use this when you must support clients that do not send `Origin` or `Sec-Fetch-Site`. It is
+the signed double-submit cookie pattern: the server issues a signed token in a cookie, and
+every state-changing request must repeat it in a header.
+
+```ts
+csrf({ mode: 'token', secret: env.CSRF_SECRET });
+```
+
+The middleware sets a `csrf` cookie on the first response. Your front end reads it and sends
+it back:
+
+```ts
+const token = document.cookie.match(/(?:^|; )csrf=([^;]+)/)?.[1];
+
+await fetch('/api/orders', {
+  method: 'POST',
+  headers: { 'x-csrf-token': token, 'content-type': 'application/json' },
+  body: JSON.stringify(order),
+});
+```
+
+For server-rendered forms, read the token in a handler:
+
+```ts
+import { csrfToken } from '@suku/security';
+
+route.get('/form', { handle: ({ ctx }) => renderForm({ csrf: csrfToken(ctx) }) });
+```
+
+Another site can make the browser send the cookie, but it cannot read the cookie to copy it
+into a header. The signature stops a neighbouring subdomain from planting a cookie of its own.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `secret` | required | Signs the token. At least 32 characters. |
+| `cookieName` | `csrf` | |
+| `headerName` | `x-csrf-token` | |
+| `cookie` | `Path=/; SameSite=Lax; Secure` | The cookie is readable by scripts on purpose. |
+
+## Also do this
+
+- Set `SameSite=Lax` or `Strict` on your session cookie. It blocks most cross-site requests
+  on its own, and this middleware covers the rest.
+- Never change state in a `GET` route.
+- Keep [CORS](/docs/security/cors) strict when `credentials` is on. Allowing any origin with
+  credentials undoes CSRF protection.

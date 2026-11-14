@@ -1,0 +1,90 @@
+---
+title: CORS
+description: Let browser apps on other origins call your API.
+icon: Globe
+---
+
+Browsers stop a page on one origin from reading responses from another unless the server
+allows it. `cors` adds the headers that grant that permission.
+
+```ts
+import { cors } from '@suku/security';
+
+Suku.create({
+  middlewares: [cors({ origin: ['https://app.example.com'], credentials: true })],
+});
+```
+
+Register it at the app level. It then also covers 404s, errors and preflight requests for
+routes that have no `OPTIONS` handler.
+
+<Callout>
+  CORS is not access control. It only tells browsers which pages may read a response. Other
+  clients ignore it, and a blocked request may still have reached your server. Protect data
+  with authentication.
+</Callout>
+
+## Choosing origins
+
+| `origin` | Allows |
+| --- | --- |
+| `'*'` (default) | Any site. Right for a public, unauthenticated API. |
+| `'https://app.example.com'` | That exact origin. |
+| `['https://a.example', /\.preview\.example$/]` | Listed origins and patterns. |
+| `(origin, ctx) => boolean` | Whatever you decide per request, sync or async. |
+
+An origin is the scheme, host and port together. `https://app.example.com` and
+`http://app.example.com` are different origins.
+
+```ts
+cors({ origin: (origin) => tenants.isKnownOrigin(origin) });
+```
+
+## Credentials
+
+Set `credentials: true` when the browser must send cookies or an `Authorization` header set
+by the browser itself. It requires explicit origins.
+
+```ts
+cors({ credentials: true });   // throws: "*" cannot be combined with credentials
+```
+
+Suku refuses that combination at startup, because browsers reject it and the usual
+workaround, reflecting any origin, lets every website act as your logged-in users.
+
+## Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `origin` | `'*'` | Who may read responses. |
+| `credentials` | `false` | Allow cookies and browser-managed auth. |
+| `methods` | GET, HEAD, PUT, PATCH, POST, DELETE | Methods allowed cross-origin. |
+| `allowedHeaders` | What the browser asks for | Request headers the browser may send. |
+| `exposedHeaders` | none | Response headers scripts may read. |
+| `maxAge` | `600` | Seconds a browser may cache a preflight. |
+
+Scripts can read only a few response headers by default. Expose your own:
+
+```ts
+cors({ origin: allowed, exposedHeaders: ['x-total-count', 'ratelimit-remaining'] });
+```
+
+## Preflight requests
+
+Before a request with a JSON body or custom headers, the browser sends an `OPTIONS` request
+to ask permission. `cors` answers it with `204` and never calls your route. An origin that is
+not allowed gets a `204` with no CORS headers, which makes the browser block the real request.
+
+## Caching
+
+When the answer depends on the origin, `cors` adds `Vary: Origin`, so a shared cache does not
+serve one origin's response to another.
+
+## Troubleshooting
+
+| Symptom in the browser | Usual cause |
+| --- | --- |
+| "No 'Access-Control-Allow-Origin' header" | The page's origin is not in `origin`. Check scheme and port. |
+| "Credentials flag is true, but..." | `credentials` is on the client but not in `cors`. |
+| Preflight fails with a custom header | You set `allowedHeaders` and left that header out. |
+| Works in curl, fails in the browser | Expected: only browsers enforce CORS. |

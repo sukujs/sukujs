@@ -44,14 +44,8 @@ App-level middlewares run for every request, including ones that match no route.
 always resolves to a `Response`, because errors and 404s are rendered before control returns,
 so a CORS or request-id middleware can decorate every response.
 
-```ts
-const cors = middleware(async (ctx, next) => {
-  if (ctx.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
-  const res = await next();
-  res.headers.set('access-control-allow-origin', '*');
-  return res;
-});
-```
+Ready-made middlewares for CORS, security headers, CSRF and rate limiting are in
+[`@suku/security`](/docs/security).
 
 ## Authentication
 

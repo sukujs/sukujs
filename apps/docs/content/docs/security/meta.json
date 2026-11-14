@@ -1,0 +1,4 @@
+{
+  "title": "Security middlewares",
+  "pages": ["index", "cors", "security-headers", "csrf", "rate-limiting"]
+}

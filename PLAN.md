@@ -20,6 +20,9 @@ Suku is now built from **routes, features, middlewares and services**:
   service without a class; it is its own token and its dependencies are validated at startup.
 - `@suku/crypto` (2026-11-14): standalone, Web Crypto only. JWT (HS/RS/PS/ES/EdDSA, algorithm
   fixed at creation), PBKDF2 password hashing, HMAC signer, AES-GCM sealer, random and hash helpers.
+- `@suku/security` (2026-11-14): `cors`, `securityHeaders`, `csrf` (origin and token modes) and
+  `rateLimit` (pluggable store). Core gained `ctx.remoteAddress` via `FetchHandler(request, info)`,
+  and errors thrown by inner middlewares are rendered before returning to outer ones.
 - Deferred: typed values added by middlewares, a route-level result hook, OpenAPI and a typed
   client (routes already carry method, path, schemas and name for them).
 

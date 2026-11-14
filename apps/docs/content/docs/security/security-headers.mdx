@@ -1,0 +1,96 @@
+---
+title: Security headers
+description: Defensive response headers with sensible defaults.
+icon: ShieldCheck
+---
+
+A handful of response headers switch on protections that browsers leave off by default.
+`securityHeaders` sets them on every response.
+
+```ts
+import { securityHeaders } from '@suku/security';
+
+Suku.create({ middlewares: [securityHeaders()] });
+```
+
+## What it sets
+
+| Header | Default | What it does |
+| --- | --- | --- |
+| `Strict-Transport-Security` | `max-age=15552000; includeSubDomains` | Browsers use HTTPS only, for 180 days. |
+| `Content-Security-Policy` | Nothing may load, no framing | Limits what a response can do if rendered. |
+| `X-Content-Type-Options` | `nosniff` | Browsers trust the declared content type. |
+| `X-Frame-Options` | `DENY` | The response cannot be framed. Stops clickjacking. |
+| `Referrer-Policy` | `no-referrer` | Your URLs are not leaked to other sites. |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Other sites cannot hold a reference to your window. |
+| `Cross-Origin-Resource-Policy` | `same-origin` | Other sites cannot embed your responses. |
+
+The defaults are tuned for an API that returns JSON. If you serve HTML, set a real
+[content security policy](#content-security-policy).
+
+A header your handler already set is left alone, so one route can loosen a policy without
+turning it off for the whole app.
+
+```ts
+route.get('/embed', {
+  handle: () => new Response(html, { headers: { 'content-type': 'text/html', 'x-frame-options': 'SAMEORIGIN' } }),
+});
+```
+
+## Options
+
+Each header takes a value, or `false` to omit it.
+
+```ts
+securityHeaders({
+  hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: true },
+  frameOptions: 'SAMEORIGIN',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  crossOriginResourcePolicy: 'cross-origin',   // for public images or fonts
+  permissionsPolicy: 'camera=(), microphone=(), geolocation=()',
+  extra: { 'x-robots-tag': 'noindex' },
+});
+```
+
+| Option | Header |
+| --- | --- |
+| `hsts` | `Strict-Transport-Security` |
+| `contentSecurityPolicy` | `Content-Security-Policy` |
+| `noSniff` | `X-Content-Type-Options` |
+| `frameOptions` | `X-Frame-Options` |
+| `referrerPolicy` | `Referrer-Policy` |
+| `crossOriginOpenerPolicy` | `Cross-Origin-Opener-Policy` |
+| `crossOriginResourcePolicy` | `Cross-Origin-Resource-Policy` |
+| `permissionsPolicy` | `Permissions-Policy`, off unless set |
+| `extra` | Any other headers |
+
+## Content security policy
+
+The default policy forbids everything, which is right for JSON and wrong for a web page. Pass
+directives as an object.
+
+```ts
+securityHeaders({
+  contentSecurityPolicy: {
+    'default-src': ["'self'"],
+    'img-src': ["'self'", 'data:', 'https://cdn.example.com'],
+    'script-src': ["'self'"],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'frame-ancestors': ["'none'"],
+  },
+});
+```
+
+Avoid `'unsafe-inline'` and `'unsafe-eval'` in `script-src`. They remove most of the
+protection the policy gives.
+
+## HTTPS
+
+`Strict-Transport-Security` only takes effect over HTTPS, and browsers ignore it on plain
+HTTP, so it is safe to leave on in development. Turn on `preload` only once every subdomain
+serves HTTPS, since it is hard to undo.
+
+## What these headers do not do
+
+They harden the browser's handling of your responses. They do not validate input, encode
+output or authenticate anyone.
