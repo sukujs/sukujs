@@ -15,7 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: bun install --frozen-lockfile
+      # No lockfile is committed, so dependencies resolve fresh on every run.
+      - run: bun install
       - run: bun run version:check
       - run: bun run lint
       - run: bun run typecheck

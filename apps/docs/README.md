@@ -16,16 +16,16 @@ bun run --cwd apps/docs deploy   # build + wrangler deploy
 
 ## Cloudflare Git builds (`Workers Builds: sukujs`)
 
-The monorepo `bun.lock` is **lockfileVersion 2** (Bun 1.4+). The Workers Builds image defaults to
-Bun **1.2.15**, which cannot read it and fails with `Unknown lockfile version` under
-`--frozen-lockfile`. Do **not** delete `bun.lock` to work around this.
+The repository commits no `bun.lock` (it is in `.gitignore`), so installs resolve fresh and must
+not use `--frozen-lockfile`. The Workers Builds image defaults to Bun **1.2.15**; the workspace
+needs Bun 1.4+, so pin the version.
 
 Open the **sukujs** Worker on the sukujs Cloudflare account → **Settings** → **Build** →
 **Variables and secrets** (set on **production and preview** triggers), and add:
 
-| Variable       | Value   |
-| -------------- | ------- |
-| `BUN_VERSION`  | `1.4.4` |
+| Variable      | Value   |
+| ------------- | ------- |
+| `BUN_VERSION` | `1.4.4` |
 
 Dashboard (account `be6d1b4401c39fa79f3587ac0a5a5620`):
 
@@ -33,10 +33,10 @@ https://dash.cloudflare.com/be6d1b4401c39fa79f3587ac0a5a5620/workers/services/vi
 
 Suggested build settings:
 
-| Setting         | Value                                              |
-| --------------- | -------------------------------------------------- |
-| Root directory  | `apps/docs` (or `/` with a cwd-aware command)      |
-| Build command   | `bun run build`                                    |
-| Deploy command  | `bunx wrangler deploy`                             |
+| Setting        | Value                                         |
+| -------------- | --------------------------------------------- |
+| Root directory | `apps/docs` (or `/` with a cwd-aware command) |
+| Build command  | `bun run build`                               |
+| Deploy command | `bunx wrangler deploy`                        |
 
 After saving, the next build log must show `bun@1.4.4`, not `bun@1.2.15`.
