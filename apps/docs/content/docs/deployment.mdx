@@ -1,0 +1,465 @@
+---
+title: Deployment
+description: Run a Suku app on a VPS, Docker, Cloudflare Workers, or Vercel.
+icon: Rocket
+---
+
+Suku's kernel is a Fetch `Request` → `Response` function. On a VPS or in Docker you call
+`app.listen()` with a Node or Bun adapter. On Cloudflare and Vercel you export `app.handle`
+and let the platform call it.
+
+## Before you deploy
+
+### Build for Node
+
+Node cannot run TypeScript decorators. Bundle (or compile) before start:
+
+```bash
+bun build src/main.ts --target node --outdir dist
+node dist/main.js
+```
+
+Bun can run `src/main.ts` directly in production if you prefer.
+
+### Bind the right host
+
+`app.listen(3000)` listens on `0.0.0.0`. Behind a reverse proxy, bind loopback only:
+
+```ts
+await app.listen({ port: 3000, hostname: '127.0.0.1' });
+```
+
+### Shut down cleanly
+
+Stop accepting connections, finish in-flight work, then dispose singletons:
+
+```ts
+const server = await app.listen(env.PORT);
+console.log(`listening on ${server.url}`);
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    void app.close().then(() => process.exit(0));
+  });
+}
+```
+
+`app.close({ force: true })` also drops open connections.
+
+### Health check
+
+Expose a cheap route your process manager or load balancer can hit:
+
+```ts
+const health = route.get('/health', { handle: () => ({ ok: true }) });
+```
+
+---
+
+## VPS with PM2
+
+Works for Node or Bun on a Linux VPS. Put Nginx, Caddy or Apache in front for TLS (see
+[Reverse proxy](#reverse-proxy) below).
+
+### 1. Build and start script
+
+```json title="package.json"
+{
+  "scripts": {
+    "build": "bun build src/main.ts --target node --outdir dist",
+    "start": "node dist/main.js"
+  }
+}
+```
+
+### 2. Ecosystem file
+
+```js title="ecosystem.config.cjs"
+module.exports = {
+  apps: [
+    {
+      name: 'api',
+      script: 'dist/main.js',
+      instances: 'max', // or 1 for Bun / sticky sessions
+      exec_mode: 'cluster', // Node only; use fork for Bun
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000,
+      },
+      max_memory_restart: '512M',
+    },
+  ],
+};
+```
+
+For Bun instead of a bundle:
+
+```js
+{
+  name: 'api',
+  script: 'bun',
+  args: 'run src/main.ts',
+  interpreter: 'none',
+  instances: 1,
+  exec_mode: 'fork',
+  env: { PORT: 3000 },
+}
+```
+
+### 3. Deploy
+
+```bash
+git pull
+bun install --production
+bun run build
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup   # enable on boot
+```
+
+Useful commands: `pm2 logs api`, `pm2 reload api` (zero-downtime on Node cluster),
+`pm2 restart api`.
+
+---
+
+## VPS with systemd
+
+No PM2 — a unit file owns the process.
+
+```ini title="/etc/systemd/system/suku-api.service"
+[Unit]
+Description=Suku API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/api
+EnvironmentFile=/var/www/api/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Hardening (optional)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+For Bun, set `ExecStart=/usr/local/bin/bun run src/main.ts`.
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now suku-api
+sudo systemctl status suku-api
+journalctl -u suku-api -f
+```
+
+Reload after a deploy:
+
+```bash
+bun run build
+sudo systemctl restart suku-api
+```
+
+Use a [reverse proxy](#reverse-proxy) in front for TLS.
+
+---
+
+## Reverse proxy
+
+Bind the app to loopback (`127.0.0.1:3000`) and terminate TLS at the proxy. Forward
+`Host`, `X-Forwarded-For` and `X-Forwarded-Proto` so `@sukujs/security` rate limits and CSRF
+see the real client. Point trusted-proxy options at this hop.
+
+<Tabs items={['Caddy', 'Nginx', 'Apache']}>
+  <Tab value="Caddy">
+    Caddy obtains and renews certificates automatically.
+
+    ```text title="Caddyfile"
+    api.example.com {
+      reverse_proxy 127.0.0.1:3000
+    }
+    ```
+
+    Headers are set for you. Reload with `caddy reload --config /etc/caddy/Caddyfile`.
+
+    With Docker Compose, add a Caddy service and proxy to `api:3000` on the compose network
+    instead of `127.0.0.1`.
+  </Tab>
+  <Tab value="Nginx">
+    ```nginx title="/etc/nginx/sites-available/api"
+    server {
+      listen 443 ssl http2;
+      server_name api.example.com;
+
+      # ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+      # ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+      location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+      }
+    }
+    ```
+
+    ```bash
+    sudo ln -s /etc/nginx/sites-available/api /etc/nginx/sites-enabled/
+    sudo nginx -t && sudo systemctl reload nginx
+    ```
+  </Tab>
+  <Tab value="Apache">
+    Enable the proxy modules, then add a vhost:
+
+    ```bash
+    sudo a2enmod proxy proxy_http headers ssl
+    ```
+
+    ```apache title="/etc/apache2/sites-available/api.conf"
+    <VirtualHost *:443>
+      ServerName api.example.com
+
+      SSLEngine on
+      # SSLCertificateFile    /etc/letsencrypt/live/api.example.com/fullchain.pem
+      # SSLCertificateKeyFile /etc/letsencrypt/live/api.example.com/privkey.pem
+
+      ProxyPreserveHost On
+      ProxyPass        / http://127.0.0.1:3000/
+      ProxyPassReverse / http://127.0.0.1:3000/
+
+      RequestHeader set X-Forwarded-Proto "https"
+      RequestHeader set X-Forwarded-Port "443"
+    </VirtualHost>
+    ```
+
+    Apache sets `X-Forwarded-For` when acting as a proxy. Enable and reload:
+
+    ```bash
+    sudo a2ensite api
+    sudo apache2ctl configtest && sudo systemctl reload apache2
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Docker Compose
+
+### Dockerfile
+
+```dockerfile title="Dockerfile"
+# syntax=docker/dockerfile:1
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun build src/main.ts --target node --outdir dist
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+USER node
+EXPOSE 3000
+CMD ["node", "dist/main.js"]
+```
+
+Skip the Node stage and run Bun if you prefer a single-runtime image:
+
+```dockerfile
+FROM oven/bun:1
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+COPY . .
+ENV PORT=3000
+EXPOSE 3000
+CMD ["bun", "run", "src/main.ts"]
+```
+
+### Compose
+
+```yaml title="docker-compose.yml"
+services:
+  api:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file: .env
+    environment:
+      PORT: 3000
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+```
+
+```bash
+docker compose up -d --build
+docker compose logs -f api
+```
+
+Put [Caddy, Nginx or Apache](#reverse-proxy) in the same compose file for TLS, or terminate TLS
+at your cloud load balancer. With Caddy as a sibling service:
+
+```yaml
+  caddy:
+    image: caddy:2
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [api]
+
+volumes:
+  caddy_data:
+```
+
+```text title="Caddyfile"
+api.example.com {
+  reverse_proxy api:3000
+}
+```
+
+---
+
+## Cloudflare Workers
+
+There is no `@sukujs/platform-cloudflare` yet. Workers already speak Fetch, so export
+`app.handle`.
+
+### Entry
+
+```ts title="src/worker.ts"
+import { Suku, route } from '@sukujs/core';
+import { z } from 'zod';
+
+const hello = route.get('/hello/:name', {
+  handle: ({ params }) => ({ message: `Hello, ${params.name}` }),
+});
+
+const app = await Suku.create({
+  routes: [hello],
+  // no adapter — Workers call handle(), they do not listen()
+});
+
+export default {
+  fetch: app.handle,
+};
+```
+
+For bindings (secrets, KV, D1), create the app once and close over `env` in a wrapper, or
+resolve config inside a middleware from request-scoped state you attach yourself.
+
+### Wrangler
+
+```toml title="wrangler.toml"
+name = "suku-api"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "bun run build:worker"
+```
+
+Bundle so decorator metadata survives (plain `route.*` apps need less ceremony):
+
+```bash
+bun build src/worker.ts --outfile dist/worker.js --target bun
+# or: wrangler deploy with a bundler plugin that keeps experimentalDecorators
+```
+
+```bash
+npx wrangler deploy
+```
+
+<Callout type="warn">
+  Avoid Node-only APIs (`fs`, `node:http`, native addons). Prefer Web Crypto — `@sukujs/crypto`
+  is built for edge. Official Cloudflare adapter and first-class binding helpers are not
+  published yet.
+</Callout>
+
+---
+
+## Vercel
+
+Same idea as Workers: no `listen()`, export a Fetch handler. Use a catch-all serverless
+function so every path reaches Suku.
+
+### App module
+
+```ts title="src/app.ts"
+import { Suku, route } from '@sukujs/core';
+
+const health = route.get('/health', { handle: () => ({ ok: true }) });
+const hello = route.get('/hello/:name', {
+  handle: ({ params }) => ({ message: `Hello, ${params.name}` }),
+});
+
+export const app = await Suku.create({ routes: [health, hello] });
+```
+
+### Serverless entry
+
+```ts title="api/[[...path]].ts"
+import { app } from '../src/app';
+
+export const config = { runtime: 'edge' }; // or omit for Node
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return app.handle(request);
+  },
+};
+```
+
+On the Node runtime, ensure your build emits decorator metadata if you use `@Routes` /
+constructor injection. Edge prefers plain `route.*` handlers and Web APIs only.
+
+### Project config
+
+```json title="vercel.json"
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}
+```
+
+```bash
+vercel deploy --prod
+```
+
+Set secrets in the Vercel project environment. Long-lived sockets, local disk, and heavy
+startup work are a poor fit for serverless — keep cold starts small or prefer a VPS / Docker
+host for always-on workloads.
+
+---
+
+## Choosing a host
+
+| Host | How Suku runs | Use when |
+| --- | --- | --- |
+| VPS + PM2 | `listen()` + process manager | Simple always-on API, Node cluster |
+| VPS + systemd | `listen()` + unit file | No extra runtime deps, tight OS control |
+| Docker Compose | `listen()` in a container | Reproducible deploys, multi-service stacks |
+| Cloudflare Workers | `app.handle` | Edge latency, global distribution |
+| Vercel | `app.handle` in a function | Preview deploys, serverless APIs |
+
+See [Node and Bun](/docs/platforms) for adapters, `listen` / `close`, and writing your own
+adapter.

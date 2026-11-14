@@ -24,6 +24,7 @@
     "...database",
     "---Platforms---",
     "platforms",
+    "deployment",
     "---Guides---",
     "graphql",
     "from-nestjs",
