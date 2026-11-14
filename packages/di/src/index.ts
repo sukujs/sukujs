@@ -50,7 +50,12 @@ export {
   installReflectShim,
 } from './metadata.js';
 export { buildServiceProvider, ServiceProvider, type ServiceProviderOptions } from './provider.js';
-export { getConstructorParameters, type ParameterInfo } from './reflection.js';
+export {
+  getConstructorParameters,
+  type InjectEntry,
+  type InjectEntryObject,
+  type ParameterInfo,
+} from './reflection.js';
 export {
   type AbstractConstructor,
   type Constructor,

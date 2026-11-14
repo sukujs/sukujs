@@ -205,3 +205,40 @@ describe('resolution', () => {
     expect(sp.get('alias')).toBe(7);
   });
 });
+
+describe('decorator-free classes and create()', () => {
+  class Db {}
+  class Repo {
+    static inject = [Db, { token: 'missing', optional: true }];
+    constructor(
+      readonly db: Db,
+      readonly extra?: unknown,
+    ) {}
+  }
+  class Unregistered {
+    static inject = [Repo];
+    disposed = false;
+    constructor(readonly repo: Repo) {}
+    dispose() {
+      this.disposed = true;
+    }
+  }
+
+  test('static inject replaces decorator metadata', () => {
+    const sp = new ServiceCollection()
+      .addSingleton(Db)
+      .addSingleton(Repo)
+      .build({ validateOnBuild: true });
+    expect(sp.get(Repo).db).toBe(sp.get(Db));
+    expect(sp.get(Repo).extra).toBeUndefined();
+  });
+
+  test('create() builds an unregistered class and owns its disposal', async () => {
+    const sp = new ServiceCollection().addSingleton(Db).addSingleton(Repo).build();
+    const a = sp.create(Unregistered);
+    expect(a.repo).toBe(sp.get(Repo));
+    expect(sp.create(Unregistered)).not.toBe(a);
+    await sp.dispose();
+    expect(a.disposed).toBe(true);
+  });
+});
