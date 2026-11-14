@@ -93,7 +93,7 @@ When a middleware needs injected services, write it as a class. It is constructe
 container and does not need to be registered.
 
 ```ts
-@Injectable()
+@Service()
 export class RequestLogger implements Middleware {
   constructor(private readonly log: Logger) {}
 
@@ -107,7 +107,7 @@ export class RequestLogger implements Middleware {
 Suku.create({ middlewares: [RequestLogger] });
 ```
 
-A middleware class is a singleton unless declared `@Injectable({ lifetime: 'scoped' })`, in
+A middleware class is a singleton unless declared `@Service({ lifetime: 'scoped' })`, in
 which case it is created per request and may inject the `RequestContext`.
 
 ## Rules

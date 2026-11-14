@@ -32,7 +32,7 @@ Inject it with the token.
 ```ts
 import type { Infer } from '@suku/core';
 
-@Injectable()
+@Service()
 export class Database {
   constructor(@Inject(Env) private readonly env: Infer<typeof Env.schema>) {}
 }

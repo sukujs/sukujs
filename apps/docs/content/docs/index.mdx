@@ -9,11 +9,10 @@ Suku is a lightweight TypeScript backend framework built from four ideas: **rout
 services come from a dependency injection container modelled on .NET's.
 
 ```ts title="main.ts"
-import { Injectable, Routes, Suku, feature, route, singleton } from '@suku/core';
+import { Routes, Suku, feature, route, singleton } from '@suku/core';
 import { nodeAdapter } from '@suku/platform-node';
 import { z } from 'zod';
 
-@Injectable()
 class UsersService {
   find(id: number) {
     return { id, name: 'Ada' };
@@ -53,7 +52,8 @@ await app.listen(3000);
     One concept for everything that wraps a request: logging, authentication, caching, CORS.
   </Card>
   <Card title="Services" href="/docs/dependency-injection">
-    Singleton, scoped and transient lifetimes, a scope per request, and startup validation.
+    Declared with a class or without one. Singleton, scoped and transient lifetimes, a scope
+    per request, and startup validation.
   </Card>
 </Cards>
 

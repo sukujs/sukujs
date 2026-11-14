@@ -22,7 +22,7 @@ get it as `ctx`, and scoped services can inject it.
 ## Injecting it
 
 ```ts
-@Injectable({ lifetime: 'scoped' })
+@Service({ lifetime: 'scoped' })
 export class CurrentUser {
   readonly id: string | undefined;
 

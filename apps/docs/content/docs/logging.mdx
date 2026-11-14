@@ -10,7 +10,7 @@ anywhere.
 ```ts
 import { Logger } from '@suku/core';
 
-@Injectable()
+@Service()
 export class BillingService {
   constructor(private readonly log: Logger) {}
 
@@ -40,7 +40,7 @@ default.
 ```ts
 import pino from 'pino';
 
-@Injectable()
+@Service()
 export class PinoLogger extends Logger {
   private readonly pino = pino();
 

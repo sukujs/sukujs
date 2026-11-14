@@ -17,7 +17,7 @@ concepts to get there, and types flow from schemas instead of being written twic
 | `@Get(':id')` on a method | `findOne = route.get('/:id', { ... })` as a field |
 | `@Param`, `@Query`, `@Body` | The `params`, `query` and `body` schemas |
 | DTO class with `class-validator` | A Standard Schema (Zod, Valibot, ArkType) |
-| Provider | Service |
+| `@Injectable()` provider | `@Service()` class, or `service(name, { ... })` without a class |
 | Middleware, guard, interceptor | [Middleware](/docs/middlewares) |
 | Pipe | A schema |
 | Exception filter | [`onError`](/docs/errors) |

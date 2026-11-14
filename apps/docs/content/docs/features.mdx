@@ -51,7 +51,8 @@ singleton(Logger, UsersService);     // compile error
 value(CONFIG, { port: '3000' });     // compile error if CONFIG is InjectionToken<{ port: number }>
 ```
 
-See [dependency injection](/docs/dependency-injection) for lifetimes and tokens.
+A [classless service](/docs/dependency-injection#services-without-a-class) is listed by itself:
+`services: [Clock, Invoices]`. See [services](/docs/dependency-injection) for lifetimes and tokens.
 
 ## Composing the app
 

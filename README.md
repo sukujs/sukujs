@@ -5,11 +5,10 @@ A lightweight TypeScript backend framework built from four ideas: **routes**, **
 dependency injection container modelled on .NET's. Zero runtime dependencies. Runs on Node and Bun.
 
 ```ts
-import { Injectable, Routes, Suku, feature, route, singleton } from '@suku/core';
+import { Routes, Suku, feature, route, singleton } from '@suku/core';
 import { nodeAdapter } from '@suku/platform-node';
 import { z } from 'zod';
 
-@Injectable()
 class UsersService {
   find(id: number) {
     return { id, name: 'Ada' };

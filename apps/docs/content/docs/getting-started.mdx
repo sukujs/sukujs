@@ -58,6 +58,7 @@ This style needs no decorators and no compiler options.
 ### Add a service and a routes class
 
 Classes that receive services through their constructor need TypeScript's decorator metadata.
+`UsersService` below takes nothing in its constructor, so it needs no decorator at all.
 
 ```json title="tsconfig.json"
 {
@@ -73,10 +74,9 @@ Classes that receive services through their constructor need TypeScript's decora
 ```
 
 ```ts title="src/users.ts"
-import { Injectable, NotFoundException, Routes, feature, route, singleton } from '@suku/core';
+import { NotFoundException, Routes, feature, route, singleton } from '@suku/core';
 import { z } from 'zod';
 
-@Injectable()
 export class UsersService {
   private readonly users = new Map([[1, { id: 1, name: 'Ada Lovelace' }]]);
 

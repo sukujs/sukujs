@@ -70,6 +70,8 @@ Register either kind in a [feature](/docs/features), or directly on the app.
 feature('users', { routes: [UsersRoutes, findOne] });
 ```
 
+A missing entry in `services` is caught at startup, with the route and service named.
+
 ## What the handler receives
 
 One object. Each part is typed by its schema, or is the raw value when there is none.

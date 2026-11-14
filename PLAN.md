@@ -16,6 +16,8 @@ Suku is now built from **routes, features, middlewares and services**:
   `defineModule`, `@UseGuards`/`@UseInterceptors`/`@UsePipes`/`@UseFilters`, built-in pipes.
 - Unchanged: the container (now also `static inject` and `provider.create()`), radix router,
   adapters, Standard Schema validation, `defineConfig`, `Logger`.
+- `@Injectable` was renamed `@Service`, and `service(name, { services, create })` declares a
+  service without a class; it is its own token and its dependencies are validated at startup.
 - Deferred: typed values added by middlewares, a route-level result hook, OpenAPI and a typed
   client (routes already carry method, path, schemas and name for them).
 

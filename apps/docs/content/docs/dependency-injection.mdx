@@ -1,31 +1,118 @@
 ---
-title: Dependency injection
-description: Lifetimes, scopes, tokens, keyed services, validation and disposal.
+title: Services
+description: Declaring services with or without a class, lifetimes, tokens, validation and disposal.
 icon: Boxes
 ---
 
-`@suku/di` is a container modelled on .NET's. Services are registered in one
-`ServiceCollection` with an explicit lifetime, and resolved from a `ServiceProvider`. Inside
-an application `Suku.create` builds both for you. The package also works alone.
+A service is anything your routes and other services depend on: a repository, a mailer, a
+clock. Suku resolves them from a container modelled on .NET's, where every service has an
+explicit lifetime. Like routes, a service can be written with a class or without one.
+
+<Tabs items={['With a class', 'Without a class']}>
+  <Tab value="With a class">
+    Dependencies arrive through the constructor.
+
+    ```ts
+    import { Service } from '@suku/core';
+
+    @Service()
+    export class UsersService {
+      constructor(private readonly db: Database) {}
+
+      find(id: number) {
+        return this.db.users.get(id);
+      }
+    }
+    ```
+  </Tab>
+  <Tab value="Without a class">
+    The service lists what it needs and returns its implementation. Its type is inferred.
+
+    ```ts
+    import { service } from '@suku/core';
+
+    export const UsersService = service('users', {
+      services: { db: Database },
+      create: ({ db }) => ({
+        find: (id: number) => db.users.get(id),
+      }),
+    });
+    ```
+  </Tab>
+</Tabs>
+
+Both register the same way and can depend on each other.
 
 ```ts
-import { Injectable, ServiceCollection } from '@suku/di';
+feature('users', { services: [UsersService] });
+```
 
-@Injectable()
-class Database {}
+## When `@Service()` is needed
 
-@Injectable()
-class UsersRepository {
-  constructor(private readonly db: Database) {}
+The decorator has no behaviour of its own. It makes TypeScript record the constructor's
+parameter types, which is how the container knows what to pass.
+
+| Class | Needs `@Service()`? |
+| --- | --- |
+| No constructor parameters | No |
+| Constructor parameters | Yes, or a `static inject` array |
+| Already decorated with `@Routes()` | No |
+| Wants a default lifetime | `@Service({ lifetime: 'scoped' })`, or register with `scoped(...)` |
+
+Forgetting it on a class that needs it fails at startup with a message naming the class.
+
+## Services without a class
+
+`service(name, options)` returns a value that is both the registration and the token.
+
+```ts
+export const Clock = service('clock', () => ({ now: () => new Date() }));
+
+export const Invoices = service('invoices', {
+  lifetime: 'scoped',
+  services: { clock: Clock, db: Database },
+  create: ({ clock, db }) => ({
+    due: () => db.invoices.dueBefore(clock.now()),
+  }),
+});
+```
+
+Use it by name in a route, or in another service.
+
+```ts
+route.get('/invoices/due', {
+  services: { invoices: Invoices },
+  handle: ({ invoices }) => invoices.due(),      // fully typed
+});
+```
+
+In a class constructor, inject it with its token and take the type with `ServiceOf`.
+
+```ts
+@Service()
+class Reports {
+  constructor(@Inject(Invoices) private readonly invoices: ServiceOf<typeof Invoices>) {}
 }
+```
+
+Declared dependencies are checked at startup exactly like constructor parameters: a missing
+one, or a singleton depending on a scoped service, stops the app before it listens. An object
+with a `dispose()` method is disposed with its scope.
+
+## Using the container directly
+
+`@suku/di` also works on its own, without HTTP.
+
+```ts
+import { ServiceCollection } from '@suku/di';
 
 const provider = new ServiceCollection()
   .addSingleton(Database)
-  .addScoped(UsersRepository)
+  .addScoped(UsersService)
   .build({ validateOnBuild: true });
 
 const scope = provider.createScope();
-scope.get(UsersRepository);
+scope.get(UsersService);
 await scope.dispose();
 ```
 
@@ -51,7 +138,7 @@ export abstract class Cache {
   abstract get(key: string): Promise<string | undefined>;
 }
 
-@Injectable()
+@Service()
 export class RedisCache extends Cache { /* ... */ }
 
 services: [singleton(Cache, RedisCache)];
@@ -77,8 +164,7 @@ class Server {
 
 ## Without decorators
 
-`@Injectable()` exists so TypeScript emits the constructor's parameter types. To avoid
-decorators, list the dependencies in a static `inject` array instead.
+To keep a class but avoid decorators, list its dependencies in a static `inject` array.
 
 ```ts
 class UsersRepository {
@@ -122,7 +208,7 @@ server listens.
 
 | Problem | Error |
 | --- | --- |
-| A constructor needs a service that is not registered. | `MissingServiceError` |
+| A constructor, service or route needs a service that is not registered. | `MissingServiceError` |
 | Services depend on each other in a loop. | `CircularDependencyError` |
 | A singleton depends on a scoped service. | `CaptiveDependencyError` |
 | A parameter's type is an interface or primitive with no `@Inject`. | `UnresolvableParameterError` |
@@ -142,7 +228,7 @@ first. A service takes part by having any of `dispose()`, `onDispose()`, `[Symbo
 or `[Symbol.asyncDispose]()`.
 
 ```ts
-@Injectable()
+@Service()
 class UnitOfWork {
   async dispose() {
     await this.connection.release();

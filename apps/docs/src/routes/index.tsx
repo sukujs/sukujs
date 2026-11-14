@@ -19,11 +19,10 @@ export const Route = createFileRoute('/')({
   }),
 });
 
-const sample = `import { Injectable, Routes, Suku, feature, route, singleton } from '@suku/core';
+const sample = `import { Routes, Suku, feature, route, singleton } from '@suku/core';
 import { nodeAdapter } from '@suku/platform-node';
 import { z } from 'zod';
 
-@Injectable()
 class UsersService {
   find(id: number) {
     return { id, name: 'Ada' };
