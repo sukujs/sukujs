@@ -1,34 +1,243 @@
 ---
-title: Errors
-description: HTTP exceptions, error handlers, and what happens to everything else.
+title: Errors and status codes
+description: Setting a status, throwing HTTP exceptions, writing your own, and mapping errors.
 icon: Bug
 ---
 
-## Throwing
+## Status codes
 
-Throw an `HttpException` subclass anywhere: a handler, a service, a middleware.
+### On success
+
+Three ways, depending on when the status is known.
+
+**Fixed for the route.** Set `status`.
 
 ```ts
-throw new NotFoundException(`User ${id} not found`);
+route.post('/jobs', {
+  status: 202,
+  handle: ({ body }) => queue.add(body),
+});
 ```
+
+**Decided at runtime.** Return a `Response`.
+
+```ts
+route.put('/items/:id', {
+  handle: async ({ params, ctx }) => {
+    const { item, created } = await items.upsert(params.id, await ctx.body());
+    return Response.json(item, { status: created ? 201 : 200 });
+  },
+});
+```
+
+**Left to the defaults.**
+
+| Situation | Status |
+| --- | --- |
+| A handler returns data | `200` |
+| A `POST` handler returns data | `201` |
+| A handler returns nothing | `204` |
+
+### On failure
+
+Throw an exception. Any status works.
+
+```ts
+throw new NotFoundException('User 42 not found');
+throw new HttpException(402, 'Subscription required');
+```
+
+## HTTP exceptions
+
+`HttpException` and its subclasses are exported from `@suku/core`. Throw one from a handler,
+a service or a middleware and the request ends with that response.
+
+| Status | Class | Typical use |
+| --- | --- | --- |
+| 400 | `BadRequestException` | The request is malformed. |
+| 401 | `UnauthorizedException` | Not signed in, or the credentials are bad. |
+| 403 | `ForbiddenException` | Signed in, but not allowed. |
+| 404 | `NotFoundException` | The thing does not exist. |
+| 405 | `MethodNotAllowedException` | Wrong method for the path. Sent automatically. |
+| 406 | `NotAcceptableException` | No representation matches `Accept`. |
+| 408 | `RequestTimeoutException` | The client took too long. |
+| 409 | `ConflictException` | It clashes with current state, such as a duplicate. |
+| 410 | `GoneException` | It existed and was removed for good. |
+| 412 | `PreconditionFailedException` | An `If-Match` style condition failed. |
+| 413 | `PayloadTooLargeException` | The body is too big. Sent automatically past `bodyLimit`. |
+| 415 | `UnsupportedMediaTypeException` | The `Content-Type` is not accepted. |
+| 422 | `UnprocessableEntityException` | Well-formed, but breaks a business rule. |
+| 429 | `TooManyRequestsException` | Rate limited. |
+| 500 | `InternalServerErrorException` | Something broke on the server. |
+| 501 | `NotImplementedException` | Not supported yet. |
+| 502 | `BadGatewayException` | An upstream service answered badly. |
+| 503 | `ServiceUnavailableException` | Temporarily unable to serve. |
+| 504 | `GatewayTimeoutException` | An upstream service did not answer in time. |
+
+`ValidationException` is a `400` that carries `issues`. [Schemas](/docs/validation) throw it
+for you.
+
+### What you can pass
+
+```ts
+throw new NotFoundException();                          // the default message
+throw new NotFoundException('User 42 not found');       // your message
+throw new ConflictException({ code: 'email_taken', field: 'email' });   // your whole body
+```
+
+A string, or nothing, produces the standard body:
 
 ```json
-{ "statusCode": 404, "message": "User 7 not found", "error": "Not Found" }
+{ "statusCode": 404, "message": "User 42 not found", "error": "Not Found" }
 ```
 
-Classes exist for the common statuses, including `BadRequestException`,
-`UnauthorizedException`, `ForbiddenException`, `ConflictException`,
-`UnprocessableEntityException` and `TooManyRequestsException`. Pass an object instead of a
-string to control the whole body, and `headers` to add response headers.
+An object is sent exactly as you wrote it, which is how you define your own error format.
+
+The second argument adds response headers and the underlying cause.
 
 ```ts
 throw new TooManyRequestsException('Slow down', { headers: { 'retry-after': '30' } });
+
+try {
+  await payments.charge(order);
+} catch (error) {
+  throw new BadGatewayException('Payment provider failed', { cause: error });
+}
 ```
 
-## Everything else
+`cause` is kept for your logs and never sent to the client.
 
-An error that is not an `HttpException` is reported through the [logger](/docs/logging) with
-the method and path, and the client receives a `500` with no details.
+### Any other status
+
+`HttpException` takes the status directly.
+
+```ts
+import { HttpException } from '@suku/core';
+
+throw new HttpException(402, 'Subscription required');
+// { "statusCode": 402, "message": "Subscription required", "error": "Payment Required" }
+```
+
+The `error` label is filled in for every standard status. A non-standard one such as `499`
+is labelled `HTTP 499`.
+
+## Custom exception classes
+
+### A status with no built-in class
+
+Extend `HttpException` and fix the status.
+
+```ts
+import { HttpException } from '@suku/core';
+
+export class PaymentRequiredException extends HttpException {
+  constructor(message = 'Payment required') {
+    super(402, message);
+  }
+}
+
+throw new PaymentRequiredException();
+```
+
+### An error with its own shape
+
+Pass an object as the body, and keep typed fields on the class for code that catches it.
+
+```ts
+export class QuotaExceededException extends HttpException {
+  constructor(
+    readonly limit: number,
+    readonly retryAfter: number,
+  ) {
+    super(
+      429,
+      { code: 'quota_exceeded', limit, retryAfter },
+      { headers: { 'retry-after': String(retryAfter) } },
+    );
+  }
+}
+
+throw new QuotaExceededException(1000, 60);
+```
+
+```text
+HTTP/1.1 429 Too Many Requests
+retry-after: 60
+
+{ "code": "quota_exceeded", "limit": 1000, "retryAfter": 60 }
+```
+
+### Domain errors without HTTP
+
+This is the approach to prefer for errors thrown by [services](/docs/dependency-injection).
+The service throws a plain error that knows nothing about status codes.
+
+```ts title="billing/errors.ts"
+export class InsufficientFunds extends Error {
+  constructor(readonly missing: number) {
+    super('Insufficient funds');
+  }
+}
+
+export class AccountFrozen extends Error {}
+```
+
+One [error handler](#error-handlers) translates them at the edge.
+
+```ts title="billing/billing.feature.ts"
+import type { ErrorHandler } from '@suku/core';
+
+const billingErrors: ErrorHandler = (error) => {
+  if (error instanceof InsufficientFunds) {
+    return Response.json({ code: 'insufficient_funds', missing: error.missing }, { status: 422 });
+  }
+  if (error instanceof AccountFrozen) {
+    return Response.json({ code: 'account_frozen' }, { status: 403 });
+  }
+};
+
+export const BillingFeature = feature('billing', {
+  routes: [PaymentRoutes],
+  services: [BillingService],
+  onError: billingErrors,
+});
+```
+
+The service stays usable from a queue worker or a script, and your API's error format lives
+in one file.
+
+### Which to use
+
+| Situation | Use |
+| --- | --- |
+| A route cannot find something, or rejects the caller | A built-in exception |
+| You need a status that has no class | `HttpException`, or a small subclass |
+| Clients need a machine-readable code | A subclass with an object body |
+| The error comes from business logic | A plain `Error` and an `onError` handler |
+
+### Reading an exception
+
+```ts
+const error = new QuotaExceededException(1000, 60);
+
+error instanceof HttpException;   // true
+error.status;                     // 429
+error.getBody();                  // { code: 'quota_exceeded', limit: 1000, retryAfter: 60 }
+error.limit;                      // 1000
+```
+
+## Unexpected errors
+
+Anything thrown that is not an `HttpException`, and that no handler mapped, is treated as a
+bug. It is reported through the [logger](/docs/logging) with the method and path, and the
+client receives a `500` that reveals nothing.
+
+```json
+{ "statusCode": 500, "message": "Internal Server Error", "error": "Internal Server Error" }
+```
+
+The original message and stack never reach the client, so an error from a database driver
+cannot leak a query or a hostname.
 
 ## Error handlers
 
@@ -37,14 +246,14 @@ the method and path, and the client receives a `500` with no details.
 ```ts
 import type { ErrorHandler } from '@suku/core';
 
-export const domainErrors: ErrorHandler = (error) => {
+export const domainErrors: ErrorHandler = (error, ctx) => {
   if (error instanceof InsufficientFunds) {
-    return Response.json({ code: 'insufficient_funds', missing: error.missing }, { status: 422 });
+    return Response.json({ code: 'insufficient_funds' }, { status: 422 });
   }
 };
 ```
 
-It attaches wherever middlewares do.
+It attaches wherever [middlewares](/docs/middlewares) do.
 
 ```ts
 route.post('/pay', { onError: domainErrors, handle });        // one route
@@ -58,40 +267,57 @@ Handlers run most specific first: route, class or group, feature, app. The first
 `Response` wins. If none does, the default applies: an `HttpException` renders itself, and
 anything else is logged and answered with a `500`.
 
-The app-level handler also sees unmatched routes and errors thrown by middlewares.
+The app-level handler also sees unmatched routes and errors thrown by middlewares. If a
+handler itself throws, the client receives a `500` and the failure is logged.
+
+### One error format for the whole API
+
+Because the app-level handler sees every error, it can give them all one shape.
 
 ```ts
-Suku.create({
-  onError: (error, ctx) => {
-    if (ctx.route === undefined) return new Response('Nothing here', { status: 404 });
-  },
-});
-```
-
-If a handler itself throws, the client receives a `500` and the failure is logged.
-
-## A problem-details handler
-
-```ts
-import { HttpException, defaultMessage } from '@suku/core';
+import { HttpException, ValidationException, defaultMessage } from '@suku/core';
 
 export const problemDetails: ErrorHandler = (error, ctx) => {
   const status = error instanceof HttpException ? error.status : 500;
+  if (status === 500) return;                    // let the default log it and hide the detail
   return Response.json(
-    { type: 'about:blank', title: defaultMessage(status), status, instance: ctx.url.pathname },
+    {
+      type: 'about:blank',
+      title: defaultMessage(status),
+      status,
+      detail: error instanceof Error ? error.message : undefined,
+      instance: ctx.url.pathname,
+      issues: error instanceof ValidationException ? error.issues : undefined,
+    },
     { status, headers: { 'content-type': 'application/problem+json' } },
   );
 };
+
+Suku.create({ onError: problemDetails });
 ```
 
-## Reporting to a service
+### Reporting to a service
 
 Returning nothing keeps the default response while letting you observe the error.
 
 ```ts
 Suku.create({
   onError: (error, ctx) => {
-    if (!(error instanceof HttpException)) sentry.captureException(error, { extra: { path: ctx.url.pathname } });
+    if (!(error instanceof HttpException)) {
+      sentry.captureException(error, { extra: { path: ctx.url.pathname } });
+    }
   },
 });
 ```
+
+## Guidelines
+
+- **`401` or `403`?** `401` when you do not know who the caller is. `403` when you do, and
+  they are not allowed.
+- **`400` or `422`?** `400` when the request cannot be understood. `422` when it is
+  well-formed and breaks a rule.
+- **`404` instead of `403`** when even the existence of a thing is private.
+- **Give clients a `code`, not just a message.** Messages get reworded; code that branches on
+  them breaks.
+- **Say little on authentication routes.** "Invalid email or password", never which one.
+- **Do not put internal detail in a message.** It is sent to the client as written.

@@ -197,6 +197,8 @@ See the [request context](/docs/request-context) for the full list.
 
 ### Status
 
+Set a fixed status on the route.
+
 ```ts
 route.post('/jobs', {
   status: 202,
@@ -213,6 +215,13 @@ route.put('/items/:id', {
     return Response.json(item, { status: created ? 201 : 200 });
   },
 });
+```
+
+For an error status, throw. See [errors and status codes](/docs/errors) for the full list of
+exceptions and how to write your own.
+
+```ts
+throw new HttpException(402, 'Subscription required');
 ```
 
 ### Headers [#headers]
@@ -377,7 +386,8 @@ route.get('/users/:id', {
 });
 ```
 
-See [errors](/docs/errors) for the available exceptions and for mapping your own.
+See [errors and status codes](/docs/errors) for every built-in exception, custom exception
+classes, and mapping errors to responses.
 
 ## Using services
 
