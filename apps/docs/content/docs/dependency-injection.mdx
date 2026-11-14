@@ -75,6 +75,22 @@ class Server {
 
 `@Optional()` yields `undefined` instead of throwing when nothing is registered.
 
+## Without decorators
+
+`@Injectable()` exists so TypeScript emits the constructor's parameter types. To avoid
+decorators, list the dependencies in a static `inject` array instead.
+
+```ts
+class UsersRepository {
+  static inject = [Database, { token: CONFIG, optional: true }];
+
+  constructor(
+    private readonly db: Database,
+    private readonly config?: Config,
+  ) {}
+}
+```
+
 ## Keyed services
 
 Register several implementations of one token under keys.
@@ -116,7 +132,7 @@ captures a scoped unit of work would keep the first request's instance forever. 
 include the resolution chain.
 
 ```text
-Captive dependency: OrdersController (singleton) depends on UnitOfWork (scoped).
+Captive dependency: OrdersRoutes (singleton) depends on UnitOfWork (scoped).
 ```
 
 ## Disposal

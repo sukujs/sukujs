@@ -1,6 +1,6 @@
 ---
 title: Validation
-description: Validate bodies, queries and parameters with any Standard Schema library.
+description: Schemas validate the request and type the handler.
 icon: BadgeCheck
 ---
 
@@ -8,23 +8,24 @@ Suku validates through the [Standard Schema](https://standardschema.dev) interfa
 Valibot, ArkType and Effect Schema all implement it, so they work without adapters and Suku
 depends on none of them.
 
-Pass a schema where a pipe would go.
+Give a route a schema for any part of the request.
 
 ```ts
 import { z } from 'zod';
-import type { Infer } from '@suku/core';
 
-export const CreateUser = z.object({
+const CreateUser = z.object({
   name: z.string().min(2),
   email: z.email(),
 });
-export type CreateUser = Infer<typeof CreateUser>;
 
-@Post()
-create(@Body(CreateUser) dto: CreateUser) {
-  return this.users.create(dto);
-}
+route.post('/users', {
+  body: CreateUser,
+  services: { users: UsersService },
+  handle: ({ body, users }) => users.create(body),   // body is { name: string; email: string }
+});
 ```
+
+The handler is typed from the schema's output. There is no second type to keep in sync.
 
 Invalid input never reaches the handler.
 
@@ -42,24 +43,38 @@ Invalid input never reaches the handler.
 
 Nested paths are joined with dots, for example `address.zip`.
 
-## Queries and parameters
+## Params, query and headers
 
-Query values arrive as strings, so use your library's coercion.
+These arrive as strings, so use your library's coercion.
 
 ```ts
-export const ListUsers = z.object({
-  q: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+route.get('/users/:id', {
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  query: z.object({ expand: z.enum(['posts', 'none']).default('none') }),
+  headers: z.object({ 'x-tenant': z.string() }),
+  handle: ({ params, query, headers }) => load(params.id, query.expand, headers['x-tenant']),
 });
-
-@Get()
-list(@Query(ListUsers) query: Infer<typeof ListUsers>) {}
-
-@Get(':id')
-get(@Param('id', z.coerce.number().int().positive()) id: number) {}
 ```
 
-The handler receives the schema's **output**, so defaults and transforms are applied.
+Defaults and transforms are applied, because the handler receives the schema's output.
+
+A `params` schema must cover every parameter named in the path, which is checked at
+[compile time](/docs/routes#checked-against-the-schema).
+
+## Responses
+
+A `response` schema checks what the handler returns and strips fields it does not declare.
+
+```ts
+const PublicUser = z.object({ id: z.number(), name: z.string() });
+
+route.get('/users/:id', {
+  response: PublicUser,
+  handle: () => db.users.find(1),     // passwordHash never leaves the server
+});
+```
+
+A return value that does not match is a server bug: it is logged and the client gets a `500`.
 
 ## Other libraries
 
@@ -84,17 +99,16 @@ The handler receives the schema's **output**, so defaults and transforms are app
   </Tab>
 </Tabs>
 
-All three go straight into `@Body(CreateUser)`.
+All three go straight into `body: CreateUser`.
 
-## Outside the pipeline
+## Outside a route
 
 ```ts
-import { validate, ValidationPipe } from '@suku/core';
+import { type Infer, validate } from '@suku/core';
 
+type CreateUser = Infer<typeof CreateUser>;
 const user = await validate(CreateUser, input);      // throws ValidationException
-
-@Body('name', new ValidationPipe(z.string().min(2))) name: string
 ```
 
 `ValidationException` extends `BadRequestException` and carries `issues`, which an
-[exception filter](/docs/exception-filters) can reshape.
+[error handler](/docs/errors) can reshape.

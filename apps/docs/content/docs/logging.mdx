@@ -26,7 +26,7 @@ metadata object. `error` also accepts an `Error` and records its stack.
 ## Level
 
 ```ts
-const app = await Suku.create({ imports: [AppModule] });
+const app = await Suku.create({ features: [AppFeature] });
 (app.get(Logger) as ConsoleLogger).level = 'debug';
 ```
 
@@ -49,20 +49,13 @@ export class PinoLogger extends Logger {
   }
 }
 
-await Suku.create({ imports: [AppModule], services: [singleton(Logger, PinoLogger)] });
+await Suku.create({ features: [AppFeature], services: [singleton(Logger, PinoLogger)] });
 ```
 
 `SilentLogger` discards everything, which is useful in tests.
 
 ## Unhandled errors
 
-An error that is not an `HttpException` and that no filter handled is reported through the
-logger with the method and path, then answered with a `500`. To handle it yourself instead,
-pass `onError`.
-
-```ts
-await Suku.create({
-  imports: [AppModule],
-  onError: (error, ctx) => sentry.captureException(error, { extra: { path: ctx?.url.pathname } }),
-});
-```
+An error that is not an `HttpException`, and that no [error handler](/docs/errors) turned
+into a response, is reported through the logger with the method and path, then answered with
+a `500`.

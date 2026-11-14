@@ -1,13 +1,12 @@
 ---
 title: Getting started
-description: Set up the compiler, write a first module, and run it on Bun or Node.
+description: Write a first route, add a service, and run it on Bun or Node.
 icon: Rocket
 ---
 
 <Callout type="warn">
   The packages are not on npm yet. Until the first release, clone the
-  [repository](https://github.com/sukujs/sukujs) and work inside its workspace, or link the
-  packages locally.
+  [repository](https://github.com/sukujs/sukujs) and work inside its workspace.
 </Callout>
 
 <Steps>
@@ -16,18 +15,49 @@ icon: Rocket
 ### Install
 
 ```bash
-bun add @suku/core @suku/di @suku/platform-bun
+bun add @suku/core @suku/platform-bun zod
 ```
 
-Use `@suku/platform-node` instead of, or alongside, the Bun adapter when you deploy on Node.
+Any [Standard Schema](https://standardschema.dev) library works in place of Zod. Use
+`@suku/platform-node` when you deploy on Node.
 
 </Step>
 <Step>
 
-### Configure TypeScript
+### A first route
 
-Constructor injection reads parameter types at runtime, which needs TypeScript's decorator
-metadata.
+```ts title="src/main.ts"
+import { Suku, route } from '@suku/core';
+import { bunAdapter } from '@suku/platform-bun';
+import { z } from 'zod';
+
+const hello = route.get('/hello/:name', {
+  query: z.object({ shout: z.coerce.boolean().default(false) }),
+  handle: ({ params, query }) => {
+    const text = `Hello, ${params.name}`;
+    return { message: query.shout ? text.toUpperCase() : text };
+  },
+});
+
+const app = await Suku.create({ routes: [hello], adapter: bunAdapter() });
+const server = await app.listen(3000);
+console.log(`listening on ${server.url}`);
+```
+
+```bash
+bun run src/main.ts
+curl 'localhost:3000/hello/ada?shout=true'
+# {"message":"HELLO, ADA"}
+```
+
+This style needs no decorators and no compiler options.
+
+</Step>
+<Step>
+
+### Add a service and a routes class
+
+Classes that receive services through their constructor need TypeScript's decorator metadata.
 
 ```json title="tsconfig.json"
 {
@@ -42,64 +72,49 @@ metadata.
 }
 ```
 
-<Callout type="error" title="Turn off type-only import rewriting">
-  Lint rules that rewrite imports used only as types into `import type` erase the class that
-  injection needs, and the parameter compiles to `Object`. Disable Biome's
-  `style/useImportType` and ESLint's `consistent-type-imports`. Suku reports this at startup as
-  an `UnresolvableParameterError` naming the parameter.
-</Callout>
-
-</Step>
-<Step>
-
-### Write a service and a controller
-
 ```ts title="src/users.ts"
-import { Controller, Get, NotFoundException, Param } from '@suku/core';
-import { Injectable } from '@suku/di';
+import { Injectable, NotFoundException, Routes, feature, route, singleton } from '@suku/core';
+import { z } from 'zod';
 
 @Injectable()
 export class UsersService {
-  private readonly users = new Map([['1', { id: '1', name: 'Ada Lovelace' }]]);
+  private readonly users = new Map([[1, { id: 1, name: 'Ada Lovelace' }]]);
 
-  find(id: string) {
+  find(id: number) {
     return this.users.get(id);
   }
 }
 
-@Controller('users')
-export class UsersController {
+@Routes('/users')
+export class UsersRoutes {
   constructor(private readonly users: UsersService) {}
 
-  @Get(':id')
-  get(@Param('id') id: string) {
-    const user = this.users.find(id);
-    if (!user) throw new NotFoundException(`User ${id} not found`);
-    return user;
-  }
+  findOne = route.get('/:id', {
+    params: z.object({ id: z.coerce.number().int() }),
+    handle: ({ params }) => {
+      const user = this.users.find(params.id);
+      if (!user) throw new NotFoundException(`User ${params.id} not found`);
+      return user;
+    },
+  });
 }
-```
 
-</Step>
-<Step>
-
-### Declare a module and start the app
-
-```ts title="src/main.ts"
-import { Suku, defineModule, singleton } from '@suku/core';
-import { bunAdapter } from '@suku/platform-bun';
-import { UsersController, UsersService } from './users.js';
-
-const UsersModule = defineModule({
-  name: 'users',
-  controllers: [UsersController],
+export const UsersFeature = feature('users', {
+  routes: [UsersRoutes],
   services: [singleton(UsersService)],
 });
-
-const app = await Suku.create({ imports: [UsersModule], adapter: bunAdapter() });
-const server = await app.listen(3000);
-console.log(`listening on ${server.url}`);
 ```
+
+```ts title="src/main.ts"
+const app = await Suku.create({ features: [UsersFeature], routes: [hello], adapter: bunAdapter() });
+```
+
+<Callout type="error" title="Turn off type-only import rewriting">
+  Lint rules that rewrite imports used only as types into `import type` erase the class that
+  constructor injection needs. Disable Biome's `style/useImportType` and ESLint's
+  `consistent-type-imports`. Suku reports the problem at startup as an
+  `UnresolvableParameterError` naming the parameter.
+</Callout>
 
 </Step>
 <Step>
@@ -115,8 +130,8 @@ console.log(`listening on ${server.url}`);
     ```
   </Tab>
   <Tab value="Node">
-    Node cannot execute decorators, so compile first, with `tsc` or by bundling. Swap
-    `bunAdapter()` for `nodeAdapter()`.
+    Swap `bunAdapter()` for `nodeAdapter()`. Node cannot execute decorators, so compile first
+    with `tsc`, or bundle. Apps that use only plain routes can skip this.
 
     ```bash
     bun build src/main.ts --target node --outdir dist
@@ -125,18 +140,13 @@ console.log(`listening on ${server.url}`);
   </Tab>
 </Tabs>
 
-```bash
-curl localhost:3000/users/1
-# {"id":"1","name":"Ada Lovelace"}
-```
-
 </Step>
 </Steps>
 
 ## Next
 
 <Cards>
-  <Card title="Modules" href="/docs/modules" />
-  <Card title="Controllers" href="/docs/controllers" />
-  <Card title="Dependency injection" href="/docs/dependency-injection" />
+  <Card title="Routes" href="/docs/routes" />
+  <Card title="Features" href="/docs/features" />
+  <Card title="Middlewares" href="/docs/middlewares" />
 </Cards>

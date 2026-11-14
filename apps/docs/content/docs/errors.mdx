@@ -1,0 +1,97 @@
+---
+title: Errors
+description: HTTP exceptions, error handlers, and what happens to everything else.
+icon: Bug
+---
+
+## Throwing
+
+Throw an `HttpException` subclass anywhere: a handler, a service, a middleware.
+
+```ts
+throw new NotFoundException(`User ${id} not found`);
+```
+
+```json
+{ "statusCode": 404, "message": "User 7 not found", "error": "Not Found" }
+```
+
+Classes exist for the common statuses, including `BadRequestException`,
+`UnauthorizedException`, `ForbiddenException`, `ConflictException`,
+`UnprocessableEntityException` and `TooManyRequestsException`. Pass an object instead of a
+string to control the whole body, and `headers` to add response headers.
+
+```ts
+throw new TooManyRequestsException('Slow down', { headers: { 'retry-after': '30' } });
+```
+
+## Everything else
+
+An error that is not an `HttpException` is reported through the [logger](/docs/logging) with
+the method and path, and the client receives a `500` with no details.
+
+## Error handlers
+
+`onError` maps an error to a response. Return nothing to pass it on.
+
+```ts
+import type { ErrorHandler } from '@suku/core';
+
+export const domainErrors: ErrorHandler = (error) => {
+  if (error instanceof InsufficientFunds) {
+    return Response.json({ code: 'insufficient_funds', missing: error.missing }, { status: 422 });
+  }
+};
+```
+
+It attaches wherever middlewares do.
+
+```ts
+route.post('/pay', { onError: domainErrors, handle });        // one route
+@Routes('/payments', { onError: domainErrors })               // a class
+route.group('/payments', { onError: domainErrors }, {})       // a group
+feature('billing', { onError: domainErrors });                // a feature
+Suku.create({ onError: domainErrors });                       // the app
+```
+
+Handlers run most specific first: route, class or group, feature, app. The first to return a
+`Response` wins. If none does, the default applies: an `HttpException` renders itself, and
+anything else is logged and answered with a `500`.
+
+The app-level handler also sees unmatched routes and errors thrown by middlewares.
+
+```ts
+Suku.create({
+  onError: (error, ctx) => {
+    if (ctx.route === undefined) return new Response('Nothing here', { status: 404 });
+  },
+});
+```
+
+If a handler itself throws, the client receives a `500` and the failure is logged.
+
+## A problem-details handler
+
+```ts
+import { HttpException, defaultMessage } from '@suku/core';
+
+export const problemDetails: ErrorHandler = (error, ctx) => {
+  const status = error instanceof HttpException ? error.status : 500;
+  return Response.json(
+    { type: 'about:blank', title: defaultMessage(status), status, instance: ctx.url.pathname },
+    { status, headers: { 'content-type': 'application/problem+json' } },
+  );
+};
+```
+
+## Reporting to a service
+
+Returning nothing keeps the default response while letting you observe the error.
+
+```ts
+Suku.create({
+  onError: (error, ctx) => {
+    if (!(error instanceof HttpException)) sentry.captureException(error, { extra: { path: ctx.url.pathname } });
+  },
+});
+```

@@ -4,20 +4,20 @@ description: The object that describes the request in flight.
 icon: FileInput
 ---
 
-Every request gets one `RequestContext`. Guards, interceptors, pipes, filters and middleware
-receive it, handlers can ask for it with `@Ctx()`, and scoped services can inject it.
+Every request gets one `RequestContext`. Middlewares and error handlers receive it, handlers
+get it as `ctx`, and scoped services can inject it.
 
 | Member | Value |
 | --- | --- |
 | `request` | The Fetch `Request`. |
 | `method`, `headers` | Shortcuts to the request's. |
 | `url` | A parsed `URL`, created on first use. |
-| `params` | Decoded route parameters. |
-| `route` | `{ method, path, controller, handler }`, or `undefined` when nothing matched. |
+| `query` | The query string as an object. Repeated keys become arrays. |
+| `params` | Raw route parameters, decoded. |
+| `route` | `{ method, path, name, meta }`, or `undefined` when nothing matched. |
 | `provider` | The request's DI scope. |
 | `body()` | The parsed body, read once and cached. |
 | `set(key, value)`, `get(key)` | A per-request state bag. |
-| `getMetadata(key)` | Values attached with `@SetMetadata`. |
 
 ## Injecting it
 
@@ -30,28 +30,32 @@ export class CurrentUser {
     this.id = ctx.headers.get('x-user-id') ?? undefined;
   }
 }
+
+route.get('/me', {
+  services: { user: CurrentUser },
+  handle: ({ user }) => ({ id: user.id }),
+});
 ```
 
 Only scoped and transient services can inject the context. A singleton that tries is a
-captive dependency.
+captive dependency, and Suku refuses to start.
 
 ## Sharing state
 
-Middleware and guards usually compute something that handlers need.
-
 ```ts
-const authenticate: MiddlewareFn = async (ctx, next) => {
+const authenticate = middleware(async (ctx, next) => {
   ctx.set('user', await verify(ctx.headers.get('authorization')));
   return next();
-};
+});
 
-export const User = createParamDecorator('User', (_data, ctx) => ctx.get('user'));
+route.get('/me', { middlewares: [authenticate], handle: ({ ctx }) => ctx.get<User>('user') });
 ```
 
 ## The body
 
-`ctx.body()` parses by content type and caches the result, so middleware and `@Body()` share
-one read.
+A route with a `body` schema receives the validated body. Without one, `body` is `undefined`
+and nothing is read. Call `ctx.body()` to parse it yourself; the result is cached, so a
+middleware and a handler share one read.
 
 | Content type | Result |
 | --- | --- |
@@ -64,5 +68,5 @@ one read.
 Bodies over the limit get `413`. The limit is 1 MiB unless set.
 
 ```ts
-await Suku.create({ imports: [AppModule], bodyLimit: 5 * 1024 * 1024 });
+await Suku.create({ features: [AppFeature], bodyLimit: 5 * 1024 * 1024 });
 ```

@@ -20,10 +20,10 @@ export const Env = defineConfig(
 );
 ```
 
-Import `Env.load()` to validate the environment when the application starts.
+Add `Env.load()` to your features to validate the environment when the application starts.
 
 ```ts
-const app = await Suku.create({ imports: [Env.load(), UsersModule], adapter: nodeAdapter() });
+const app = await Suku.create({ features: [Env.load(), UsersFeature], adapter: nodeAdapter() });
 await app.listen(app.get(Env).PORT);
 ```
 
@@ -36,6 +36,11 @@ import type { Infer } from '@suku/core';
 export class Database {
   constructor(@Inject(Env) private readonly env: Infer<typeof Env.schema>) {}
 }
+
+route.get('/info', {
+  services: { env: Env },
+  handle: ({ env }) => ({ logLevel: env.LOG_LEVEL }),   // typed from the schema
+});
 ```
 
 ## Failing fast
@@ -57,7 +62,7 @@ ConfigError: Invalid configuration "env":
 Env.load({ ...process.env, ...(await readSecrets()) });
 ```
 
-`Env.parse()` validates and returns the value without creating a module, for scripts that run
+`Env.parse()` validates and returns the value without creating a feature, for scripts that run
 outside the container.
 
 ## Several configs
@@ -67,5 +72,5 @@ Define one per concern. Each is its own token.
 ```ts
 export const Mail = defineConfig('mail', z.object({ SMTP_URL: z.url() }));
 
-imports: [Env.load(), Mail.load()];
+features: [Env.load(), Mail.load()];
 ```

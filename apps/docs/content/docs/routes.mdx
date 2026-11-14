@@ -1,0 +1,197 @@
+---
+title: Routes
+description: Typed routes, with a class or without one.
+icon: Route
+---
+
+A route is created with `route.get`, `route.post`, `route.put`, `route.patch`,
+`route.delete`, `route.head`, `route.options` or `route.all`. It takes a path and an options
+object whose `handle` function produces the response.
+
+```ts
+import { route } from '@suku/core';
+import { z } from 'zod';
+
+const findUser = route.get('/users/:id', {
+  params: z.object({ id: z.coerce.number() }),
+  handle: ({ params }) => ({ id: params.id }),
+});
+```
+
+The schemas are the single source of truth. They validate the request at runtime and type the
+handler at compile time.
+
+## Two ways to write them
+
+Both styles create the same kind of route, and can be mixed freely.
+
+<Tabs items={['In a class', 'Without a class']}>
+  <Tab value="In a class">
+    Services arrive through the constructor, and handlers use `this`.
+
+    ```ts
+    @Routes('/users')
+    export class UsersRoutes {
+      constructor(private readonly users: UsersService) {}
+
+      findOne = route.get('/:id', {
+        params: z.object({ id: z.coerce.number() }),
+        handle: ({ params }) => this.users.find(params.id),
+      });
+
+      create = route.post('/', {
+        body: CreateUser,
+        handle: ({ body }) => this.users.create(body),
+      });
+    }
+    ```
+
+    Best when a resource has several routes that share dependencies.
+  </Tab>
+  <Tab value="Without a class">
+    The route declares the services it needs, and they arrive in the handler by name.
+
+    ```ts
+    export const findOne = route.get('/users/:id', {
+      params: z.object({ id: z.coerce.number() }),
+      services: { users: UsersService },
+      handle: ({ params, users }) => users.find(params.id),
+    });
+    ```
+
+    Best for small services and one-off routes. It needs no decorators, so on Node it runs
+    without a compile step.
+  </Tab>
+</Tabs>
+
+Register either kind in a [feature](/docs/features), or directly on the app.
+
+```ts
+feature('users', { routes: [UsersRoutes, findOne] });
+```
+
+## What the handler receives
+
+One object. Each part is typed by its schema, or is the raw value when there is none.
+
+| Field | With a schema | Without |
+| --- | --- | --- |
+| `params` | The schema's output. | Strings, keyed by the names in the path. |
+| `query` | The schema's output. | An object of strings. Repeated keys become arrays. |
+| `body` | The schema's output. | `undefined`. Call `ctx.body()` to read it yourself. |
+| `headers` | The schema's output. | The `Headers` object. |
+| `ctx` | The [request context](/docs/request-context). | |
+| `request` | The Fetch `Request`. | |
+| services | One field per entry in `services`. | |
+
+## Options
+
+| Option | Purpose |
+| --- | --- |
+| `params`, `query`, `body`, `headers` | Schemas for the request. See [validation](/docs/validation). |
+| `response` | Schema for the returned value. Validates it and strips undeclared fields. |
+| `services` | Services to resolve from the request scope, by name. |
+| `middlewares` | [Middlewares](/docs/middlewares) for this route only. |
+| `onError` | [Error handler](/docs/errors) for this route only. |
+| `status` | Success status. Default `200`, or `201` for `POST`. |
+| `name` | Identity in logs and the route table. |
+| `meta` | Free-form data for middlewares, read as `ctx.route.meta`. |
+| `handle` | The handler. May be `async`. |
+
+## Paths
+
+| Pattern | Matches |
+| --- | --- |
+| `/users/me` | That exact path. |
+| `/users/:id` | One segment, available as `id`. |
+| `/files/*path` | The rest of the path, including nothing. |
+
+Static segments win over parameters, and parameters over wildcards. Trailing slashes are
+ignored, and `HEAD` falls back to the `GET` route. A known path with the wrong method gets
+`405` with an `Allow` header.
+
+### Checked against the schema
+
+The path is read at compile time. A `params` schema must cover every parameter in it.
+
+```ts
+route.get('/users/:id', {
+  params: z.object({ userId: z.string() }),   // compile error: `id` is missing
+  handle: () => {},
+});
+
+route.get('/users/:id', {
+  handle: ({ params }) => params.idd,          // compile error: no `idd` in the path
+});
+```
+
+## Return values
+
+| Returned | Response |
+| --- | --- |
+| An object or array | JSON. |
+| A string | `text/plain`. |
+| `undefined` or `null` | `204 No Content`. |
+| `Uint8Array` or `ArrayBuffer` | `application/octet-stream`. |
+| `ReadableStream`, `Blob`, `FormData` | Passed to `Response` as the body. |
+| A `Response` | Sent as it is. |
+
+```ts
+import { redirect } from '@suku/core';
+
+route.get('/old', { handle: () => redirect('/new', 301) });
+route.post('/jobs', { status: 202, handle: ({ ctx }) => queue.add(ctx) });
+```
+
+## Route names
+
+A class field's name, or a group's key, becomes the route's name. It does not affect the URL.
+It identifies the route in the route table, in logs, and in anything generated from your
+routes.
+
+```ts
+app.routes;
+// [{ method: 'GET', path: '/users/:id', name: 'UsersRoutes.findOne' }, ...]
+```
+
+## Groups
+
+`route.group` shares a prefix, middlewares and an error handler without a class.
+
+```ts
+export const admin = route.group('/admin', { middlewares: [requireAdmin] }, {
+  stats: route.get('/stats', { handle: () => getStats() }),
+  purge: route.post('/purge', { handle: () => purge() }),
+});
+```
+
+## Classes in detail
+
+`@Routes(prefix, options)` accepts `middlewares`, `onError` and `lifetime`.
+
+A routes class is a singleton by default. Fields that are not routes are ignored, and a class
+with no route fields is rejected at startup.
+
+For request-bound services, prefer the route's `services` option, which works in a singleton
+class:
+
+```ts
+@Routes('/orders')
+export class OrdersRoutes {
+  constructor(private readonly catalog: Catalog) {}
+
+  place = route.post('/', {
+    body: PlaceOrder,
+    services: { uow: UnitOfWork },          // scoped: one per request
+    handle: ({ body, uow }) => uow.orders.place(body, this.catalog),
+  });
+}
+```
+
+Alternatively make the whole class scoped with `@Routes('/orders', { lifetime: 'scoped' })`.
+
+<Callout title="Scoped classes are built once at startup">
+  Routes live on instances, so Suku constructs each class once at startup to discover them. A
+  scoped class must therefore be constructible without a live request. If its constructor
+  needs the `RequestContext`, use the `services` option instead.
+</Callout>

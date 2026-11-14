@@ -30,8 +30,8 @@ as a promise for your hardware.
 response types. Creating a `Request` and a `Response` for every call is what costs
 throughput, spread across their construction rather than in one hot spot.
 
-**The framework itself is cheap.** Module resolution, the per-request DI scope, parameter
-extraction and JSON serialisation together add about 2% over a bare adapter with a
+**The framework itself is cheap.** Route lookup, the per-request DI scope, input
+assembly and JSON serialisation together add about 2% over a bare adapter with a
 hand-written router.
 
 ## What Suku does about it
@@ -40,7 +40,8 @@ hand-written router.
   `Content-Length`, instead of draining its stream.
 - A request scope allocates its caches only when a scoped service is actually resolved.
 - The URL is parsed only if something reads `ctx.url`.
-- Routes, parameter resolvers and pipeline chains are compiled once at startup.
+- Routes and their middleware chains are compiled once at startup.
+- A request body is read only when a route declares a `body` schema or calls `ctx.body()`.
 
 ## Running the benchmark
 

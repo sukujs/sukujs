@@ -1,68 +1,84 @@
 ---
 title: Coming from NestJS
-description: What carries over unchanged and what works differently.
+description: How NestJS concepts map onto Suku's.
 icon: ArrowRightLeft
 ---
 
-Controllers, route decorators, parameter decorators, guards, interceptors, pipes, filters and
-`HttpException` classes keep their names and their order. Most controller code moves over
-with only its imports changed.
+Suku keeps what makes NestJS manageable: code organised by feature, routes next to their
+handlers, constructor injection, and declarative cross-cutting concerns. It uses fewer
+concepts to get there, and types flow from schemas instead of being written twice.
 
-## What is different
+## Concept map
 
 | NestJS | Suku |
 | --- | --- |
-| `@Module()` on a class | `defineModule({ ... })`. `@Module` still works. |
-| `providers` | `services`. `providers` is accepted. |
-| `{ provide, useClass }` | `singleton(Token, Impl)`, type-checked. The object form still works. |
-| `Module.forRoot(options)` | A function: `MyModule(options)`. |
-| `exports` controls visibility | One flat container. Every service is visible. |
-| `@Injectable({ scope: Scope.REQUEST })` | `@Injectable({ lifetime: 'scoped' })`, or `scoped(Service)`. |
-| Request scope bubbles up silently | A singleton depending on a scoped service fails at startup. |
-| `ExecutionContext`, `switchToHttp()` | `RequestContext`, injectable. |
-| `Reflector.get(key, handler)` | `ctx.getMetadata(key)`. |
-| Interceptors return an `Observable` | `async (ctx, next) => await next()`. No RxJS. |
-| `class-validator` and `ValidationPipe` | Any Standard Schema: `@Body(schema)`. |
-| `ConfigModule.forRoot()` | `defineConfig(name, schema)` and `Env.load()`. |
-| `NestFactory.create(AppModule)` | `Suku.create(AppModule, { adapter })`. |
-| Express or Fastify request objects | Fetch `Request` and `Response`. |
-| `Test.createTestingModule()` | `Suku.create({ ..., configureServices })` and `app.handle()`. |
+| Module | [Feature](/docs/features): `feature('users', { ... })` |
+| Controller | A [`@Routes` class](/docs/routes), or plain routes |
+| `@Get(':id')` on a method | `findOne = route.get('/:id', { ... })` as a field |
+| `@Param`, `@Query`, `@Body` | The `params`, `query` and `body` schemas |
+| DTO class with `class-validator` | A Standard Schema (Zod, Valibot, ArkType) |
+| Provider | Service |
+| Middleware, guard, interceptor | [Middleware](/docs/middlewares) |
+| Pipe | A schema |
+| Exception filter | [`onError`](/docs/errors) |
+| `@SetMetadata` and `Reflector` | The route's `meta`, read as `ctx.route.meta` |
+| `ExecutionContext` | `RequestContext` |
+| `ConfigModule.forRoot()` | `defineConfig(name, schema)` and `Env.load()` |
+| `NestFactory.create(AppModule)` | `Suku.create({ features: [...] })` |
+| `Test.createTestingModule()` | `Suku.create({ ..., configureServices })` and `app.handle()` |
 
-## Scopes are strict
-
-This is the change most likely to surprise you. In NestJS a request-scoped provider quietly
-makes everything that depends on it request-scoped. In Suku lifetimes are explicit and
-checked.
-
-```text
-Captive dependency: UsersController (singleton) depends on CurrentUser (scoped).
-```
-
-Fix it by making the consumer scoped, `@Controller({ path: 'users', lifetime: 'scoped' })`,
-or by resolving the scoped service from `ctx.provider` inside the handler.
-
-## Interceptors without RxJS
+## A controller, translated
 
 ```ts
 // NestJS
-intercept(context, next) {
-  return next.handle().pipe(map((data) => ({ data })));
-}
+@Controller('users')
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
 
-// Suku
-async intercept(ctx, next) {
-  return { data: await next() };
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.users.find(id);
+  }
+
+  @Post()
+  @UseGuards(AuthGuard)
+  create(@Body() dto: CreateUserDto) {
+    return this.users.create(dto);
+  }
 }
 ```
-
-## Middleware is simpler
-
-No `configure(consumer)` and no `forRoutes`. Put middleware on a module, on a controller, or
-make it global.
 
 ```ts
-defineModule({ controllers: [AdminController], middleware: [auditTrail] });
+// Suku
+@Routes('/users')
+export class UsersRoutes {
+  constructor(private readonly users: UsersService) {}
+
+  findOne = route.get('/:id', {
+    params: z.object({ id: z.coerce.number().int() }),
+    handle: ({ params }) => this.users.find(params.id),
+  });
+
+  create = route.post('/', {
+    body: CreateUser,
+    middlewares: [authenticate],
+    handle: ({ body }) => this.users.create(body),
+  });
+}
 ```
+
+## What changes in practice
+
+**Lifetimes are strict.** In NestJS a request-scoped provider quietly makes everything that
+depends on it request-scoped. In Suku a singleton that depends on a scoped service is rejected
+at startup. Take request-bound services through a route's `services` option.
+
+**One container.** Every service is visible everywhere. There is no `exports`.
+
+**One cross-cutting concept.** A guard is a middleware that throws. An interceptor is a
+middleware that changes the response. There is no RxJS.
+
+**Fetch, not Express.** Handlers receive a Fetch `Request` and can return a `Response`.
 
 ## Not available yet
 

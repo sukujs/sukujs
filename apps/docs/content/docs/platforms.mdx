@@ -12,7 +12,7 @@ runtime's HTTP server.
     ```ts
     import { bunAdapter } from '@suku/platform-bun';
 
-    const app = await Suku.create({ imports: [AppModule], adapter: bunAdapter() });
+    const app = await Suku.create({ features: [AppFeature], adapter: bunAdapter() });
     await app.listen(3000);
     ```
 
@@ -22,7 +22,7 @@ runtime's HTTP server.
     ```ts
     import { nodeAdapter } from '@suku/platform-node';
 
-    const app = await Suku.create({ imports: [AppModule], adapter: nodeAdapter() });
+    const app = await Suku.create({ features: [AppFeature], adapter: nodeAdapter() });
     await app.listen(3000);
     ```
 
