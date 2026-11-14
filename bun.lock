@@ -68,6 +68,10 @@
         "zod": "^4.6.7",
       },
     },
+    "packages/crypto": {
+      "name": "@suku/crypto",
+      "version": "0.0.0",
+    },
     "packages/di": {
       "name": "@suku/di",
       "version": "0.0.0",
@@ -303,6 +307,8 @@
     "@suku-examples/hello": ["@suku-examples/hello@workspace:examples/hello"],
 
     "@suku/core": ["@suku/core@workspace:packages/core"],
+
+    "@suku/crypto": ["@suku/crypto@workspace:packages/crypto"],
 
     "@suku/di": ["@suku/di@workspace:packages/di"],
 
