@@ -65,3 +65,22 @@ made the same day, to offer guides only.)
 - **Tested against the real library.** Every documented pattern runs in a test.
 - **Other API styles stay as guides.** tRPC, oRPC and similar get documentation, not packages,
   unless that is decided separately.
+
+## Scope: databases are guides, not packages
+
+Suku ships no database layer and no ORM integration packages.
+
+- **No `@suku/drizzle`, `@suku/prisma` or similar.** A database library is an ordinary service,
+  and the docs show how to wire each one. Do not add database dependencies to any package
+  under `packages/`.
+- **One pattern for all of them**, documented in the Database section: a connection service
+  with `dispose` registered through `factory`, a repository behind an abstract class, domain
+  errors thrown from the repository, and one `onError` handler mapping them to HTTP.
+- **Guides are tested.** `examples/database` implements the same contract on every library the
+  docs cover, and one suite runs identical checks against each. Add a library to the docs only
+  with an implementation and a passing run there. Sketches that cannot be run in process
+  (they need a server) must say so on the page.
+- **In-process databases only in tests:** SQLite, or PGlite for PostgreSQL. Tests must not
+  need a database server.
+- **Compatibility fixes belong in the packages.** If a library exposes a problem in Suku, such
+  as `reflect-metadata` load order, fix Suku generally and add a test.
