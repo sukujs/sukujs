@@ -1,5 +1,4 @@
-import { Logger } from '@suku/core';
-import { Injectable } from '@suku/di';
+import { Injectable, Logger } from '@suku/core';
 
 export interface User {
   id: string;
