@@ -87,6 +87,23 @@
       "name": "@suku/di",
       "version": "0.0.0",
     },
+    "packages/graphql": {
+      "name": "@suku/graphql",
+      "version": "0.0.0",
+      "dependencies": {
+        "@suku/core": "workspace:*",
+        "@suku/di": "workspace:*",
+      },
+      "devDependencies": {
+        "graphql": "^17.1.0",
+        "graphql-yoga": "^6.1.0",
+        "zod": "^4.6.7",
+      },
+      "peerDependencies": {
+        "graphql": ">=16",
+        "graphql-yoga": ">=5",
+      },
+    },
     "packages/platform-bun": {
       "name": "@suku/platform-bun",
       "version": "0.0.0",
@@ -360,6 +377,8 @@
     "@suku/di": ["@suku/di@workspace:packages/di"],
 
     "@suku/docs": ["@suku/docs@workspace:apps/docs"],
+
+    "@suku/graphql": ["@suku/graphql@workspace:packages/graphql"],
 
     "@suku/platform-bun": ["@suku/platform-bun@workspace:packages/platform-bun"],
 

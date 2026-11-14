@@ -11,6 +11,7 @@ const budgets: Record<string, number> = {
   'packages/platform-bun/src/index.ts': 2 * 1024,
   'packages/crypto/src/index.ts': 12 * 1024,
   'packages/security/src/index.ts': 8 * 1024,
+  'packages/graphql/src/index.ts': 6 * 1024,
 };
 
 let failed = false;
@@ -20,7 +21,7 @@ for (const [entry, limit] of Object.entries(budgets)) {
     minify: true,
     target: 'node',
     write: false,
-    external: ['@suku/*'],
+    external: ['@suku/*', 'graphql', 'graphql-yoga'],
   });
   if (!result.success) {
     console.error(result.logs);
