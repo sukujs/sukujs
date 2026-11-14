@@ -37,6 +37,8 @@ const app = await Suku.create({ features: [UsersFeature], routes: [health], adap
   apply to a feature's own routes. All services share one flat container.
 - **Middlewares** are the one cross-cutting concept: `(ctx, next) => Response`. Functions,
   instances, or classes built through the container. Order: app, feature, class or group, route.
+- **Handlers** read `params`, `query`, `body`, `headers` and `ctx.cookies`, and write with
+  return values, `ctx.setHeader` and `ctx.cookies.set` (HttpOnly, Secure, SameSite=Lax by default).
 - **Errors**: throw `HttpException` subclasses; map others with `onError` at any level.
 - **Config**: `defineConfig(name, schema)`, then `Env.load()` as a feature.
 - **Testing**: `app.handle(new Request(...))` runs a request in process.

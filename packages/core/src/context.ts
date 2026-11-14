@@ -1,5 +1,6 @@
 import type { ServiceProvider } from '@suku/di';
 import { type BodyOptions, parseBody } from './body.js';
+import { Cookies } from './cookies.js';
 
 export interface RouteInfo {
   readonly method: string;
@@ -27,6 +28,8 @@ export class RequestContext {
   private parsedQuery: Record<string, string | string[]> | undefined;
   private state: Map<unknown, unknown> | undefined;
   private parsedBody: Promise<unknown> | undefined;
+  private cookieJar: Cookies | undefined;
+  private pendingHeaders: Headers | undefined;
 
   constructor(
     readonly request: Request,
@@ -77,6 +80,51 @@ export class RequestContext {
    */
   body<T = unknown>(): Promise<T> {
     return (this.parsedBody ??= parseBody(this.request, this.settings.body)) as Promise<T>;
+  }
+
+  /**
+   * Cookies: `get` reads what the client sent, `set` and `delete` are applied to the
+   * response, whatever it turns out to be.
+   */
+  get cookies(): Cookies {
+    return (this.cookieJar ??= new Cookies(
+      this.request.headers.get('cookie'),
+      () => this.responseHeaders,
+    ));
+  }
+
+  /**
+   * Headers to add to the response. Useful when a handler returns plain data and still
+   * needs a header. A header set on a returned `Response` takes precedence.
+   */
+  get responseHeaders(): Headers {
+    return (this.pendingHeaders ??= new Headers());
+  }
+
+  /** Sets a response header. Shorthand for `ctx.responseHeaders.set`. */
+  setHeader(name: string, value: string): this {
+    this.responseHeaders.set(name, value);
+    return this;
+  }
+
+  /** @internal Applies cookies and headers collected during the request. */
+  finalize(response: Response): Response {
+    const pending = this.pendingHeaders;
+    if (!pending) return response;
+    let out = response;
+    try {
+      out.headers.append('x-suku-probe', '1');
+      out.headers.delete('x-suku-probe');
+    } catch {
+      // Headers of fetch() results and Response.redirect() are immutable: copy.
+      out = new Response(response.body, response);
+    }
+    for (const [name, value] of pending) {
+      if (name === 'set-cookie') continue;
+      if (!out.headers.has(name)) out.headers.set(name, value);
+    }
+    for (const cookie of pending.getSetCookie()) out.headers.append('set-cookie', cookie);
+    return out;
   }
 
   /** Per-request state shared by middlewares and handlers (e.g. the current user). */
