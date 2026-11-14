@@ -6,11 +6,12 @@ let server: HttpServer;
 
 beforeAll(async () => {
   server = await bunAdapter({ onError: () => new Response('custom 500', { status: 500 }) }).serve(
-    async (req) => {
+    async (req, info) => {
       const url = new URL(req.url);
       if (url.pathname === '/echo')
         return new Response(await req.text(), { headers: { 'x-m': req.method } });
       if (url.pathname === '/throw') throw new Error('boom');
+      if (url.pathname === '/ip') return Response.json({ ip: info?.remoteAddress });
       return Response.json({ path: url.pathname });
     },
     { port: 0, hostname: '127.0.0.1' },
@@ -46,4 +47,9 @@ describe('bunAdapter', () => {
     await s.close({ force: true });
     await expect(fetch(s.url)).rejects.toThrow();
   });
+});
+
+test('passes the peer address to the handler', async () => {
+  const res = await fetch(`${server.url}/ip`);
+  expect(((await res.json()) as { ip: string }).ip).toMatch(/127\.0\.0\.1/);
 });

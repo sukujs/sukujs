@@ -3,7 +3,13 @@
  * that knows about sockets: it turns the platform's native request into a `Request`,
  * calls the handler, and writes the `Response` back.
  */
-export type FetchHandler = (request: Request) => Response | Promise<Response>;
+/** What the platform knows about a request beyond the `Request` object itself. */
+export interface RequestInfo {
+  /** The peer's IP address, as the socket reports it. Behind a proxy this is the proxy. */
+  remoteAddress?: string;
+}
+
+export type FetchHandler = (request: Request, info?: RequestInfo) => Response | Promise<Response>;
 
 export interface ServeOptions {
   /** Port to bind. `0` picks a free port. Default `3000`. */

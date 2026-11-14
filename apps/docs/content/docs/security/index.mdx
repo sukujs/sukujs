@@ -1,0 +1,60 @@
+---
+title: Security middlewares
+description: CORS, security headers, CSRF protection and rate limiting.
+icon: Shield
+---
+
+`@suku/security` is a set of [middlewares](/docs/middlewares) that most public-facing apps
+need. Each one is a function that returns a middleware, with safe defaults.
+
+```bash
+bun add @suku/security
+```
+
+```ts
+import sukuSecurity from '@suku/security';
+
+const app = await Suku.create({
+  features: [UsersFeature],
+  middlewares: [
+    sukuSecurity.securityHeaders(),
+    sukuSecurity.cors({ origin: ['https://app.example.com'], credentials: true }),
+    sukuSecurity.rateLimit({ limit: 300, window: '1m' }),
+  ],
+});
+```
+
+Each function is also a named export: `import { cors, rateLimit } from '@suku/security'`.
+
+| Middleware | Protects against | You need it when |
+| --- | --- | --- |
+| [`cors`](/docs/security/cors) | Other websites reading your API's responses | A browser app on another origin calls your API |
+| [`securityHeaders`](/docs/security/security-headers) | Clickjacking, content sniffing, protocol downgrade | Always |
+| [`csrf`](/docs/security/csrf) | Other websites making requests as a logged-in user | You authenticate with cookies |
+| [`rateLimit`](/docs/security/rate-limiting) | Password guessing, scraping, abuse | Always, at least on login routes |
+
+## Order
+
+App-level middlewares run in the order listed, outermost first. Put the ones that decorate
+every response first, so they also cover responses produced by the ones after them.
+
+```ts
+middlewares: [securityHeaders(), cors(options), rateLimit(options), csrf()];
+```
+
+With that order a `429` from the rate limiter and a `403` from CSRF protection still carry
+CORS and security headers, so a browser app can read the error instead of reporting a
+network failure.
+
+Because errors are turned into responses before they travel back through outer middlewares,
+the same holds for a `401` thrown by your own authentication middleware.
+
+## What this package does not do
+
+Authentication, input validation, account lockout, bot detection and a web application
+firewall are separate concerns. For tokens and passwords see
+[`@suku/crypto`](/docs/crypto); for input see [validation](/docs/validation).
+
+<Callout type="warn">
+  Like the rest of Suku, this package has not had an independent security audit.
+</Callout>

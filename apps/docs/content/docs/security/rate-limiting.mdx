@@ -1,0 +1,139 @@
+---
+title: Rate limiting
+description: Limit how often a client may call your app.
+icon: Timer
+---
+
+`rateLimit` counts requests per client in a time window and answers `429 Too Many Requests`
+once the limit is passed.
+
+```ts
+import { rateLimit } from '@suku/security';
+
+Suku.create({ middlewares: [rateLimit({ limit: 300, window: '1m' })] });
+```
+
+## Where to put limits
+
+A generous limit on everything stops runaway clients. Tight limits belong on the routes worth
+attacking.
+
+```ts
+const strict = rateLimit({ limit: 5, window: '1m' });
+
+route.post('/auth/login', { middlewares: [strict], body: Login, handle });
+route.post('/auth/forgot', { middlewares: [strict], body: Forgot, handle });
+```
+
+Each call to `rateLimit` has its own counters. Create a limiter once and share the variable
+when several routes should count together, as above. Call it again for a separate budget.
+
+| Route | A reasonable starting point |
+| --- | --- |
+| Login, password reset, code entry | 5 per minute per IP, and per account |
+| Registration | 3 per hour per IP |
+| Expensive searches or exports | 10 per minute per user |
+| Everything else | 100 to 600 per minute per IP |
+
+## What is being limited
+
+By default the key is the client's IP address. Return something else to limit per account,
+per API key, or both.
+
+```ts
+rateLimit({
+  limit: 1000,
+  window: '1h',
+  key: (ctx) => ctx.get<CurrentUser>('user')?.sub,
+});
+```
+
+Returning `undefined` lets the request through uncounted. For login, limit by account as well
+as by IP, so one address cannot try many accounts and many addresses cannot try one.
+
+```ts
+const perAccount = rateLimit({
+  limit: 10,
+  window: '15m',
+  key: async (ctx) => (await ctx.body<{ email?: string }>())?.email?.toLowerCase(),
+});
+```
+
+## Behind a proxy
+
+<Callout type="error" title="Get this right or the limiter does nothing">
+  Behind a load balancer or reverse proxy, every request appears to come from the proxy.
+  Without `trustProxy`, all your users share one counter.
+</Callout>
+
+```ts
+rateLimit({ limit: 300, window: '1m', trustProxy: 1 });
+```
+
+`trustProxy` is the number of proxies between the internet and your app. With it, the address
+is taken from `X-Forwarded-For`, counting back from the end, so entries a client added itself
+are ignored.
+
+Do not set it when clients can reach the app directly. They could then send any
+`X-Forwarded-For` they like and never be limited.
+
+`clientIp(ctx, trustProxy)` gives the same address for your own logging.
+
+## Response headers
+
+Every response says where the client stands, and a `429` adds `Retry-After`.
+
+```text
+RateLimit-Limit: 300
+RateLimit-Remaining: 287
+RateLimit-Reset: 42
+```
+
+Pass `headers: false` to hide them. To let a browser app on another origin read them, expose
+them in [CORS](/docs/security/cors#options).
+
+## Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `limit` | required | Requests per window, per key. |
+| `window` | required | Seconds, or a string such as `30s`, `1m`, `1h`. |
+| `key` | client IP | What to count by. |
+| `trustProxy` | `false` | Proxies in front of the app. |
+| `skip` | | Requests to leave uncounted, such as health checks. |
+| `message` | | Text of the `429`. |
+| `headers` | `true` | Send the `RateLimit-*` headers. |
+| `store` | in memory | Where counters live. |
+| `name` | generated | Separates limiters that share a store. |
+
+## More than one instance
+
+The default store keeps counters in the process's memory. That is exact for one instance.
+With several, each counts separately, so a limit of 100 behaves like 100 per instance, and
+counters reset on deploy.
+
+For a shared limit, implement `RateLimitStore` over something every instance can reach.
+
+```ts
+import type { RateLimitStore } from '@suku/security';
+
+export const redisStore = (redis: Redis): RateLimitStore => ({
+  async hit(key, windowMs) {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.pexpire(key, windowMs);
+    const ttl = await redis.pttl(key);
+    return { count, resetAt: Date.now() + Math.max(ttl, 0) };
+  },
+});
+
+rateLimit({ limit: 300, window: '1m', store: redisStore(redis), name: 'global' });
+```
+
+Give each limiter a `name` when sharing a store, so their counters stay apart across
+restarts.
+
+## Limits
+
+Windows are fixed, so a client can make up to twice the limit across a window boundary. A
+rate limiter slows abuse; it does not stop a distributed attack, which needs protection at
+the network edge.

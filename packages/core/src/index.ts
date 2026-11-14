@@ -19,6 +19,7 @@ export type {
   FetchHandler,
   HttpServer,
   PlatformAdapter,
+  RequestInfo,
   ServeOptions,
 } from './adapter.js';
 export { Suku, SukuApplication, type SukuOptions } from './application.js';

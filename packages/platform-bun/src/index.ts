@@ -14,7 +14,10 @@ export function bunAdapter(options: BunAdapterOptions = {}): PlatformAdapter {
         port,
         hostname,
         development: false,
-        fetch: (request) => handler(request),
+        fetch: (request, server) => {
+          const address = server.requestIP(request)?.address;
+          return handler(request, address === undefined ? undefined : { remoteAddress: address });
+        },
         error:
           options.onError ??
           ((error) => {

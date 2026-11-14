@@ -71,6 +71,7 @@ const findOne = route.get('/users/:id', {
 | `@suku/core`          | Routes, features, middlewares, validation, config, logger                           |
 | `@suku/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation       |
 | `@suku/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own |
+| `@suku/security`      | CORS, security headers, CSRF protection and rate limiting, as middlewares           |
 | `@suku/platform-node` | `node:http` adapter                                                                 |
 | `@suku/platform-bun`  | `Bun.serve` adapter                                                                 |
 

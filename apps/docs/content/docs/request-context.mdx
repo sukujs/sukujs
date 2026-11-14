@@ -15,6 +15,7 @@ get it as `ctx`, and scoped services can inject it.
 | `query` | The query string as an object. Repeated keys become arrays. |
 | `params` | Raw route parameters, decoded. |
 | `route` | `{ method, path, name, meta }`, or `undefined` when nothing matched. |
+| `remoteAddress` | The peer's IP address from the adapter. Behind a proxy, the proxy's. |
 | `provider` | The request's DI scope. |
 | `body()` | The parsed body, read once and cached. |
 | `set(key, value)`, `get(key)` | A per-request state bag. |

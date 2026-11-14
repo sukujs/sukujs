@@ -10,6 +10,7 @@ const budgets: Record<string, number> = {
   'packages/platform-node/src/index.ts': 4 * 1024,
   'packages/platform-bun/src/index.ts': 2 * 1024,
   'packages/crypto/src/index.ts': 12 * 1024,
+  'packages/security/src/index.ts': 8 * 1024,
 };
 
 let failed = false;
