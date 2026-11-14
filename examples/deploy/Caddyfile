@@ -1,0 +1,5 @@
+# Local test: plain HTTP on port 80 inside the container.
+# For a real domain, replace ":80" with "api.example.com" and publish 80 and 443.
+:80 {
+	reverse_proxy api:3000
+}

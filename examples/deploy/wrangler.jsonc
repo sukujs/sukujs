@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "suku-deploy-example",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "vars": {
+    "GREETING": "Hello from Workers",
+    "APP_VERSION": "workers"
+  }
+}

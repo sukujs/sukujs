@@ -1,0 +1,25 @@
+# /etc/systemd/system/suku-deploy.service
+# Adjust User, WorkingDirectory and the path to node.
+[Unit]
+Description=Suku deploy example
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/suku-deploy
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/suku-deploy/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

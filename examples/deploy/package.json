@@ -1,0 +1,28 @@
+{
+  "name": "@suku-examples/deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "build": "bun build src/main.ts --target node --outdir dist",
+    "start": "node dist/main.js",
+    "start:bun": "bun run src/main.ts",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy",
+    "smoke": "bun run smoke.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sukujs/core": "^0.1.0",
+    "@sukujs/crypto": "^0.1.0",
+    "@sukujs/platform-bun": "^0.1.0",
+    "@sukujs/platform-node": "^0.1.0",
+    "@sukujs/security": "^0.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

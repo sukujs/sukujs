@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+# Run the TypeScript source on Bun, with no build step.
+FROM oven/bun:1
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install --production
+COPY . .
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+USER bun
+EXPOSE 3000
+CMD ["bun", "run", "src/main.ts"]

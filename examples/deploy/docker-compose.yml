@@ -1,0 +1,20 @@
+# The API behind Caddy. Open http://localhost:8080
+# Several copies:  docker compose up -d --build --scale api=3
+services:
+  api:
+    build: .
+    environment:
+      TRUST_PROXY: 1
+      GREETING: Hello from Compose
+      APP_VERSION: compose
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [api]
+    restart: unless-stopped
