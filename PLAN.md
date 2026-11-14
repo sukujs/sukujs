@@ -23,6 +23,9 @@ Suku is now built from **routes, features, middlewares and services**:
 - `@suku/security` (2026-11-14): `cors`, `securityHeaders`, `csrf` (origin and token modes) and
   `rateLimit` (pluggable store). Core gained `ctx.remoteAddress` via `FetchHandler(request, info)`,
   and errors thrown by inner middlewares are rendered before returning to outer ones.
+- Handlers API (2026-11-14): `ctx.cookies` (get/has/all/set/delete), `ctx.setHeader` and
+  `ctx.responseHeaders`, applied to the final response by the kernel. The Node adapter now aborts
+  `request.signal` when the client disconnects.
 - Deferred: typed values added by middlewares, a route-level result hook, OpenAPI and a typed
   client (routes already carry method, path, schemas and name for them).
 

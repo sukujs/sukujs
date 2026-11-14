@@ -125,7 +125,7 @@ used, as the [reset-link example](/docs/crypto/use-cases#password-reset-links) d
 These tools assume TLS. A token sent over plain HTTP is a token given away.
 
 - Serve everything over HTTPS and set `Strict-Transport-Security`.
-- Mark cookies `HttpOnly`, `Secure` and `SameSite`.
+- Mark cookies `HttpOnly`, `Secure` and `SameSite`. `ctx.cookies.set` does so by default.
 - Do not put tokens in URLs. They end up in logs, browser history and referrer headers.
   Reset and verification links are the exception, which is why they must be short-lived and
   single-use.

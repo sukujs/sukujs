@@ -1,0 +1,406 @@
+---
+title: Handlers
+description: Everything a handler can read from the request and write to the response.
+icon: SquareFunction
+---
+
+A handler is the `handle` function of a [route](/docs/routes). It receives one object and
+returns the response.
+
+```ts
+route.get('/users/:id', {
+  handle: ({ params, query, body, headers, ctx, request }) => {
+    return { id: params.id };
+  },
+});
+```
+
+| You want to | Use |
+| --- | --- |
+| Read a path parameter | `params.id` |
+| Read the query string | `query.page` |
+| Read the JSON or form body | `body`, with a `body` schema |
+| Read a header | `headers.get('authorization')` |
+| Read a cookie | `ctx.cookies.get('session')` |
+| Send JSON | `return { ... }` |
+| Set the status | `status: 201` on the route |
+| Set a header | `ctx.setHeader('cache-control', 'no-store')` |
+| Set a cookie | `ctx.cookies.set('session', value)` |
+| Redirect | `return redirect('/login')` |
+| Fail | `throw new NotFoundException()` |
+
+## Reading the request
+
+### Path parameters
+
+```ts
+route.get('/orgs/:org/repos/:repo', {
+  handle: ({ params }) => `${params.org}/${params.repo}`,   // both are strings
+});
+```
+
+Without a schema they are strings. With a `params` schema they are whatever it produces.
+
+```ts
+route.get('/users/:id', {
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  handle: ({ params }) => users.find(params.id),             // a number
+});
+```
+
+### Query string
+
+```ts
+// GET /search?q=suku&tag=a&tag=b
+route.get('/search', {
+  handle: ({ query }) => query,     // { q: 'suku', tag: ['a', 'b'] }
+});
+```
+
+A key that appears once is a string and a repeated key is an array. A `query` schema gives
+you types, defaults and one consistent shape.
+
+```ts
+route.get('/search', {
+  query: z.object({
+    q: z.string().default(''),
+    page: z.coerce.number().int().min(1).default(1),
+    tag: z.union([z.string(), z.array(z.string())]).transform((v) => (Array.isArray(v) ? v : [v])).default([]),
+  }),
+  handle: ({ query }) => search(query.q, query.page, query.tag),
+});
+```
+
+### Headers [#reading-headers]
+
+```ts
+route.get('/me', {
+  handle: ({ headers }) => {
+    const language = headers.get('accept-language') ?? 'en';
+    return { language };
+  },
+});
+```
+
+`headers` is the standard `Headers` object. Names are case-insensitive.
+
+### Cookies [#reading-cookies]
+
+```ts
+route.get('/preferences', {
+  handle: ({ ctx }) => ({
+    theme: ctx.cookies.get('theme') ?? 'light',
+    returning: ctx.cookies.has('visited'),
+  }),
+});
+```
+
+| Method | Returns |
+| --- | --- |
+| `ctx.cookies.get(name)` | The value, or `undefined`. |
+| `ctx.cookies.has(name)` | Whether the client sent it. |
+| `ctx.cookies.all()` | Every cookie as an object. |
+
+Values are URL-decoded. A cookie is input from the client like any other: never trust one
+you have not [signed or sealed](/docs/crypto/signed-and-sealed).
+
+### Body
+
+Give the route a `body` schema and the handler receives the validated result.
+
+```ts
+route.post('/users', {
+  body: z.object({ name: z.string().min(2), email: z.email() }),
+  handle: ({ body }) => users.create(body),
+});
+```
+
+Without a schema `body` is `undefined` and nothing is read. Call `ctx.body()` to parse it
+yourself; the format is chosen from the `Content-Type`.
+
+```ts
+route.post('/contact', {
+  handle: async ({ ctx }) => {
+    const form = await ctx.body<{ email: string; message: string }>();   // JSON or a form post
+    return send(form);
+  },
+});
+```
+
+### File uploads
+
+A multipart form arrives as a standard `FormData`, and each file as a `File`.
+
+```ts
+route.post('/avatar', {
+  handle: async ({ ctx }) => {
+    const form = await ctx.body<FormData>();
+    const file = form.get('file');
+    if (!(file instanceof File)) throw new BadRequestException('A file is required');
+    if (file.size > 2_000_000) throw new PayloadTooLargeException();
+    await storage.put(`avatars/${crypto.randomUUID()}`, await file.arrayBuffer(), file.type);
+    return { name: file.name, size: file.size };
+  },
+});
+```
+
+Raise the app's body limit for upload routes with `bodyLimit` in `Suku.create`. The default
+is 1 MiB.
+
+### Raw body and streams
+
+For a webhook signature or a large upload, read the request directly.
+
+```ts
+route.post('/webhooks/payments', {
+  handle: async ({ request }) => {
+    const raw = await request.text();          // or arrayBuffer(), or request.body as a stream
+    return verifyAndHandle(raw);
+  },
+});
+```
+
+The body can be read once. Use `request` or `ctx.body()`, not both.
+
+### Everything else
+
+```ts
+route.get('/debug', {
+  handle: ({ ctx, request }) => ({
+    method: ctx.method,
+    path: ctx.url.pathname,
+    host: ctx.url.host,
+    ip: ctx.remoteAddress,          // behind a proxy this is the proxy
+    route: ctx.route?.name,
+    user: ctx.get('user'),          // set by a middleware
+    signal: request.signal.aborted, // true if the client went away
+  }),
+});
+```
+
+See the [request context](/docs/request-context) for the full list.
+
+## Writing the response
+
+### Returning data
+
+| Returned | Sent as |
+| --- | --- |
+| An object or array | JSON, `200` |
+| A string | `text/plain`, `200` |
+| `undefined` or `null` | `204 No Content` |
+| `Uint8Array` or `ArrayBuffer` | `application/octet-stream` |
+| A `ReadableStream` or `Blob` | A streamed body |
+| A `Response` | Exactly as it is |
+
+`POST` routes default to `201`. Handlers may be `async`.
+
+### Status
+
+```ts
+route.post('/jobs', {
+  status: 202,
+  handle: ({ body }) => queue.add(body),
+});
+```
+
+For a status decided at runtime, return a `Response`.
+
+```ts
+route.put('/items/:id', {
+  handle: async ({ params, ctx }) => {
+    const { item, created } = await items.upsert(params.id, await ctx.body());
+    return Response.json(item, { status: created ? 201 : 200 });
+  },
+});
+```
+
+### Headers [#headers]
+
+`ctx.setHeader` adds a header to whatever you return, so plain data stays plain.
+
+```ts
+route.get('/users', {
+  handle: async ({ ctx }) => {
+    const { items, total } = await users.page();
+    ctx.setHeader('x-total-count', String(total)).setHeader('cache-control', 'private, max-age=30');
+    return items;
+  },
+});
+```
+
+If you return a `Response` that already has the same header, the response's value wins.
+
+### Cookies [#cookies]
+
+```ts
+route.post('/login', {
+  body: Login,
+  status: 200,
+  handle: async ({ body, ctx }) => {
+    const session = await sessions.create(await authenticate(body));
+    ctx.cookies.set('session', session.id, { maxAge: 60 * 60 * 24 * 7 });
+    return { ok: true };
+  },
+});
+
+route.post('/logout', {
+  handle: ({ ctx }) => {
+    ctx.cookies.delete('session');
+  },
+});
+```
+
+Cookies set this way are added to the final response whatever it is: plain data, a
+`Response` you built, a redirect, or an error.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxAge` | none | Seconds to live. Without it the cookie lasts until the browser closes. |
+| `expires` | none | An absolute `Date`. Prefer `maxAge`. |
+| `path` | `/` | |
+| `domain` | none | Set it to share the cookie with subdomains. |
+| `httpOnly` | `true` | Page scripts cannot read the cookie. |
+| `secure` | `true` | Sent over HTTPS only. |
+| `sameSite` | `Lax` | `Strict`, `Lax` or `None`. `None` requires `secure`. |
+| `partitioned` | `false` | For embedded third-party contexts. |
+
+The defaults are the safe ones. Turn `httpOnly` off only for a value your own scripts must
+read, such as a UI preference.
+
+```ts
+ctx.cookies.set('theme', 'dark', { httpOnly: false, maxAge: 31_536_000 });
+```
+
+To delete a cookie, `path` and `domain` must match the ones it was set with.
+
+<Callout title="Local development">
+  Browsers accept `Secure` cookies on `http://localhost`, except Safari. If cookies vanish
+  there, pass `secure: false` in development only.
+</Callout>
+
+For cookies the client must not read or alter, seal the value first.
+
+```ts
+ctx.cookies.set('session', await sealer.seal({ userId: user.id }, { ttl: '7d' }), { maxAge: 604_800 });
+
+const data = await sealer.unseal<{ userId: string }>(ctx.cookies.get('session') ?? '');
+```
+
+### Redirects
+
+```ts
+import { redirect } from '@suku/core';
+
+route.get('/old-page', { handle: () => redirect('/new-page', 301) });
+
+route.post('/login', {
+  handle: async ({ ctx }) => {
+    ctx.cookies.set('session', await createSession(ctx));
+    return redirect('/dashboard');      // 302 by default
+  },
+});
+```
+
+Use `303` after a form `POST`, so the browser follows with a `GET`.
+
+### Files and downloads
+
+```ts
+route.get('/reports/:id/export', {
+  handle: async ({ params }) =>
+    new Response(await reports.csv(params.id), {
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="report-${params.id}.csv"`,
+      },
+    }),
+});
+```
+
+Pass a stream as the body to send a large file without holding it in memory.
+
+### Streaming
+
+Return a `ReadableStream` to send the body as it is produced.
+
+```ts
+route.get('/export', {
+  handle: () => {
+    const encoder = new TextEncoder();
+    return new ReadableStream<Uint8Array>({
+      async start(controller) {
+        for await (const row of db.rows()) controller.enqueue(encoder.encode(`${JSON.stringify(row)}\n`));
+        controller.close();
+      },
+    });
+  },
+});
+```
+
+### Server-sent events
+
+```ts
+route.get('/events', {
+  handle: ({ request }) => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const send = (data: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        const unsubscribe = events.subscribe(send);
+        request.signal.addEventListener('abort', () => {
+          unsubscribe();
+          controller.close();
+        });
+      },
+    });
+    return new Response(stream, {
+      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+    });
+  },
+});
+```
+
+`request.signal` fires when the client disconnects. Use it to stop work nobody is waiting for.
+
+### Errors
+
+Throw to end the request with an error response.
+
+```ts
+route.get('/users/:id', {
+  handle: async ({ params }) => {
+    const user = await users.find(params.id);
+    if (!user) throw new NotFoundException(`User ${params.id} not found`);
+    return user;
+  },
+});
+```
+
+See [errors](/docs/errors) for the available exceptions and for mapping your own.
+
+## Using services
+
+In a `@Routes` class, services come through the constructor and handlers use `this`. In a
+plain route, list them under `services` and they arrive beside the request parts.
+
+```ts
+route.get('/invoices/due', {
+  services: { invoices: Invoices, clock: Clock },
+  handle: ({ invoices, clock }) => invoices.dueBefore(clock.now()),
+});
+```
+
+## From a middleware
+
+Everything on `ctx` is available in a [middleware](/docs/middlewares) too, so a middleware can
+read a cookie, set a header, or share data with the handler.
+
+```ts
+const requestId = middleware((ctx, next) => {
+  const id = ctx.headers.get('x-request-id') ?? crypto.randomUUID();
+  ctx.set('requestId', id);
+  ctx.setHeader('x-request-id', id);
+  return next();
+});
+```
