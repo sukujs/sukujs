@@ -73,6 +73,24 @@ export function hasMetadata(key: MetadataKey, target: object, property?: Propert
   return getMetadata(key, target, property) !== undefined;
 }
 
+export function getOwnMetadataKeys(target: object, property?: PropertyKey): MetadataKey[] {
+  return [...(getTargetMap(target, property, false)?.keys() ?? [])];
+}
+
+export function getMetadataKeys(target: object, property?: PropertyKey): MetadataKey[] {
+  const keys = new Set<MetadataKey>();
+  let current: object | null = target;
+  while (current) {
+    for (const key of getOwnMetadataKeys(current, property)) keys.add(key);
+    current = Object.getPrototypeOf(current);
+  }
+  return [...keys];
+}
+
+export function deleteMetadata(key: MetadataKey, target: object, property?: PropertyKey): boolean {
+  return getTargetMap(target, property, false)?.delete(key) ?? false;
+}
+
 /** Decorator factory form, matching `Reflect.metadata` from reflect-metadata. */
 export function metadata(key: MetadataKey, value: unknown) {
   return (target: object, property?: PropertyKey): void => {
@@ -87,6 +105,9 @@ type ReflectWithMetadata = typeof Reflect & {
   getOwnMetadata?: typeof getOwnMetadata;
   hasMetadata?: typeof hasMetadata;
   hasOwnMetadata?: typeof hasOwnMetadata;
+  getMetadataKeys?: typeof getMetadataKeys;
+  getOwnMetadataKeys?: typeof getOwnMetadataKeys;
+  deleteMetadata?: typeof deleteMetadata;
 };
 
 /** Installs the shim on `globalThis.Reflect` unless a metadata API is already present. */
@@ -99,6 +120,10 @@ export function installReflectShim(): boolean {
   R.getOwnMetadata = getOwnMetadata;
   R.hasMetadata = hasMetadata;
   R.hasOwnMetadata = hasOwnMetadata;
+  // The full surface, so `reflect-metadata` can adopt this store if it is loaded later.
+  R.getMetadataKeys = getMetadataKeys;
+  R.getOwnMetadataKeys = getOwnMetadataKeys;
+  R.deleteMetadata = deleteMetadata;
   return true;
 }
 
@@ -110,14 +135,18 @@ installReflectShim();
  */
 export function readMetadata<T = unknown>(key: MetadataKey, target: object): T | undefined {
   const R = globalThis.Reflect as ReflectWithMetadata;
-  if (R.getMetadata && R.getMetadata !== getMetadata) return R.getMetadata(key, target) as T;
+  if (R.getMetadata && R.getMetadata !== getMetadata) {
+    // Another implementation (reflect-metadata) is installed. Classes decorated before it
+    // loaded recorded their metadata in our own store, so fall back to that.
+    return (R.getMetadata(key, target) as T | undefined) ?? getMetadata<T>(key, target);
+  }
   return getMetadata<T>(key, target);
 }
 
 export function readOwnMetadata<T = unknown>(key: MetadataKey, target: object): T | undefined {
   const R = globalThis.Reflect as ReflectWithMetadata;
   if (R.getOwnMetadata && R.getOwnMetadata !== getOwnMetadata) {
-    return R.getOwnMetadata(key, target) as T;
+    return (R.getOwnMetadata(key, target) as T | undefined) ?? getOwnMetadata<T>(key, target);
   }
   return getOwnMetadata<T>(key, target);
 }
