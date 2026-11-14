@@ -1,6 +1,6 @@
 import type { Infer, Middleware, Next } from '@sukujs/core';
 import { Inject, Logger, RequestContext, Service, UnauthorizedException } from '@sukujs/core';
-import { Env } from './config.js';
+import { Env } from './config';
 
 /** App-level middleware: one log line per request with status and duration. */
 @Service()

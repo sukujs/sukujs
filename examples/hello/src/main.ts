@@ -1,10 +1,10 @@
 import { type ConsoleLogger, Logger, Suku } from '@sukujs/core';
 import { bunAdapter } from '@sukujs/platform-bun';
 import { nodeAdapter } from '@sukujs/platform-node';
-import { health, hello, Uptime, whoami } from './app.routes.js';
-import { RequestLogger } from './common.js';
-import { Env } from './config.js';
-import { UsersFeature } from './users/users.feature.js';
+import { health, hello, Uptime, whoami } from './app.routes';
+import { RequestLogger } from './common';
+import { Env } from './config';
+import { UsersFeature } from './users/users.feature';
 
 const adapter = typeof Bun !== 'undefined' ? bunAdapter() : nodeAdapter();
 
