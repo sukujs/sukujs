@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "bun"],
+    "lib": ["ES2023", "ESNext.Disposable", "DOM"],
+    "strictPropertyInitialization": false
+  },
+  "include": ["src", "test"]
+}
