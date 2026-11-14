@@ -1,0 +1,54 @@
+{
+  "name": "@sukujs/cli",
+  "version": "0.1.0",
+  "description": "The Suku command line: create a project, generate features, routes and services, and run, build and start your app.",
+  "keywords": [
+    "suku",
+    "cli",
+    "scaffold",
+    "generator",
+    "backend",
+    "framework"
+  ],
+  "license": "MIT",
+  "author": "Suku Authors",
+  "homepage": "https://github.com/sukujs/sukujs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sukujs/sukujs.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/sukujs/sukujs/issues"
+  },
+  "type": "module",
+  "bin": {
+    "suku": "./dist/bin.mjs"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "zod": "^4.6.7"
+  }
+}

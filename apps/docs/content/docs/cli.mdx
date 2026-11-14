@@ -1,0 +1,169 @@
+---
+title: CLI
+description: Create a project, generate features, routes and services, and run, build and start your app.
+icon: Terminal
+---
+
+`@sukujs/cli` gives you the `suku` command. It creates projects, generates code that follows
+the conventions in these docs, and wraps the commands to run, build and start an app.
+
+```bash
+bunx @sukujs/cli new my-api
+```
+
+Inside a project the CLI is a dev dependency, so `suku` is available to your scripts and
+through `bunx suku`.
+
+<Callout>
+  `suku dev`, `suku build` and the generated tests use [Bun](https://bun.sh), because Bun keeps
+  the decorator metadata that constructor injection needs. The built app runs on Node or Bun.
+</Callout>
+
+## Creating a project
+
+```bash
+suku new my-api
+```
+
+In a terminal, `suku new` asks for anything you did not pass as a flag:
+
+| Question | Choices | Default | Flag |
+| --- | --- | --- | --- |
+| Project name | any | `my-api` | the first argument |
+| Production runtime | Node.js, Bun | Node.js | `--runtime node` |
+| Package manager | bun, npm, pnpm, yarn | bun | `--package-manager bun` |
+| Deployment targets | Docker, PM2, systemd, Cloudflare Workers, Vercel (any number) | none | `--deploy docker,pm2` |
+| Initialise a git repository? | yes, no | yes | `--skip-git` |
+| Install dependencies? | yes, no | yes | `--skip-install` |
+
+Move with the arrow keys, toggle a deployment target with space, confirm with enter. Pass
+`--yes` to ask nothing and take the defaults, which is what happens in CI, where there is no
+terminal.
+
+```bash
+suku new my-api --yes
+suku new my-api --runtime bun --deploy docker,cloudflare --skip-git
+```
+
+### What you get
+
+```text
+my-api/
+  src/
+    main.ts              # creates the app, listens, shuts down on SIGTERM
+    config.ts            # the environment, validated at startup
+    app.feature.ts       # the root feature and a /health route
+    app.test.ts          # tests that call the app in process
+    hello/
+      hello.feature.ts
+      hello.routes.ts
+      hello.service.ts
+  package.json
+  tsconfig.json
+```
+
+### Deployment targets
+
+Each target you pick adds its files and a section in the project's README. They follow the
+[deployment guide](/docs/deployment).
+
+| Target | Files | Scripts |
+| --- | --- | --- |
+| `docker` | `Dockerfile`, `.dockerignore`, `docker-compose.yml` | |
+| `pm2` | `ecosystem.config.cjs` | |
+| `systemd` | `deploy/<name>.service` | |
+| `cloudflare` | `src/worker.ts`, `wrangler.jsonc` | `dev:worker`, `build:worker`, `deploy:cloudflare` |
+| `vercel` | `api/index.ts`, `vercel.json` | `dev:vercel`, `deploy:vercel` |
+
+## Generating code
+
+```bash
+suku generate <schematic> <name>
+suku g <schematic> <name>
+```
+
+| Schematic | Alias | Creates |
+| --- | --- | --- |
+| `resource` | `res` | A CRUD feature: routes, service, schemas and a test |
+| `feature` | `f` | `<name>/<name>.feature.ts` |
+| `routes` | `r` | `<name>/<name>.routes.ts`, a [`@Routes`](/docs/routes) class |
+| `service` | `s` | `<name>/<name>.service.ts`, a [`@Service`](/docs/dependency-injection) class |
+| `middleware` | `mw` | `middlewares/<name>.middleware.ts` |
+
+Generated code is registered for you:
+
+- a **feature** or **resource** is added to `imports` in `src/app.feature.ts`, or to
+  `features` in your entry file when there is no root feature
+- **routes** and a **service** are added to the feature file in the same folder
+
+```bash
+suku g resource products
+```
+
+```text
+CREATE src/products/products.schemas.ts (459 bytes)
+CREATE src/products/products.service.ts (1020 bytes)
+CREATE src/products/products.routes.ts (946 bytes)
+CREATE src/products/products.feature.ts (290 bytes)
+CREATE src/products/products.test.ts (1107 bytes)
+UPDATE src/app.feature.ts (467 bytes)
+```
+
+That is a working `GET`, `POST`, `PATCH` and `DELETE` on `/products` with validated input,
+an in-memory service to replace with a [repository](/docs/database), and a passing test.
+
+### Options
+
+| Option | Effect |
+| --- | --- |
+| `--classless` | `routes` and `service`: generate `route.group` and `service()` instead of classes |
+| `--flat` | Do not create a folder named after the thing |
+| `--skip-import` | Do not edit other files to register it |
+| `--skip-tests` | `resource`: do not generate the test |
+| `-d`, `--dry-run` | Print what would be written and write nothing |
+| `--force` | Overwrite files that already exist |
+
+A name can be written any way (`userProfiles`, `user_profiles`, `user-profiles`); files are
+kebab-case and classes are PascalCase. A name with a folder, such as `admin/reports`,
+generates into `src/admin/reports/`.
+
+The CLI never overwrites a file unless you pass `--force`. If it cannot find where to register
+something, it says so and leaves the file alone.
+
+## Running, building, starting
+
+```bash
+suku dev      # run src/main.ts with Bun, restart on change
+suku build    # bundle the app and its dependencies into dist/
+suku start    # run dist/main.js with the production runtime
+```
+
+| Option | Commands | Effect |
+| --- | --- | --- |
+| `--entry <file>` | all | Entry file. Default `src/main.ts` |
+| `--target <node\|bun>` | `build` | What the bundle runs on. Default: the project's runtime |
+| `--outdir <dir>` | `build`, `start` | Output folder. Default `dist` |
+| `--minify`, `--sourcemap` | `build` | |
+| `--external <package>` | `build` | Leave a package out of the bundle. Repeatable; needed for native modules |
+| `--runtime <node\|bun>` | `start` | Override the project's runtime |
+
+Arguments after `--` go to your app: `suku dev -- --port 4000`.
+
+## Project settings
+
+The CLI reads an optional `suku` field in `package.json`.
+
+```json title="package.json"
+{
+  "suku": {
+    "runtime": "node",
+    "sourceRoot": "src",
+    "entry": "src/main.ts"
+  }
+}
+```
+
+## Reporting a problem
+
+`suku info` prints the versions of the CLI, Node, Bun and every `@sukujs/*` package in the
+project. Include it in bug reports.

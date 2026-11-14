@@ -5,7 +5,8 @@
 All publishable packages share a single version number. They are released together, always.
 
 - **Scope.** Every package under `packages/*`: `@sukujs/core`, `@sukujs/di`, `@sukujs/crypto`,
-  `@sukujs/security`, `@sukujs/platform-node`, `@sukujs/platform-bun`, and any package added later.
+  `@sukujs/security`, `@sukujs/graphql`, `@sukujs/cli`, `@sukujs/platform-node`, `@sukujs/platform-bun`,
+  and any package added later.
   Private workspaces (`apps/*`, `examples/*`, `benchmarks`, the repo root) carry no version.
 - **Always identical.** The `version` field in every `packages/*/package.json` must be the same
   string. Never bump one package on its own, even if it is the only one that changed.
@@ -106,3 +107,21 @@ Suku ships no database layer and no ORM integration packages.
   need a database server.
 - **Compatibility fixes belong in the packages.** If a library exposes a problem in Suku, such
   as `reflect-metadata` load order, fix Suku generally and add a test.
+
+## Scope: the CLI generates code, it is not a runtime dependency
+
+`@sukujs/cli` provides the `suku` command: `new`, `generate`, `dev`, `build`, `start`, `info`.
+
+- **Zero dependencies.** Node built-ins only. Prompts, argument parsing and templates are in
+  the package. It never imports another `@sukujs/*` package.
+- **Apps never import it.** It is a dev dependency of generated projects. Nothing in
+  `packages/*` depends on it.
+- **Generated code follows the docs.** A template that shows a pattern must match the page that
+  documents it. When a convention changes, change both.
+- **Tested end to end.** The suite creates a project, generates into it, runs its tests,
+  typechecks it, builds it and serves requests from the bundle.
+- **Bun is the toolchain.** `dev` and `build` call Bun, because it emits decorator metadata.
+  The built app runs on Node or Bun.
+- **`suku new` asks, flags answer.** Every question has a flag, and `--yes` or a missing
+  terminal takes the defaults, so the command works in scripts.
+- **Never overwrite silently.** A generator refuses to replace a file without `--force`.
