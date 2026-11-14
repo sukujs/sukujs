@@ -1,78 +1,80 @@
 # Suku
 
-A lightweight TypeScript backend framework. NestJS-shaped structure (controllers, decorators,
-a request pipeline, modules) on a flat .NET-style dependency injection container with
-singleton, scoped and transient lifetimes. Zero runtime dependencies. Runs on Node and Bun.
+A lightweight TypeScript backend framework built from four ideas: **routes**, **features**,
+**middlewares** and **services**. Routes are typed by their schemas, and services come from a
+dependency injection container modelled on .NET's. Zero runtime dependencies. Runs on Node and Bun.
 
 ```ts
-import { Body, Controller, Get, Param, Post, Suku, defineModule, singleton } from '@suku/core';
-import { Injectable } from '@suku/di';
+import { Injectable, Routes, Suku, feature, route, singleton } from '@suku/core';
 import { nodeAdapter } from '@suku/platform-node';
 import { z } from 'zod';
 
-const CreateUser = z.object({ name: z.string().min(2) });
-
 @Injectable()
 class UsersService {
-  find(id: string) {
+  find(id: number) {
     return { id, name: 'Ada' };
   }
 }
 
-@Controller('users')
-class UsersController {
+@Routes('/users')
+class UsersRoutes {
   constructor(private readonly users: UsersService) {}
 
-  @Get(':id')
-  get(@Param('id') id: string) {
-    return this.users.find(id);
-  }
-
-  @Post()
-  create(@Body(CreateUser) dto: z.infer<typeof CreateUser>) {
-    return dto;
-  }
+  findOne = route.get('/:id', {
+    params: z.object({ id: z.coerce.number() }),
+    handle: ({ params }) => this.users.find(params.id), // params.id is a number
+  });
 }
 
-const UsersModule = defineModule({
-  controllers: [UsersController],
+const UsersFeature = feature('users', {
+  routes: [UsersRoutes],
   services: [singleton(UsersService)],
 });
 
-const app = await Suku.create({ imports: [UsersModule], adapter: nodeAdapter() });
+const app = await Suku.create({ features: [UsersFeature], adapter: nodeAdapter() });
 await app.listen(3000);
 ```
 
+Prefer no classes? A route can declare the services it needs instead:
+
+```ts
+const findOne = route.get('/users/:id', {
+  params: z.object({ id: z.coerce.number() }),
+  services: { users: UsersService },
+  handle: ({ params, users }) => users.find(params.id),
+});
+```
+
+## What makes it different
+
+- **Types written once.** A route's schemas validate the request and type the handler. The path
+  literal is checked against the `params` schema at compile time.
+- **Two styles, one primitive.** Routes as fields of an injected class, or as plain values.
+- **DI like .NET.** One flat service collection, explicit lifetimes, a scope per request,
+  captive-dependency and cycle detection at startup, disposal in reverse order.
+- **One cross-cutting concept.** Everything that wraps a request is a middleware.
+- **Web-standard core.** The kernel speaks Fetch `Request`/`Response`; Bun runs at parity with raw `Bun.serve`.
+- **Validation via Standard Schema.** Zod, Valibot or ArkType, with no adapter.
+
 ## Packages
 
-| Package               | What it is                                                                                                            | Size (min) |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `@suku/di`            | Container: `ServiceCollection`, lifetimes, scopes, keyed services, disposal, build-time validation                    | 13 KB      |
-| `@suku/core`          | Modules, controllers, router, pipeline (middleware, guards, interceptors, pipes, filters), validation, config, logger | 24 KB      |
-| `@suku/platform-node` | `node:http` adapter                                                                                                   | 2 KB       |
-| `@suku/platform-bun`  | `Bun.serve` adapter                                                                                                   | 1 KB       |
-
-## Why not just NestJS?
-
-- **DI like .NET**: one flat service collection, explicit lifetimes, a scope per request,
-  captive-dependency and cycle detection at startup, disposal in reverse order.
-- **Modules are typed objects**, not decorated empty classes. `singleton(Logger, ConsoleLogger)`
-  is type-checked; `ConfigModule(opts)` is a function, not `forRoot`.
-- **Web-standard core**: the kernel speaks Fetch `Request`/`Response`, so adapters are tiny and
-  Bun runs at parity with raw `Bun.serve`.
-- **Validation via Standard Schema**: Zod, Valibot or ArkType plug in with no adapter.
-- **No RxJS, no reflect-metadata, no Express**: zero runtime dependencies.
+| Package               | What it is                                                                    |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `@suku/core`          | Routes, features, middlewares, validation, config, logger                     |
+| `@suku/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation |
+| `@suku/platform-node` | `node:http` adapter                                                           |
+| `@suku/platform-bun`  | `Bun.serve` adapter                                                           |
 
 ## Development
 
 ```bash
 bun install
 bun run check        # lint, typecheck, tests (Bun + Node), build, size budgets
+bun run docs:dev     # documentation site
 bun run --cwd examples/hello dev
 ```
 
-Compile with `experimentalDecorators` and `emitDecoratorMetadata`. See [PLAN.md](PLAN.md) for
-the design decisions and roadmap, and each package's README for its API.
+Documentation lives in [apps/docs](apps/docs). See [PLAN.md](PLAN.md) for design decisions.
 
 ## License
 
