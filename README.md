@@ -14,7 +14,9 @@ const CreateUser = z.object({ name: z.string().min(2) });
 
 @Injectable()
 class UsersService {
-  find(id: string) { return { id, name: 'Ada' }; }
+  find(id: string) {
+    return { id, name: 'Ada' };
+  }
 }
 
 @Controller('users')
@@ -22,13 +24,20 @@ class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get(':id')
-  get(@Param('id') id: string) { return this.users.find(id); }
+  get(@Param('id') id: string) {
+    return this.users.find(id);
+  }
 
   @Post()
-  create(@Body(CreateUser) dto: z.infer<typeof CreateUser>) { return dto; }
+  create(@Body(CreateUser) dto: z.infer<typeof CreateUser>) {
+    return dto;
+  }
 }
 
-const UsersModule = defineModule({ controllers: [UsersController], services: [singleton(UsersService)] });
+const UsersModule = defineModule({
+  controllers: [UsersController],
+  services: [singleton(UsersService)],
+});
 
 const app = await Suku.create({ imports: [UsersModule], adapter: nodeAdapter() });
 await app.listen(3000);
@@ -36,12 +45,12 @@ await app.listen(3000);
 
 ## Packages
 
-| Package | What it is | Size (min) |
-|---|---|---|
-| `@suku/di` | Container: `ServiceCollection`, lifetimes, scopes, keyed services, disposal, build-time validation | 13 KB |
-| `@suku/core` | Modules, controllers, router, pipeline (middleware, guards, interceptors, pipes, filters), validation, config, logger | 24 KB |
-| `@suku/platform-node` | `node:http` adapter | 2 KB |
-| `@suku/platform-bun` | `Bun.serve` adapter | 1 KB |
+| Package               | What it is                                                                                                            | Size (min) |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `@suku/di`            | Container: `ServiceCollection`, lifetimes, scopes, keyed services, disposal, build-time validation                    | 13 KB      |
+| `@suku/core`          | Modules, controllers, router, pipeline (middleware, guards, interceptors, pipes, filters), validation, config, logger | 24 KB      |
+| `@suku/platform-node` | `node:http` adapter                                                                                                   | 2 KB       |
+| `@suku/platform-bun`  | `Bun.serve` adapter                                                                                                   | 1 KB       |
 
 ## Why not just NestJS?
 
