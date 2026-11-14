@@ -18,6 +18,8 @@ Suku is now built from **routes, features, middlewares and services**:
   adapters, Standard Schema validation, `defineConfig`, `Logger`.
 - `@Injectable` was renamed `@Service`, and `service(name, { services, create })` declares a
   service without a class; it is its own token and its dependencies are validated at startup.
+- `@suku/crypto` (2026-11-14): standalone, Web Crypto only. JWT (HS/RS/PS/ES/EdDSA, algorithm
+  fixed at creation), PBKDF2 password hashing, HMAC signer, AES-GCM sealer, random and hash helpers.
 - Deferred: typed values added by middlewares, a route-level result hook, OpenAPI and a typed
   client (routes already carry method, path, schemas and name for them).
 
