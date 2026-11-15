@@ -1,5 +1,5 @@
 import { type MiddlewareFn, type RequestContext, TooManyRequestsException } from '@sukujs/core';
-import { type Duration, mutable, toSeconds } from './util.js';
+import { type Duration, mutable, toSeconds, warn } from './util.js';
 
 export interface RateLimitHit {
   /** Requests counted in the current window, including this one. */
@@ -135,6 +135,10 @@ export function rateLimit(options: RateLimitOptions): MiddlewareFn {
       : {};
 
     if (count > options.limit) {
+      // Once per key and window, so a client hammering the limit cannot also fill the log.
+      if (count === options.limit + 1) {
+        warn(ctx, 'Rate limit exceeded', { limiter: name, key, limit: options.limit });
+      }
       return new TooManyRequestsException(
         options.message ?? 'Too many requests, please try again later',
         {

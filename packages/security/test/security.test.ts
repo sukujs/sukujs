@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { route, Suku, UnauthorizedException } from '@sukujs/core';
+import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
+import { Logger, type LogLevel, route, Suku, singleton, UnauthorizedException } from '@sukujs/core';
 import sukuSecurity, {
   buildCsp,
   clientIp,
@@ -10,6 +10,11 @@ import sukuSecurity, {
   rateLimit,
   securityHeaders,
 } from '../src/index.js';
+
+// Blocked requests are logged at warn through the default ConsoleLogger; keep the output quiet.
+beforeAll(() => {
+  spyOn(console, 'warn').mockImplementation(() => {});
+});
 
 const req = (path: string, init?: RequestInit) => new Request(`http://api.test${path}`, init);
 const routes = [
@@ -459,6 +464,101 @@ describe('rateLimit', () => {
     );
     // spoofable entry first, real client next, inner proxy, then the socket peer
     expect(out).toEqual(['10.0.0.1', '10.0.0.2', '203.0.113.7', '6.6.6.6']);
+  });
+});
+
+describe('security events are logged', () => {
+  const entries: { level: LogLevel; message: string; meta?: Record<string, unknown> }[] = [];
+  class CapturingLogger extends Logger {
+    log(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
+      entries.push({ level, message, ...(meta ? { meta } : {}) });
+    }
+  }
+  const app = (middlewares: import('@sukujs/core').MiddlewareRef[]) =>
+    Suku.create({ routes, middlewares, services: [singleton(Logger, CapturingLogger)] });
+
+  test('a blocked cross-site request is logged at warn with its origin', async () => {
+    entries.length = 0;
+    const a = await app([csrf()]);
+    const blocked = await a.handle(
+      req('/data', {
+        method: 'POST',
+        headers: { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' },
+      }),
+    );
+    expect(blocked.status).toBe(403);
+    expect(entries).toEqual([
+      {
+        level: 'warn',
+        message: 'CSRF check failed',
+        meta: {
+          method: 'POST',
+          path: '/data',
+          route: 'POST /data',
+          reason: 'origin is not allowed',
+          origin: 'https://evil.example',
+          site: 'cross-site',
+        },
+      },
+    ]);
+    // Requests that pass are not logged.
+    await a.handle(req('/data', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } }));
+    expect(entries).toHaveLength(1);
+  });
+
+  test('a missing token is logged in token mode', async () => {
+    entries.length = 0;
+    const a = await app([
+      csrf({ mode: 'token', secret: 'a-secret-that-is-at-least-32-characters' }),
+    ]);
+    expect((await a.handle(req('/data', { method: 'POST' }))).status).toBe(403);
+    expect(entries.map((e) => [e.level, e.meta?.reason])).toEqual([
+      ['warn', 'missing or invalid token'],
+    ]);
+  });
+
+  test('going over a rate limit is logged once per key and window', async () => {
+    entries.length = 0;
+    let now = 0;
+    const a = await app([rateLimit({ limit: 2, window: '1m', name: 'api', now: () => now })]);
+    const hit = (remoteAddress: string) => a.handle(req('/data'), { remoteAddress });
+    for (let i = 0; i < 6; i++) await hit('203.0.113.7');
+    expect(entries).toEqual([
+      {
+        level: 'warn',
+        message: 'Rate limit exceeded',
+        meta: {
+          method: 'GET',
+          path: '/data',
+          route: 'GET /data',
+          limiter: 'api',
+          key: '203.0.113.7',
+          limit: 2,
+        },
+      },
+    ]);
+    // Another client, and the same client in the next window, are logged separately.
+    for (let i = 0; i < 4; i++) await hit('203.0.113.8');
+    now = 61_000;
+    for (let i = 0; i < 4; i++) await hit('203.0.113.7');
+    expect(entries.map((e) => e.meta?.key)).toEqual(['203.0.113.7', '203.0.113.8', '203.0.113.7']);
+  });
+
+  test('a logger that throws does not change the response', async () => {
+    class BrokenLogger extends Logger {
+      log(): void {
+        throw new Error('disk full');
+      }
+    }
+    const a = await Suku.create({
+      routes,
+      middlewares: [csrf()],
+      services: [singleton(Logger, BrokenLogger)],
+    });
+    const blocked = await a.handle(
+      req('/data', { method: 'POST', headers: { origin: 'https://evil.example' } }),
+    );
+    expect(blocked.status).toBe(403);
   });
 });
 

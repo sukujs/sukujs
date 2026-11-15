@@ -1,6 +1,6 @@
 import { ForbiddenException, type MiddlewareFn, type RequestContext } from '@sukujs/core';
 import { createSigner, randomToken, timingSafeEqual } from '@sukujs/crypto';
-import { matchesOrigin, mutable, type OriginRule } from './util.js';
+import { matchesOrigin, mutable, type OriginRule, warn } from './util.js';
 
 interface CsrfCommon {
   /** Methods that never change state and are not checked. Default: GET, HEAD, OPTIONS. */
@@ -58,7 +58,13 @@ export function csrfToken(ctx: RequestContext): string | undefined {
   return ctx.get<string>(TOKEN);
 }
 
-function reject(): never {
+/** Refuses the request and records why, so an attack in progress shows up in the logs. */
+function reject(ctx: RequestContext, reason: string): never {
+  warn(ctx, 'CSRF check failed', {
+    reason,
+    origin: ctx.headers.get('origin') ?? undefined,
+    site: ctx.headers.get('sec-fetch-site') ?? undefined,
+  });
   throw new ForbiddenException('Cross-site request blocked');
 }
 
@@ -98,18 +104,18 @@ export function csrf(options: CsrfOptions = {}): MiddlewareFn {
       if (origin === null) {
         // No Origin and no cross-site marker: not a browser making a cross-site request.
         if (site === null) return next();
-        reject();
+        reject(ctx, 'cross-site request without an Origin header');
       }
       if (matchesOrigin(origin, allowed)) return next();
       let host: string | undefined;
       try {
         host = new URL(origin).host;
       } catch {
-        reject();
+        reject(ctx, 'unreadable Origin header');
       }
       // Compared by host, because TLS is often terminated before the app sees the request.
       if (host === ctx.url.host && site !== 'cross-site') return next();
-      reject();
+      reject(ctx, 'origin is not allowed');
     };
   }
 
@@ -159,7 +165,8 @@ export function csrf(options: CsrfOptions = {}): MiddlewareFn {
 
     if (!safe.has(ctx.method)) {
       const echoed = ctx.headers.get(headerName);
-      if (!valid || echoed === null || !timingSafeEqual(echoed, presented as string)) reject();
+      if (!valid || echoed === null || !timingSafeEqual(echoed, presented as string))
+        reject(ctx, 'missing or invalid token');
     }
 
     const token = valid ? (presented as string) : await issue(session);
