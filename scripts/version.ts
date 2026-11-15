@@ -6,9 +6,10 @@
  *   bun scripts/version.ts set 0.3.0        set every package to an exact version
  *   bun scripts/version.ts bump patch       bump every package: patch | minor | major
  *
- * `set` and `bump` only edit package.json files. Committing and tagging stay manual.
+ * `set` and `bump` edit the package.json files and the matching versions in bun.lock.
+ * Committing and tagging stay manual.
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dir, '..');
@@ -87,6 +88,26 @@ function write(pkgs: Pkg[], version: string): void {
       throw new Error(`Could not update ${pkg.file}`);
     writeFileSync(pkg.file, next);
   }
+  writeLockfile(pkgs, version);
+}
+
+/**
+ * bun.lock records each workspace package's version. Updating it here keeps the lockfile in
+ * step with the release commit; otherwise the next `bun install` rewrites it and leaves the
+ * tree dirty, which the publish script refuses.
+ */
+function writeLockfile(pkgs: Pkg[], version: string): void {
+  const file = join(root, 'bun.lock');
+  if (!existsSync(file)) return;
+  let lock = readFileSync(file, 'utf8');
+  for (const { json } of pkgs) {
+    const name = json.name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+    const entry = new RegExp(`("name":\\s*"${name}",\\s*"version":\\s*")[^"]*(")`);
+    if (!entry.test(lock))
+      throw new Error(`Could not find ${json.name} in bun.lock. Run \`bun install\` first.`);
+    lock = lock.replace(entry, `$1${version}$2`);
+  }
+  writeFileSync(file, lock);
 }
 
 const [command, argument] = process.argv.slice(2);
