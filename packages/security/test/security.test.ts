@@ -438,7 +438,49 @@ describe('rateLimit', () => {
     expect((await app.handle(req('/open'), { remoteAddress: '9.9.9.9' })).status).toBe(200);
     const small = new MemoryRateLimitStore(50);
     for (let i = 0; i < 2000; i++) small.hit(`k${i}`, 60_000, 0);
-    expect(small.size).toBeLessThanOrEqual(1050);
+    expect(small.size).toBe(50);
+  });
+
+  test('a full store keeps live counters and counts new keys together', () => {
+    const store = new MemoryRateLimitStore(3);
+    store.hit('victim', 60_000, 0);
+    store.hit('victim', 60_000, 0);
+    store.hit('a', 60_000, 0);
+    store.hit('b', 60_000, 0);
+    // The store is full. New keys share one counter and evict nobody.
+    expect(store.hit('flood-1', 60_000, 10).count).toBe(1);
+    expect(store.hit('flood-2', 60_000, 20).count).toBe(2);
+    expect(store.hit('flood-3', 60_000, 30).count).toBe(3);
+    expect(store.size).toBe(3);
+    expect(store.hit('victim', 60_000, 40).count).toBe(3);
+    // Once the window has passed, expired counters make room and new keys count alone again.
+    expect(store.hit('flood-4', 60_000, 61_000).count).toBe(1);
+    expect(store.hit('flood-4', 60_000, 61_001).count).toBe(2);
+    expect(store.hit('victim', 60_000, 61_002).count).toBe(1);
+  });
+
+  test('the default key groups IPv6 clients by /64 and leaves IPv4 whole', async () => {
+    const app = await Suku.create({
+      routes,
+      middlewares: [rateLimit({ limit: 1, window: '1m' })],
+    });
+    const status = async (remoteAddress: string) =>
+      (await app.handle(req('/data'), { remoteAddress })).status;
+    expect(await status('2001:db8:aa:bb::1')).toBe(200);
+    // Same /64, written three other ways.
+    expect(await status('2001:db8:aa:bb:ffff:ffff:ffff:ffff')).toBe(429);
+    expect(await status('2001:0DB8:00aa:00bb:0:0:0:2')).toBe(429);
+    expect(await status('2001:db8:aa:bb::3%eth0')).toBe(429);
+    // A different /64.
+    expect(await status('2001:db8:aa:bc::1')).toBe(200);
+    // IPv4, and IPv4 mapped into IPv6, are the same client; its neighbour is not.
+    expect(await status('203.0.113.7')).toBe(200);
+    expect(await status('::ffff:203.0.113.7')).toBe(429);
+    expect(await status('203.0.113.8')).toBe(200);
+    // Loopback and something that is not an address still get a key of their own.
+    expect(await status('::1')).toBe(200);
+    expect(await status('::1')).toBe(429);
+    expect(await status('not:an::address::x')).toBe(200);
   });
 
   test('clientIp: socket address by default, X-Forwarded-For only when a proxy is trusted', async () => {
