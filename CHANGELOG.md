@@ -3,6 +3,67 @@
 All notable changes to Suku are documented here. Packages under `packages/*` share one
 version and are released together.
 
+## 0.5.0 — 2026-11-17
+
+Suku 0.5.0 adds encryption for stored data to `@sukujs/crypto`, and makes JWT configuration
+and keys safer by refusing settings that used to weaken verification without a word. Every
+`@sukujs/*` package is published at 0.5.0.
+
+### Breaking Changes
+
+#### RSA keys under 2048 bits are refused
+
+`createJwt` with `RS*` or `PS*` now refuses RSA keys shorter than 2048 bits, as RFC 7518
+requires, with a `JwtError` whose code is `weak_key`. A key that does not fit the configured
+algorithm is refused with `invalid_key`: for example a P-384 key for `ES256`, which signed
+tokens that other libraries reject, or an RSA-PSS key for `RS256`. This applies to PEM, JWK
+and `CryptoKey` keys alike ([#19](https://github.com/sukujs/sukujs/issues/19)).
+
+**Migration:** replace short RSA keys with 2048-bit or larger ones, for example
+`openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072`. Use a key whose type, curve
+and hash match the algorithm.
+
+#### Invalid `clockTolerance` and `maxTokenLength` are refused
+
+`createJwt` throws a `JwtError` with code `invalid_input` when `clockTolerance` is not a
+finite number of 0 or more, or `maxTokenLength` is not a positive whole number. Before, a
+`NaN` tolerance, such as `Number(process.env.JWT_SKEW)` with the variable unset, turned off
+the expiry check, so expired tokens were accepted
+([#18](https://github.com/sukujs/sukujs/issues/18)).
+
+**Migration:** if the app now stops at startup with this error, fix the value, or leave the
+option out to use the default.
+
+### Features
+
+- **`createEncrypter`** — keeps data you store unreadable: database fields, files, backups.
+  `AES-256-GCM` (the default) encrypts and decrypts with one secret, with a separate key per
+  `purpose`. `RSA-OAEP-256` encrypts with a public key so that only the holder of the private
+  key can decrypt, for an app that must not read what it saves. `encrypt` returns a string,
+  or bytes with `{ as: 'bytes' }`; `context` ties a value to its row, so it cannot be copied
+  into another; old keys can be kept for decrypting while keys change. A failure throws a
+  `CryptoError` with the new code `decryption_failed`. The formats are standard and can be
+  read with other tools ([#22](https://github.com/sukujs/sukujs/issues/22)).
+
+### Fixes
+
+- **Fresh installs** — `bun install` failed on a fresh clone because an example asked for an
+  unpublished package version. Standalone examples now follow the shared version, which
+  `version:set` and `version:bump` keep up to date and `version:check` enforces
+  ([#17](https://github.com/sukujs/sukujs/issues/17)).
+- **Node 24** — the `@sukujs/platform-node` test suite now passes on Node 24, where responses
+  take the streaming path ([#21](https://github.com/sukujs/sukujs/issues/21)).
+
+### Documentation
+
+- A new guide, Encrypting data, walks through an encrypted database column step by step, then
+  files, key pairs, changing keys and errors.
+- The Crypto overview explains what each check returns on failure and how to answer the
+  client.
+- The JWT page lists the rules for `clockTolerance`, `maxTokenLength` and keys.
+
+**Full changelog**: https://github.com/sukujs/sukujs/compare/v0.4.0...v0.5.0
+
 ## 0.4.0 — 2026-11-17
 
 Suku 0.4.0 adds observability: a new package that sends request traces, logs, errors and
