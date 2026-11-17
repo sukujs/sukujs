@@ -381,10 +381,11 @@ logger.error(new Error('outside'));
     });
     expect(outside.trace_id).toBeUndefined();
 
-    // LOG_FORMAT=pretty gives the same two entries through pino-pretty.
+    // LOG_FORMAT=pretty gives the same two entries through pino-pretty. NO_COLOR keeps the
+    // output plain: pino-pretty turns colours on in CI (it reads CI and GITHUB_ACTIONS).
     const pretty = Bun.spawnSync(['bun', 'trace-check.ts'], {
       cwd: root,
-      env: { ...process.env, LOG_FORMAT: 'pretty' },
+      env: { ...process.env, LOG_FORMAT: 'pretty', NO_COLOR: '1' },
     });
     const lines = pretty.stdout.toString().split('\n');
     expect(lines[0]).toMatch(
