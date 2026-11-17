@@ -43,14 +43,16 @@ Most mistakes come from using the wrong tool, not from using a tool badly.
 
 | You need to | Use | Why |
 | --- | --- | --- |
-| Let a client prove who it is on each request | [JWT](/docs/crypto/jwt) | Verified without a database lookup. |
-| Let other services verify your tokens | [JWT](/docs/crypto/jwt) with a key pair | They hold only the public key. |
-| Store a password | [`hashPassword`](/docs/crypto/passwords) | Slow on purpose, salted, upgradeable. |
-| Send a value the client may read but not change | [`createSigner`](/docs/crypto/signed-and-sealed) | Tamper-proof, still readable. |
-| Send a value the client must not read | [`createSealer`](/docs/crypto/signed-and-sealed) | Encrypted and tamper-proof, with expiry. |
-| Create a session id, API key or reset token | `randomToken()` | 256 bits from the system's secure source. |
-| Fingerprint a file or cache key | `sha256()` | Fast. Never for passwords. |
-| Compare two secrets | `timingSafeEqual()` | Does not leak where they differ. |
+| Let a client prove who it is on each request | [JWT](/docs/crypto/jwt) | Checked without a database lookup. |
+| Let other services check your tokens | [JWT](/docs/crypto/jwt) with a key pair | They hold only the public key, so they cannot make tokens. |
+| Store a password | [`hashPassword`](/docs/crypto/passwords) | Slow on purpose, so stolen hashes are hard to crack. |
+| Give a client a value it may read but not change | [`createSigner`](/docs/crypto/signed-and-sealed) | Any change is detected. |
+| Give a client a value it must not read | [`createSealer`](/docs/crypto/signed-and-sealed) | Encrypted, change-proof, and can expire. |
+| Store data nobody else can read, such as a field or a file | [`createEncrypter`](/docs/crypto/encryption) | A copied database shows only ciphertext. |
+| Let one app encrypt what only another app can read | [`createEncrypter`](/docs/crypto/encryption#encrypt-with-a-public-key) with `RSA-OAEP-256` | The app that encrypts cannot decrypt. |
+| Create a session id, API key or reset token | `randomToken()` | 256 random bits, impossible to guess. |
+| Fingerprint a file or make a cache key | `sha256()` | Fast. Never use it for passwords. |
+| Compare two secrets | `timingSafeEqual()` | Takes the same time wherever they differ, so it leaks nothing. |
 
 ### Signed, sealed, or a JWT?
 
@@ -71,7 +73,8 @@ A JWT's payload is only encoded, not encrypted. Anyone holding the token can rea
 | Tokens | `createJwt`, `bearerToken`, `decodeJwtUnverified` |
 | Passwords | `hashPassword`, `verifyPassword`, `needsRehash` |
 | Signed values | `createSigner` |
-| Encrypted values | `createSealer` |
+| Sealed values | `createSealer` |
+| Encryption | `createEncrypter` |
 | Random | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt` |
 | Hashing | `sha256`, `sha512`, `digest` |
 | Encoding and comparison | `base64urlEncode`, `base64urlDecode`, `hexEncode`, `timingSafeEqual` |
@@ -102,15 +105,21 @@ export const Env = defineConfig(
 
 ## Errors
 
-Functions that verify something you control return a plain result: `verifyPassword` gives
-`true` or `false`, and `unpack` and `unseal` give the value or `undefined`. They never throw
-on bad input.
+What happens when a check fails depends on whose fault it usually is.
 
-`jwt.verify` throws a `JwtError` with a `code`, because the reason matters for logging.
-Whatever the code, respond to the client with a plain `401`. See
+| Function | On failure | Usually because | Answer the client with |
+| --- | --- | --- | --- |
+| `verifyPassword` | returns `false` | a wrong password | `401` |
+| `signer.unpack`, `sealer.unseal` | returns `undefined` | a stale or edited cookie or link | `401`, or treat it as missing |
+| `jwt.verify` | throws `JwtError` | an expired or forged token | `401` |
+| `encrypter.decrypt` | throws `CryptoError` | a wrong key or damaged stored data: your side | `500`, and log it |
+
+Every error has a `code`, such as `expired` or `decryption_failed`, for your logs. Do not send
+it to the client: telling an attacker why a token failed helps them. See
 [best practices](/docs/crypto/best-practices#do-not-explain-failures-to-the-client).
 
 ## Not included
 
 Encrypted JWTs (JWE), fetching keys from an identity provider (JWKS), OAuth and OpenID
-Connect flows, token revocation lists, and Argon2 or bcrypt.
+Connect flows, token revocation lists, Argon2 or bcrypt, streaming encryption of large files,
+and encryption with a password.

@@ -21,14 +21,15 @@ const signed = await sukuCrypto.createSigner(env.COOKIE_SECRET).pack('user.42');
 const sealed = await sukuCrypto.createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
 ```
 
-| Area                | API                                                                  |
-| ------------------- | -------------------------------------------------------------------- |
-| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                    |
-| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                      |
-| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`            |
-| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`  |
-| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt` |
-| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                      |
+| Area                | API                                                                   | Use for                                                                              |
+| ------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                     | API authentication, and tokens other services verify                                 |
+| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                       | Storing and checking user passwords                                                  |
+| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`             | Values a client may read but not change: cookies, links, webhooks                    |
+| Sealed values       | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`   | Values a client holds but must not read: encrypted cookies, OAuth state, reset links |
+| Encryption          | `createEncrypter` (AES-256-GCM or RSA-OAEP-256): `encrypt`, `decrypt` | Data you store: database fields, files, backups                                      |
+| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`  | Session ids, API keys, reset tokens, nonces                                          |
+| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                       | Fingerprints, cache keys, comparing secrets (not passwords)                          |
 
 ## JWT
 
@@ -201,7 +202,7 @@ const cookie = await signer.pack('user.42'); // "user.42.<sig>"
 const userId = await signer.unpack(cookie); // "user.42" or undefined
 ```
 
-## Encrypted values (`createSealer`)
+## Sealed values (`createSealer`)
 
 Authenticated encryption (AES-256-GCM) for values the client holds but must not read or
 change: encrypted cookies, OAuth state, password-reset payloads. Secret must be ≥ 32 bytes.
@@ -282,6 +283,59 @@ import sukuCrypto from '@sukujs/crypto';
 const dice = sukuCrypto.randomInt(1, 7); // 1..6
 const index = sukuCrypto.randomInt(0, items.length);
 ```
+
+## Encryption (`createEncrypter`)
+
+Keeps data you **store** unreadable: database fields, files, backups. If someone copies your
+database, they get only ciphertext. For a value you give to a client, such as a cookie, use
+`createSealer` instead.
+
+Pick the algorithm when you create the encrypter:
+
+| `algorithm`             | Locks with  | Unlocks with      | Pick it when                                   |
+| ----------------------- | ----------- | ----------------- | ---------------------------------------------- |
+| `AES-256-GCM` (default) | `secret`    | the same `secret` | the same app saves and reads the data          |
+| `RSA-OAEP-256`          | `publicKey` | `privateKey`      | the app that saves must not be able to read it |
+
+### `createEncrypter`
+
+```ts
+import sukuCrypto from '@sukujs/crypto';
+
+// With a secret (at least 32 bytes). Each `purpose` gets its own key.
+const ssn = sukuCrypto.createEncrypter({
+  secret: env.DATA_KEY,
+  purpose: 'user.ssn',
+  previousSecrets: [env.DATA_KEY_OLD], // old secrets: decrypt only, for changing keys
+});
+
+// With a key pair: the public key encrypts, only the private key decrypts.
+const inbox = sukuCrypto.createEncrypter({
+  algorithm: 'RSA-OAEP-256',
+  publicKey: env.INBOX_PUBLIC_KEY, // PEM, JWK or CryptoKey; RSA, 2048 bits or more
+  privateKey: env.INBOX_PRIVATE_KEY, // leave it out where data is only saved
+});
+```
+
+### `encrypter.encrypt` / `encrypter.decrypt`
+
+```ts
+// Text, for a database column: you get a URL-safe string.
+const stored = await ssn.encrypt('123-45-6789', { context: user.id });
+const plain = await ssn.decrypt(stored, { context: user.id }); // "123-45-6789"
+
+// Files: ask for bytes. Adds only 29 bytes.
+const sealed = await ssn.encrypt(fileBytes, { as: 'bytes' });
+const original = await ssn.decrypt(sealed, { as: 'bytes' });
+```
+
+- **`context`** ties a value to its row, usually the row's id. It is not saved in the
+  ciphertext, so pass the same value to `decrypt`. A value copied into another row then
+  fails to decrypt there.
+- **`decrypt`** takes either form `encrypt` gave you, string or bytes.
+- **On failure**, `decrypt` throws `CryptoError` with code `decryption_failed`: a wrong key,
+  `purpose` or `context`, or changed data. That is a fault on your side, so log it and answer
+  with a `500`.
 
 ## Hashing and compare
 

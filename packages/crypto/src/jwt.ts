@@ -1,6 +1,7 @@
 import { type Duration, toSeconds } from './duration.js';
 import { type Bytes, base64urlDecode, base64urlEncode, toBytes, utf8 } from './encoding.js';
 import { JwtError } from './errors.js';
+import { importKey, type KeyInput, type KeyParams } from './keys.js';
 
 export type JwtAlgorithm =
   | 'HS256'
@@ -17,8 +18,7 @@ export type JwtAlgorithm =
   | 'ES512'
   | 'EdDSA';
 
-/** A PEM string (PKCS#8 private or SPKI public), a JWK, or an imported `CryptoKey`. */
-export type KeyInput = string | JsonWebKey | CryptoKey;
+export type { KeyInput } from './keys.js';
 
 /** Registered claims (RFC 7519). Your own claims sit alongside them. */
 export interface JwtClaims {
@@ -154,86 +154,6 @@ const ALGORITHMS: readonly string[] = [
   'EdDSA',
 ];
 
-function pemBody(pem: string, label: string): Bytes | undefined {
-  const match = new RegExp(`-----BEGIN ${label}-----([\\s\\S]+?)-----END ${label}-----`).exec(pem);
-  if (!match) return undefined;
-  const binary = atob(match[1]!.replace(/\s+/g, ''));
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out as Bytes;
-}
-
-/** RFC 7518 section 3.3: RSA keys for RS and PS must be at least 2048 bits. */
-const MIN_RSA_BITS = 2048;
-
-/**
- * Checks that a key fits the configured algorithm. Web Crypto already does this when it imports
- * a PEM or JWK, but a `CryptoKey` is used as given: without the check, a P-384 key signed tokens
- * labelled ES256 that every other library rejects.
- */
-function checkKey(key: CryptoKey, algorithm: JwtAlgorithm): void {
-  const want = keyType(spec(algorithm).import as KeyParams);
-  const got = keyType(key.algorithm as KeyParams);
-  if (got !== want)
-    throw new JwtError('invalid_key', `${algorithm} needs a ${want} key; got ${got}.`);
-  const bits = (key.algorithm as RsaKeyAlgorithm).modulusLength;
-  if (bits < MIN_RSA_BITS) {
-    throw new JwtError(
-      'weak_key',
-      `${algorithm} needs an RSA key of ${MIN_RSA_BITS}+ bits; got ${bits}.`,
-    );
-  }
-}
-
-interface KeyParams {
-  name: string;
-  namedCurve?: string;
-  hash?: string | { name: string };
-}
-
-/** `ECDSA P-256`, `RSA-PSS SHA-256` or `Ed25519`: what a key is for, from import params or a key. */
-function keyType({ name, namedCurve, hash }: KeyParams): string {
-  return [name, namedCurve, typeof hash === 'object' ? hash.name : hash].filter(Boolean).join(' ');
-}
-
-async function importKey(
-  input: KeyInput,
-  algorithm: JwtAlgorithm,
-  usage: 'sign' | 'verify',
-): Promise<CryptoKey> {
-  const params = spec(algorithm).import as AlgorithmIdentifier;
-  let key: CryptoKey;
-  try {
-    if (typeof input === 'string') {
-      const label = usage === 'sign' ? 'PRIVATE KEY' : 'PUBLIC KEY';
-      const der = pemBody(input, label);
-      if (!der) {
-        throw new JwtError(
-          'invalid_key',
-          `Expected a PEM "${label}" block (${usage === 'sign' ? 'PKCS#8' : 'SPKI'}). ` +
-            'Convert legacy "RSA PRIVATE KEY" / "EC PRIVATE KEY" files with: openssl pkcs8 -topk8 -nocrypt.',
-        );
-      }
-      key = await crypto.subtle.importKey(usage === 'sign' ? 'pkcs8' : 'spki', der, params, false, [
-        usage,
-      ]);
-    } else if (typeof CryptoKey !== 'undefined' && input instanceof CryptoKey) {
-      if (!input.usages.includes(usage))
-        throw new JwtError('invalid_key', `CryptoKey does not allow "${usage}".`);
-      key = input;
-    } else {
-      key = await crypto.subtle.importKey('jwk', input as JsonWebKey, params, false, [usage]);
-    }
-  } catch (cause) {
-    if (cause instanceof JwtError) throw cause;
-    throw new JwtError('invalid_key', `Could not import the ${usage} key for ${algorithm}.`, {
-      cause,
-    });
-  }
-  checkKey(key, algorithm);
-  return key;
-}
-
 function importSecret(secret: string | Uint8Array, algorithm: JwtAlgorithm): Promise<CryptoKey> {
   const bytes = toBytes(secret);
   const { size, import: params } = spec(algorithm);
@@ -320,7 +240,7 @@ export function createJwt<T = Record<string, unknown>>(options: JwtOptions<T>): 
     } else {
       const key = (options as KeyPairJwtOptions<T>).privateKey;
       if (!key) throw new JwtError('invalid_key', `Signing with ${algorithm} needs a privateKey.`);
-      signKey = importKey(key, algorithm, 'sign');
+      signKey = importKey(key, spec(algorithm).import as KeyParams, 'sign', algorithm, JwtError);
     }
     return signKey;
   };
@@ -339,7 +259,7 @@ export function createJwt<T = Record<string, unknown>>(options: JwtOptions<T>): 
         throw new JwtError('invalid_key', `Verifying ${algorithm} needs a publicKey.`);
       verifyKeys = Promise.all(
         [o.publicKey, ...(o.previousPublicKeys ?? [])].map((k) =>
-          importKey(k, algorithm, 'verify'),
+          importKey(k, spec(algorithm).import as KeyParams, 'verify', algorithm, JwtError),
         ),
       );
     }
