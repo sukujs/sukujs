@@ -163,12 +163,46 @@ function pemBody(pem: string, label: string): Bytes | undefined {
   return out as Bytes;
 }
 
+/** RFC 7518 section 3.3: RSA keys for RS and PS must be at least 2048 bits. */
+const MIN_RSA_BITS = 2048;
+
+/**
+ * Checks that a key fits the configured algorithm. Web Crypto already does this when it imports
+ * a PEM or JWK, but a `CryptoKey` is used as given: without the check, a P-384 key signed tokens
+ * labelled ES256 that every other library rejects.
+ */
+function checkKey(key: CryptoKey, algorithm: JwtAlgorithm): void {
+  const want = keyType(spec(algorithm).import as KeyParams);
+  const got = keyType(key.algorithm as KeyParams);
+  if (got !== want)
+    throw new JwtError('invalid_key', `${algorithm} needs a ${want} key; got ${got}.`);
+  const bits = (key.algorithm as RsaKeyAlgorithm).modulusLength;
+  if (bits < MIN_RSA_BITS) {
+    throw new JwtError(
+      'weak_key',
+      `${algorithm} needs an RSA key of ${MIN_RSA_BITS}+ bits; got ${bits}.`,
+    );
+  }
+}
+
+interface KeyParams {
+  name: string;
+  namedCurve?: string;
+  hash?: string | { name: string };
+}
+
+/** `ECDSA P-256`, `RSA-PSS SHA-256` or `Ed25519`: what a key is for, from import params or a key. */
+function keyType({ name, namedCurve, hash }: KeyParams): string {
+  return [name, namedCurve, typeof hash === 'object' ? hash.name : hash].filter(Boolean).join(' ');
+}
+
 async function importKey(
   input: KeyInput,
   algorithm: JwtAlgorithm,
   usage: 'sign' | 'verify',
 ): Promise<CryptoKey> {
   const params = spec(algorithm).import as AlgorithmIdentifier;
+  let key: CryptoKey;
   try {
     if (typeof input === 'string') {
       const label = usage === 'sign' ? 'PRIVATE KEY' : 'PUBLIC KEY';
@@ -180,26 +214,24 @@ async function importKey(
             'Convert legacy "RSA PRIVATE KEY" / "EC PRIVATE KEY" files with: openssl pkcs8 -topk8 -nocrypt.',
         );
       }
-      return await crypto.subtle.importKey(
-        usage === 'sign' ? 'pkcs8' : 'spki',
-        der,
-        params,
-        false,
-        [usage],
-      );
-    }
-    if (typeof CryptoKey !== 'undefined' && input instanceof CryptoKey) {
+      key = await crypto.subtle.importKey(usage === 'sign' ? 'pkcs8' : 'spki', der, params, false, [
+        usage,
+      ]);
+    } else if (typeof CryptoKey !== 'undefined' && input instanceof CryptoKey) {
       if (!input.usages.includes(usage))
         throw new JwtError('invalid_key', `CryptoKey does not allow "${usage}".`);
-      return input;
+      key = input;
+    } else {
+      key = await crypto.subtle.importKey('jwk', input as JsonWebKey, params, false, [usage]);
     }
-    return await crypto.subtle.importKey('jwk', input as JsonWebKey, params, false, [usage]);
   } catch (cause) {
     if (cause instanceof JwtError) throw cause;
     throw new JwtError('invalid_key', `Could not import the ${usage} key for ${algorithm}.`, {
       cause,
     });
   }
+  checkKey(key, algorithm);
+  return key;
 }
 
 function importSecret(secret: string | Uint8Array, algorithm: JwtAlgorithm): Promise<CryptoKey> {

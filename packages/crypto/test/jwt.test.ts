@@ -253,4 +253,58 @@ describe('asymmetric algorithms', () => {
     });
     await expect(legacy.sign({})).rejects.toThrow(/openssl pkcs8/);
   });
+
+  test('a CryptoKey must match the configured algorithm, curve and hash', async () => {
+    // Without this check a P-384 key signed tokens labelled ES256, which other libraries reject.
+    const fakeToken = (alg: string) => `${b64({ alg, typ: 'JWT' })}.${b64({})}.AAAA`;
+    const mismatched: [JwtAlgorithm, object][] = [
+      ['ES256', { name: 'ECDSA', namedCurve: 'P-384' }], // wrong curve
+      ['ES384', { name: 'Ed25519' }], // wrong key type
+      ['RS256', { name: 'RSA-PSS', hash: 'SHA-256', ...rsa }], // PS key used for RS
+      ['RS256', { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384', ...rsa }], // wrong hash
+      ['PS256', { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256', ...rsa }], // RS key used for PS
+    ];
+    for (const [algorithm, params] of mismatched) {
+      const { pair } = await pemPair(params);
+      const jwt = createJwt({
+        algorithm,
+        privateKey: pair.privateKey,
+        publicKey: pair.publicKey,
+      } as never);
+      expect([algorithm, await code(jwt.sign({}))]).toEqual([algorithm, 'invalid_key']);
+      expect([algorithm, await code(jwt.verify(fakeToken(algorithm)))]).toEqual([
+        algorithm,
+        'invalid_key',
+      ]);
+    }
+
+    // A matching CryptoKey still works.
+    const { pair } = await pemPair({ name: 'RSA-PSS', hash: 'SHA-256', ...rsa });
+    const ps = createJwt({
+      algorithm: 'PS256',
+      privateKey: pair.privateKey,
+      publicKey: pair.publicKey,
+    });
+    expect((await ps.verify(await ps.sign({ a: 1 }))).a).toBe(1);
+  });
+
+  test('RSA keys shorter than 2048 bits are refused, as RFC 7518 requires', async () => {
+    const short = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256', ...rsa, modulusLength: 1024 };
+    const keys = await pemPair(short);
+    const fromPem = createJwt({
+      algorithm: 'RS256',
+      privateKey: keys.privateKey,
+      publicKey: keys.publicKey,
+    });
+    expect(await code(fromPem.sign({}))).toBe('weak_key');
+    const fakeToken = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({})}.AAAA`;
+    expect(await code(fromPem.verify(fakeToken))).toBe('weak_key');
+    const fromCryptoKey = createJwt({ algorithm: 'RS256', privateKey: keys.pair.privateKey });
+    expect(await code(fromCryptoKey.sign({}))).toBe('weak_key');
+    const fromJwk = createJwt({
+      algorithm: 'RS256',
+      publicKey: await crypto.subtle.exportKey('jwk', keys.pair.publicKey),
+    });
+    expect(await code(fromJwk.verify(fakeToken))).toBe('weak_key');
+  });
 });

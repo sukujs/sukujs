@@ -97,7 +97,7 @@ const token = sukuCrypto.bearerToken(ctx.headers.get('authorization'));   // und
 | --- | --- | --- |
 | One service signs and verifies | `HS256` (the default) | One shared secret. |
 | Other services or third parties verify | `ES256` or `EdDSA` | Private key signs, public key verifies. |
-| An existing system requires RSA | `RS256` or `PS256` | 2048-bit keys or larger. |
+| An existing system requires RSA | `RS256` or `PS256` | 2048-bit keys or larger. Shorter keys are refused. |
 
 With a shared secret, anything that can verify a token can also forge one. Use a key pair as
 soon as a second service needs to verify.
@@ -111,7 +111,9 @@ const verifier = sukuCrypto.createJwt({ algorithm: 'ES256', publicKey: env.JWT_P
 ```
 
 Keys may be PEM strings, JWK objects or `CryptoKey`s. PEM must be PKCS#8 for private keys and
-SPKI for public keys.
+SPKI for public keys. Every key must fit the configured algorithm: a P-256 key for `ES256`, an
+RSA-PSS key for `PS256`, and so on. A key that does not fit is refused with a `JwtError` (code
+`invalid_key`), and an RSA key under 2048 bits with code `weak_key`.
 
 ```bash
 # ES256 key pair
