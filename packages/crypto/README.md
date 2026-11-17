@@ -21,14 +21,15 @@ const signed = await sukuCrypto.createSigner(env.COOKIE_SECRET).pack('user.42');
 const sealed = await sukuCrypto.createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
 ```
 
-| Area                | API                                                                  |
-| ------------------- | -------------------------------------------------------------------- |
-| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                    |
-| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                      |
-| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`            |
-| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`  |
-| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt` |
-| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                      |
+| Area                | API                                                                    |
+| ------------------- | ---------------------------------------------------------------------- |
+| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                      |
+| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                        |
+| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`              |
+| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`    |
+| Encrypted data      | `createEncrypter` (AES-256-GCM), `createPublicKeyEncrypter` (RSA-OAEP) |
+| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`   |
+| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                        |
 
 ## JWT
 
@@ -282,6 +283,32 @@ import sukuCrypto from '@sukujs/crypto';
 const dice = sukuCrypto.randomInt(1, 7); // 1..6
 const index = sukuCrypto.randomInt(0, items.length);
 ```
+
+## Encrypted data (`createEncrypter`, `createPublicKeyEncrypter`)
+
+For data you store: database fields, files, backups. `createSealer` is for values a client holds.
+
+```ts
+import sukuCrypto from '@sukujs/crypto';
+
+// With a secret (AES-256-GCM). `purpose` gives each kind of data its own key, and `context`
+// binds a value to its row, so it cannot be copied into another one.
+const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'user.ssn' });
+const stored = await ssn.encrypt('123-45-6789', { context: user.id });
+await ssn.decrypt(stored, { context: user.id }); // throws CryptoError 'decryption_failed' if changed
+
+// Bytes, for files: about 29 bytes of overhead, no base64.
+const sealed = await ssn.encryptBytes(fileBytes);
+await ssn.decryptBytes(sealed);
+
+// With a public key: anyone with it can encrypt, only the private key decrypts.
+const inbox = sukuCrypto.createPublicKeyEncrypter({ publicKey: env.INBOX_PUBLIC_KEY });
+const office = sukuCrypto.createPublicKeyEncrypter({ privateKey: env.INBOX_PRIVATE_KEY });
+await office.decrypt(await inbox.encrypt('for the back office'));
+```
+
+Rotation: `previousSecrets` and `previousPrivateKeys` are tried when decrypting, never used to
+encrypt. RSA keys must be RSA-OAEP with SHA-256 and at least 2048 bits.
 
 ## Hashing and compare
 

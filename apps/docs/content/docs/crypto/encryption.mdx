@@ -1,0 +1,118 @@
+---
+title: Encrypting data
+description: Encrypt database fields and files with a secret, or with a public key.
+icon: LockKeyhole
+---
+
+Use these to keep data unreadable where you store it: a column with personal data, an
+uploaded file, a backup. For a value you hand to a client, such as a cookie, use
+[`createSealer`](/docs/crypto/signed-and-sealed) instead: it holds JSON and can expire.
+
+| | `createEncrypter` | `createPublicKeyEncrypter` |
+| --- | --- | --- |
+| Encrypts with | A secret | A public key |
+| Decrypts with | The same secret | The private key |
+| Use when | One service writes and reads the data | The service that writes must not be able to read |
+| Method | AES-256-GCM | RSA-OAEP (SHA-256) with AES-256-GCM |
+
+Both detect any change to the data, and both refuse to decrypt it if anything was changed.
+
+## With a secret
+
+```ts
+import sukuCrypto from '@sukujs/crypto';
+
+const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'user.ssn' });
+
+const stored = await ssn.encrypt('123-45-6789', { context: user.id }); // URL-safe string
+await ssn.decrypt(stored, { context: user.id });                       // "123-45-6789"
+```
+
+- **`purpose`** gives each kind of data its own key, derived from the secret. A value
+  encrypted as `user.ssn` cannot be decrypted as `notes`.
+- **`context`** binds a value to something it belongs to, usually the row's id. It is not
+  stored in the ciphertext; pass the same value to `decrypt`. Without it, someone with write
+  access to the database could copy an encrypted value from one row into another and have it
+  decrypt there.
+- The secret must be at least 32 bytes. Generate one with `randomToken(32)`.
+
+### Files and binary data
+
+`encrypt` and `decrypt` work with strings. For files and binary columns, use the byte
+forms, which skip the base64 step and add only 29 bytes.
+
+```ts
+const files = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'uploads' });
+
+const sealed = await files.encryptBytes(new Uint8Array(await upload.arrayBuffer()));
+await storage.put(key, sealed);
+
+const original = await files.decryptBytes(await storage.get(key));
+```
+
+The whole file is held in memory while it is encrypted. For files of hundreds of megabytes,
+use a streaming tool or your storage provider's encryption instead.
+
+### Rotating the secret
+
+Add the new secret as the main one and move the old one to `previousSecrets`. New data is
+encrypted with the new secret; old data still decrypts.
+
+```ts
+const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, {
+  purpose: 'user.ssn',
+  previousSecrets: [env.OLD_DATA_KEY],
+});
+```
+
+To retire the old secret, decrypt and re-encrypt every stored value, then remove it.
+
+## With a public key
+
+Anyone with the public key can encrypt. Only the holder of the private key can decrypt. A
+public form that collects documents for a back office is the typical case: the web server
+holds only the public key, so a breach of the server does not expose what it collected.
+
+```ts
+// The web server: encrypts only.
+const inbox = sukuCrypto.createPublicKeyEncrypter({ publicKey: env.INBOX_PUBLIC_KEY });
+const sealed = await inbox.encryptBytes(document);
+
+// The back office: decrypts.
+const office = sukuCrypto.createPublicKeyEncrypter({ privateKey: env.INBOX_PRIVATE_KEY });
+const document = await office.decryptBytes(sealed);
+```
+
+Data of any size works: each message gets a random AES-256-GCM key, and only that key is
+encrypted with RSA. `context` works as above, and `previousPrivateKeys` takes older private
+keys for rotation.
+
+Keys may be PEM strings, JWK objects or `CryptoKey`s, for RSA-OAEP with SHA-256 and at least
+2048 bits. PEM must be PKCS#8 for the private key and SPKI for the public key.
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out private.pem
+openssl pkey -in private.pem -pubout -out public.pem
+```
+
+## When decryption fails
+
+`decrypt` and `decryptBytes` throw a `CryptoError` with code `decryption_failed` if the data
+was changed, or was encrypted with another key, purpose or context. Unlike `unseal`, they do
+not return `undefined`: stored data that cannot be read is an error to look into, not a
+missing value. `decrypt` throws with code `malformed` if the plaintext was bytes that are
+not text; read those with `decryptBytes`.
+
+## Format
+
+The output starts with a format byte, so the format can change later without breaking stored
+data. Both formats use standard algorithms and can be decrypted elsewhere:
+
+| Kind | Bytes |
+| --- | --- |
+| Secret | `1`, IV (12), ciphertext, tag (16) |
+| Public key | `2`, wrapped key length (2), wrapped key, IV (12), ciphertext, tag (16) |
+
+With a secret, the AES key is HKDF-SHA-256 of the secret, with salt `suku.encrypt.v1` and
+info `suku.encrypt:<purpose>`. The additional authenticated data is everything before the IV,
+followed by the context.

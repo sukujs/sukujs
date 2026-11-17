@@ -48,6 +48,8 @@ Most mistakes come from using the wrong tool, not from using a tool badly.
 | Store a password | [`hashPassword`](/docs/crypto/passwords) | Slow on purpose, salted, upgradeable. |
 | Send a value the client may read but not change | [`createSigner`](/docs/crypto/signed-and-sealed) | Tamper-proof, still readable. |
 | Send a value the client must not read | [`createSealer`](/docs/crypto/signed-and-sealed) | Encrypted and tamper-proof, with expiry. |
+| Encrypt a database field or a file | [`createEncrypter`](/docs/crypto/encryption) | AES-256-GCM, a key per purpose, bound to its row. |
+| Let one service encrypt what only another can read | [`createPublicKeyEncrypter`](/docs/crypto/encryption#with-a-public-key) | The writer holds only the public key. |
 | Create a session id, API key or reset token | `randomToken()` | 256 bits from the system's secure source. |
 | Fingerprint a file or cache key | `sha256()` | Fast. Never for passwords. |
 | Compare two secrets | `timingSafeEqual()` | Does not leak where they differ. |
@@ -72,6 +74,7 @@ A JWT's payload is only encoded, not encrypted. Anyone holding the token can rea
 | Passwords | `hashPassword`, `verifyPassword`, `needsRehash` |
 | Signed values | `createSigner` |
 | Encrypted values | `createSealer` |
+| Encrypted data | `createEncrypter`, `createPublicKeyEncrypter` |
 | Random | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt` |
 | Hashing | `sha256`, `sha512`, `digest` |
 | Encoding and comparison | `base64urlEncode`, `base64urlDecode`, `hexEncode`, `timingSafeEqual` |
@@ -107,10 +110,13 @@ Functions that verify something you control return a plain result: `verifyPasswo
 on bad input.
 
 `jwt.verify` throws a `JwtError` with a `code`, because the reason matters for logging.
+`decrypt` throws a `CryptoError` with code `decryption_failed`, because stored data that
+cannot be read is a fault to investigate, not a missing value.
 Whatever the code, respond to the client with a plain `401`. See
 [best practices](/docs/crypto/best-practices#do-not-explain-failures-to-the-client).
 
 ## Not included
 
 Encrypted JWTs (JWE), fetching keys from an identity provider (JWKS), OAuth and OpenID
-Connect flows, token revocation lists, and Argon2 or bcrypt.
+Connect flows, token revocation lists, Argon2 or bcrypt, streaming encryption of large files,
+and encryption with a password.

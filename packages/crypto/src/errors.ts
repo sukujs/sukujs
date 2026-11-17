@@ -7,7 +7,8 @@ export type CryptoErrorCode =
   | 'algorithm_mismatch'
   | 'weak_key'
   | 'invalid_key'
-  | 'invalid_input';
+  | 'invalid_input'
+  | 'decryption_failed';
 
 /** Every failure in this package. Branch on `code`; do not show `message` to end users. */
 export class CryptoError extends Error {
