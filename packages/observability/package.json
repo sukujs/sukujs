@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/observability",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Observability for Suku with OpenTelemetry: request traces, logs, errors and runtime metrics sent to any OTLP endpoint, as one middleware.",
   "keywords": [
     "suku",
