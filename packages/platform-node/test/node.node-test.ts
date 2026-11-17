@@ -8,6 +8,12 @@ import { getNodeRaw, nodeAdapter } from '../src/index.ts';
 let server: HttpServer;
 let seenRaw = false;
 
+// The adapter's fast path reads undici's internal `state` symbol. Node 24's undici keeps that
+// state in a private field instead, so there every response takes the streaming path.
+const fastPath = Object.getOwnPropertySymbols(new Response(null)).some(
+  (s) => s.description === 'state',
+);
+
 before(async () => {
   server = await nodeAdapter({ onError: () => new Response('custom 500', { status: 500 }) }).serve(
     async (req, info) => {
@@ -112,15 +118,17 @@ describe('nodeAdapter', () => {
     assert.equal(await res.text(), 'one two three');
   });
 
-  test('fast path: string and byte bodies get a Content-Length and arrive intact', async () => {
+  test('string and byte bodies arrive intact, with a Content-Length on the fast path', async () => {
+    // Without the fast path the body streams, so there is no length to send up front.
+    const length = (expected: string) => (fastPath ? expected : null);
     let res = await fetch(`${server.url}/string`);
-    assert.equal(res.headers.get('content-length'), '6');
+    assert.equal(res.headers.get('content-length'), length('6'));
     assert.equal(await res.text(), 'héllo');
     res = await fetch(`${server.url}/bytes`);
-    assert.equal(res.headers.get('content-length'), '3');
+    assert.equal(res.headers.get('content-length'), length('3'));
     assert.deepEqual(new Uint8Array(await res.arrayBuffer()), new Uint8Array([1, 2, 3]));
     res = await fetch(`${server.url}/json`);
-    assert.ok(res.headers.get('content-length'));
+    assert.equal(Boolean(res.headers.get('content-length')), fastPath);
     assert.deepEqual(await res.json(), { ok: true, q: null });
   });
 
