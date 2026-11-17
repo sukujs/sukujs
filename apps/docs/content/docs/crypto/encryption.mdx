@@ -1,129 +1,260 @@
 ---
 title: Encrypting data
-description: Encrypt database fields and files with a secret, or with a public key.
+description: Keep database fields and files unreadable, with a secret or a public key.
 icon: LockKeyhole
 ---
 
-Use `createEncrypter` to keep data unreadable where you store it: a column with personal
-data, an uploaded file, a backup. For a value you hand to a client, such as a cookie, use
-[`createSealer`](/docs/crypto/signed-and-sealed) instead: it holds JSON and can expire.
-
-Like [`createJwt`](/docs/crypto/jwt), it is bound to one algorithm, chosen when you create it.
-
-| `algorithm` | Encrypts with | Decrypts with | Use when |
-| --- | --- | --- | --- |
-| `AES-256-GCM` (default) | `secret` | the same `secret` | One service writes and reads the data |
-| `RSA-OAEP-256` | `publicKey` | `privateKey` | The service that writes must not be able to read |
-
-Every encrypter has the same two methods, `encrypt` and `decrypt`, and detects any change
-to the data.
-
-## With a secret
+`createEncrypter` turns data into ciphertext that nobody can read without your key, and turns
+it back. Use it for data you **store**: a column with personal data, an uploaded file, a
+backup. If someone copies your database, they get only ciphertext.
 
 ```ts
 import sukuCrypto from '@sukujs/crypto';
 
-const ssn = sukuCrypto.createEncrypter({ secret: env.DATA_KEY, purpose: 'user.ssn' });
+const encrypter = sukuCrypto.createEncrypter({ secret: env.DATA_KEY });
 
-const stored = await ssn.encrypt('123-45-6789', { context: user.id }); // URL-safe string
-await ssn.decrypt(stored, { context: user.id });                       // "123-45-6789"
+const stored = await encrypter.encrypt('123-45-6789'); // "AW5rL3...", safe to save
+const plain = await encrypter.decrypt(stored);         // "123-45-6789"
 ```
 
-- **`purpose`** gives each kind of data its own key, derived from the secret. A value
-  encrypted as `user.ssn` cannot be decrypted as `notes`.
-- **`context`** binds a value to something it belongs to, usually the row's id. It is not
-  stored in the ciphertext; pass the same value to `decrypt`. Without it, someone with write
-  access to the database could copy an encrypted value from one row into another and have it
-  decrypt there.
-- The secret must be at least 32 bytes. Generate one with `randomToken(32)`.
+<Callout title="Storing or sending?">
+  For a value you give to a client, such as a cookie or a link, use
+  [`createSealer`](/docs/crypto/signed-and-sealed) instead. It can expire, and it treats a bad
+  value as missing rather than as an error.
+</Callout>
 
-### Files and binary data
+## Choose an algorithm
 
-By default `encrypt` returns a string and `decrypt` returns text. Pass `{ as: 'bytes' }` to
-get raw bytes instead: no base64 step, and only 29 bytes of overhead.
+Pick the algorithm when you create the encrypter. Everything else works the same way.
+
+| | `AES-256-GCM` (default) | `RSA-OAEP-256` |
+| --- | --- | --- |
+| **Locks with** | a secret | a public key |
+| **Unlocks with** | the same secret | the matching private key |
+| **Pick it when** | the same app saves and reads the data | the app that saves must **not** be able to read |
+| **Example** | personal data in a users table | a public form that sends documents to a back office |
+
+Not sure? Use the default. You only need a key pair when one side must be unable to read.
+
+## Encrypt a database field
+
+This walks through the most common case: an encrypted column in your own app.
+
+<Steps>
+<Step>
+
+### Create a secret
+
+Generate a random secret of 32 bytes once, and keep it in your secret store, not in the code.
+
+```bash
+bun -e "console.log(require('@sukujs/crypto').randomToken(32))"
+```
+
+Check for it at startup with [configuration](/docs/configuration), so the app refuses to start
+without it.
+
+```ts title="config.ts"
+export const Env = defineConfig('env', z.object({ DATA_KEY: z.string().min(43) }));
+```
+
+</Step>
+<Step>
+
+### Make an encrypter service
+
+Create it once and share it. `purpose` names what it protects; each purpose gets its own key,
+so a value encrypted as `user.ssn` cannot be decrypted as anything else.
+
+```ts title="crypto/ssn.ts"
+import sukuCrypto from '@sukujs/crypto';
+
+export const SsnEncrypter = service('ssn-encrypter', {
+  services: { env: Env },
+  create: ({ env }) => sukuCrypto.createEncrypter({ secret: env.DATA_KEY, purpose: 'user.ssn' }),
+});
+```
+
+</Step>
+<Step>
+
+### Encrypt when you save, decrypt when you read
+
+Do it in the [repository](/docs/database#2-a-repository-hides-the-library), so routes only
+ever see plain values. A `service(...)` is asked for with `@Inject`, as in
+[dependency injection](/docs/dependency-injection).
+
+```ts title="users/repository.ts"
+@Service()
+export class SqlUsers extends UsersRepository {
+  constructor(
+    private readonly db: Database,
+    @Inject(SsnEncrypter) private readonly ssn: ServiceOf<typeof SsnEncrypter>,
+  ) {
+    super();
+  }
+
+  async create(input: NewUser) {
+    const id = crypto.randomUUID();
+    const ssn = await this.ssn.encrypt(input.ssn, { context: id });
+    await this.db.insert('users', { id, name: input.name, ssn });
+    return { id, name: input.name };
+  }
+
+  async findSsn(id: string) {
+    const row = await this.db.get('users', id);
+    return this.ssn.decrypt(row.ssn, { context: id });
+  }
+}
+```
+
+The column holds a plain string, so a `text` column works.
+
+</Step>
+</Steps>
+
+### Why `context`?
+
+`context` ties a value to the row it belongs to. Without it, someone who can write to your
+database could copy Alice's encrypted value into Bob's row, and it would decrypt there. With
+the row's id as `context`, it only decrypts in its own row.
+
+`context` is not saved inside the ciphertext. Pass the same value to `decrypt`, or decryption
+fails. Use something that never changes, such as the id.
+
+## Encrypt a file
+
+By default, `encrypt` returns a string and `decrypt` returns text. For files, ask for bytes
+with `{ as: 'bytes' }`. It skips the conversion to text and adds only 29 bytes.
 
 ```ts
 const files = sukuCrypto.createEncrypter({ secret: env.DATA_KEY, purpose: 'uploads' });
 
-const sealed = await files.encrypt(new Uint8Array(await upload.arrayBuffer()), { as: 'bytes' });
-await storage.put(key, sealed);
+// Saving
+const bytes = new Uint8Array(await upload.arrayBuffer());
+await storage.put(key, await files.encrypt(bytes, { as: 'bytes' }));
 
+// Reading
 const original = await files.decrypt(await storage.get(key), { as: 'bytes' });
 ```
 
-`decrypt` accepts either form `encrypt` returned, string or bytes. The whole file is held in
-memory while it is encrypted. For files of hundreds of megabytes, use a streaming tool or
-your storage provider's encryption instead.
+`decrypt` accepts both forms, string or bytes, whichever `encrypt` gave you.
 
-### Rotating the secret
+The whole file is held in memory while it is encrypted. That is fine for documents and
+images. For files of hundreds of megabytes, use your storage provider's encryption instead.
 
-Add the new secret as the main one and move the old one to `previousSecrets`. New data is
-encrypted with the new secret; old data still decrypts.
+## Encrypt with a public key
 
-```ts
-const ssn = sukuCrypto.createEncrypter({
-  secret: env.DATA_KEY,
-  purpose: 'user.ssn',
-  previousSecrets: [env.OLD_DATA_KEY],
-});
-```
-
-To retire the old secret, decrypt and re-encrypt every stored value, then remove it.
-
-## With a public key
-
-Anyone with the public key can encrypt. Only the holder of the private key can decrypt. A
-public form that collects documents for a back office is the typical case: the web server
-holds only the public key, so a breach of the server does not expose what it collected.
-
-```ts
-// The web server: encrypts only.
-const inbox = sukuCrypto.createEncrypter({
-  algorithm: 'RSA-OAEP-256',
-  publicKey: env.INBOX_PUBLIC_KEY,
-});
-const sealed = await inbox.encrypt(document, { as: 'bytes' });
-
-// The back office: decrypts.
-const office = sukuCrypto.createEncrypter({
-  algorithm: 'RSA-OAEP-256',
-  privateKey: env.INBOX_PRIVATE_KEY,
-});
-const original = await office.decrypt(sealed, { as: 'bytes' });
-```
-
-Data of any size works: each message gets a random AES-256-GCM key, and only that key is
-encrypted with RSA-OAEP using SHA-256. `context` and `as` work as above, and
-`previousPrivateKeys` takes older private keys for rotation.
-
-Keys may be PEM strings, JWK objects or `CryptoKey`s, for RSA-OAEP with SHA-256 and at least
-2048 bits. PEM must be PKCS#8 for the private key and SPKI for the public key.
+Use `RSA-OAEP-256` when the app that saves the data must not be able to read it. The usual
+case is a public form that collects documents for a back office: the web server holds only
+the public key, so if it is broken into, the documents it collected stay unreadable.
 
 ```bash
+# Create the key pair once. Give public.pem to the web server, private.pem to the back office.
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out private.pem
 openssl pkey -in private.pem -pubout -out public.pem
 ```
 
-The name is `RSA-OAEP-256`, as in the JWE standard, where plain `RSA-OAEP` means SHA-1.
+<Tabs items={['Web server (encrypts)', 'Back office (decrypts)']}>
+  <Tab value="Web server (encrypts)">
+    ```ts
+    const inbox = sukuCrypto.createEncrypter({
+      algorithm: 'RSA-OAEP-256',
+      publicKey: env.INBOX_PUBLIC_KEY,
+    });
+
+    const sealed = await inbox.encrypt(document, { as: 'bytes' });
+    ```
+
+    Without a `privateKey`, this encrypter cannot decrypt, even by mistake.
+
+  </Tab>
+  <Tab value="Back office (decrypts)">
+    ```ts
+    const office = sukuCrypto.createEncrypter({
+      algorithm: 'RSA-OAEP-256',
+      privateKey: env.INBOX_PRIVATE_KEY,
+    });
+
+    const document = await office.decrypt(sealed, { as: 'bytes' });
+    ```
+
+  </Tab>
+</Tabs>
+
+Data of any size works. Keys may be PEM text, JWK objects or `CryptoKey`s: RSA-OAEP with
+SHA-256, at least 2048 bits. PEM must be PKCS#8 for the private key and SPKI for the public
+key, which is what the commands above produce.
+
+## Change the key
+
+Keys should be replaced from time to time, and at once if one leaks. Put the new key first
+and the old one in the "previous" list. New data uses the new key; old data still decrypts.
+
+```ts
+const encrypter = sukuCrypto.createEncrypter({
+  secret: env.DATA_KEY,                 // new: encrypts and decrypts
+  previousSecrets: [env.OLD_DATA_KEY],  // old: decrypts only
+  purpose: 'user.ssn',
+});
+```
+
+For key pairs, the option is `previousPrivateKeys`.
+
+To retire the old key completely, read and save every stored value again, then remove it from
+the list.
 
 ## When decryption fails
 
-`decrypt` throws a `CryptoError` with code `decryption_failed` if the data was changed, or
-was encrypted with another key, purpose or context. Unlike `unseal`, it does not return
-`undefined`: stored data that cannot be read is an error to look into, not a missing value.
-It throws with code `malformed` if the plaintext was bytes that are not text; read those with
-`{ as: 'bytes' }`.
+`decrypt` throws a `CryptoError`. Its `code` says why:
 
-## Format
+| `code` | Meaning | Usual cause |
+| --- | --- | --- |
+| `decryption_failed` | The data could not be decrypted | Wrong key, `purpose` or `context`, or the data was changed |
+| `malformed` | It decrypted, but is not text | The data was bytes; read it with `{ as: 'bytes' }` |
+| `weak_key` | The secret or RSA key is too short | A secret under 32 bytes, or an RSA key under 2048 bits |
+| `invalid_key` | A key is missing or of the wrong kind | No `privateKey` on an encrypter asked to decrypt |
 
-The output starts with a format byte, so the format can change later without breaking stored
-data. Both formats use standard algorithms and can be decrypted elsewhere:
+This is a fault on your side, not the client's: log it and answer with a `500`. Unlike
+`unseal`, which returns `undefined`, `decrypt` throws, so unreadable data never passes as
+missing data.
+
+## Options
+
+| Option | For | Meaning |
+| --- | --- | --- |
+| `algorithm` | both | `'AES-256-GCM'` (default) or `'RSA-OAEP-256'` |
+| `secret` | AES | At least 32 bytes |
+| `purpose` | AES | Name of what is protected; each gets its own key |
+| `previousSecrets` | AES | Old secrets, for decrypting only |
+| `publicKey` | RSA | Needed to encrypt |
+| `privateKey` | RSA | Needed to decrypt |
+| `previousPrivateKeys` | RSA | Old private keys, for decrypting only |
+
+And on each call:
+
+| Option | Meaning |
+| --- | --- |
+| `context` | Ties the value to something, usually a row id. Pass the same value to `decrypt`. |
+| `as: 'bytes'` | Return bytes instead of a string or text |
+
+## How it works
+
+You do not need this to use the encrypter. It is here for audits, and for reading the data
+from another language.
+
+- **`AES-256-GCM`:** the key is derived from the secret with HKDF-SHA-256 (salt
+  `suku.encrypt.v1`, info `suku.encrypt:<purpose>`). Every call uses a new random 12-byte IV.
+- **`RSA-OAEP-256`:** every call creates a random AES-256-GCM key, encrypts the data with it,
+  and encrypts that key with RSA-OAEP using SHA-256. The name follows the JWE standard, where
+  plain `RSA-OAEP` means SHA-1.
+- GCM detects any change. The additional authenticated data is everything before the IV,
+  followed by `context`.
 
 | `algorithm` | Bytes |
 | --- | --- |
 | `AES-256-GCM` | `1`, IV (12), ciphertext, tag (16) |
 | `RSA-OAEP-256` | `2`, wrapped key length (2), wrapped key, IV (12), ciphertext, tag (16) |
 
-With a secret, the AES key is HKDF-SHA-256 of the secret, with salt `suku.encrypt.v1` and
-info `suku.encrypt:<purpose>`. The additional authenticated data is everything before the IV,
-followed by the context. The string form is the same bytes in base64url.
+The first byte names the format, so it can change later without breaking stored data. The
+string form is the same bytes in base64url.

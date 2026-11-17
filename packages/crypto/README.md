@@ -286,51 +286,56 @@ const index = sukuCrypto.randomInt(0, items.length);
 
 ## Encryption (`createEncrypter`)
 
-For data you store: database fields, files, backups. For a value a client holds, such as a
-cookie, use `createSealer`. Like `createJwt`, the algorithm is chosen once, when you create it.
+Keeps data you **store** unreadable: database fields, files, backups. If someone copies your
+database, they get only ciphertext. For a value you give to a client, such as a cookie, use
+`createSealer` instead.
 
-| `algorithm`             | Encrypts with | Decrypts with     | Use when                                         |
-| ----------------------- | ------------- | ----------------- | ------------------------------------------------ |
-| `AES-256-GCM` (default) | `secret`      | the same `secret` | One service writes and reads the data            |
-| `RSA-OAEP-256`          | `publicKey`   | `privateKey`      | The service that writes must not be able to read |
+Pick the algorithm when you create the encrypter:
+
+| `algorithm`             | Locks with  | Unlocks with      | Pick it when                                   |
+| ----------------------- | ----------- | ----------------- | ---------------------------------------------- |
+| `AES-256-GCM` (default) | `secret`    | the same `secret` | the same app saves and reads the data          |
+| `RSA-OAEP-256`          | `publicKey` | `privateKey`      | the app that saves must not be able to read it |
 
 ### `createEncrypter`
 
 ```ts
 import sukuCrypto from '@sukujs/crypto';
 
-// One secret (≥ 32 bytes). `purpose` gives each kind of data its own key.
+// With a secret (at least 32 bytes). Each `purpose` gets its own key.
 const ssn = sukuCrypto.createEncrypter({
   secret: env.DATA_KEY,
   purpose: 'user.ssn',
-  previousSecrets: [env.DATA_KEY_OLD], // decrypt only, for rotation
+  previousSecrets: [env.DATA_KEY_OLD], // old secrets: decrypt only, for changing keys
 });
 
-// A key pair: RSA-OAEP with SHA-256 wraps a random AES-256-GCM key per message.
+// With a key pair: the public key encrypts, only the private key decrypts.
 const inbox = sukuCrypto.createEncrypter({
   algorithm: 'RSA-OAEP-256',
-  publicKey: env.INBOX_PUBLIC_KEY, // to encrypt; PEM (SPKI), JWK or CryptoKey, 2048+ bits
-  privateKey: env.INBOX_PRIVATE_KEY, // to decrypt; omit it where data is only written
+  publicKey: env.INBOX_PUBLIC_KEY, // PEM, JWK or CryptoKey; RSA, 2048 bits or more
+  privateKey: env.INBOX_PRIVATE_KEY, // leave it out where data is only saved
 });
 ```
 
 ### `encrypter.encrypt` / `encrypter.decrypt`
 
 ```ts
-// Text: a URL-safe string for a database column.
+// Text, for a database column: you get a URL-safe string.
 const stored = await ssn.encrypt('123-45-6789', { context: user.id });
 const plain = await ssn.decrypt(stored, { context: user.id }); // "123-45-6789"
 
-// Files: raw bytes in and out, 29 bytes of overhead, no base64.
+// Files: ask for bytes. Adds only 29 bytes.
 const sealed = await ssn.encrypt(fileBytes, { as: 'bytes' });
 const original = await ssn.decrypt(sealed, { as: 'bytes' });
 ```
 
-- `context` binds a value to the row it belongs to. It is not stored: pass the same value to
-  `decrypt`, so a value copied into another row does not decrypt there.
-- `decrypt` takes either form `encrypt` returned. It throws `CryptoError` with code
-  `decryption_failed` if the data was changed, or encrypted with another key, purpose or
-  context.
+- **`context`** ties a value to its row, usually the row's id. It is not saved in the
+  ciphertext, so pass the same value to `decrypt`. A value copied into another row then
+  fails to decrypt there.
+- **`decrypt`** takes either form `encrypt` gave you, string or bytes.
+- **On failure**, `decrypt` throws `CryptoError` with code `decryption_failed`: a wrong key,
+  `purpose` or `context`, or changed data. That is a fault on your side, so log it and answer
+  with a `500`.
 
 ## Hashing and compare
 
