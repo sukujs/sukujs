@@ -1,4 +1,12 @@
 {
   "title": "Security",
-  "pages": ["index", "jwt", "passwords", "signed-and-sealed", "encryption", "use-cases", "best-practices"]
+  "pages": [
+    "index",
+    "jwt",
+    "passwords",
+    "signed-and-sealed",
+    "encryption",
+    "use-cases",
+    "best-practices"
+  ]
 }

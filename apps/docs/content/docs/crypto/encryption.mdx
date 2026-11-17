@@ -4,25 +4,26 @@ description: Encrypt database fields and files with a secret, or with a public k
 icon: LockKeyhole
 ---
 
-Use these to keep data unreadable where you store it: a column with personal data, an
-uploaded file, a backup. For a value you hand to a client, such as a cookie, use
+Use `createEncrypter` to keep data unreadable where you store it: a column with personal
+data, an uploaded file, a backup. For a value you hand to a client, such as a cookie, use
 [`createSealer`](/docs/crypto/signed-and-sealed) instead: it holds JSON and can expire.
 
-| | `createEncrypter` | `createPublicKeyEncrypter` |
-| --- | --- | --- |
-| Encrypts with | A secret | A public key |
-| Decrypts with | The same secret | The private key |
-| Use when | One service writes and reads the data | The service that writes must not be able to read |
-| Method | AES-256-GCM | RSA-OAEP (SHA-256) with AES-256-GCM |
+Like [`createJwt`](/docs/crypto/jwt), it is bound to one algorithm, chosen when you create it.
 
-Both detect any change to the data, and both refuse to decrypt it if anything was changed.
+| `algorithm` | Encrypts with | Decrypts with | Use when |
+| --- | --- | --- | --- |
+| `AES-256-GCM` (default) | `secret` | the same `secret` | One service writes and reads the data |
+| `RSA-OAEP-256` | `publicKey` | `privateKey` | The service that writes must not be able to read |
+
+Every encrypter has the same two methods, `encrypt` and `decrypt`, and detects any change
+to the data.
 
 ## With a secret
 
 ```ts
 import sukuCrypto from '@sukujs/crypto';
 
-const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'user.ssn' });
+const ssn = sukuCrypto.createEncrypter({ secret: env.DATA_KEY, purpose: 'user.ssn' });
 
 const stored = await ssn.encrypt('123-45-6789', { context: user.id }); // URL-safe string
 await ssn.decrypt(stored, { context: user.id });                       // "123-45-6789"
@@ -38,20 +39,21 @@ await ssn.decrypt(stored, { context: user.id });                       // "123-4
 
 ### Files and binary data
 
-`encrypt` and `decrypt` work with strings. For files and binary columns, use the byte
-forms, which skip the base64 step and add only 29 bytes.
+By default `encrypt` returns a string and `decrypt` returns text. Pass `{ as: 'bytes' }` to
+get raw bytes instead: no base64 step, and only 29 bytes of overhead.
 
 ```ts
-const files = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'uploads' });
+const files = sukuCrypto.createEncrypter({ secret: env.DATA_KEY, purpose: 'uploads' });
 
-const sealed = await files.encryptBytes(new Uint8Array(await upload.arrayBuffer()));
+const sealed = await files.encrypt(new Uint8Array(await upload.arrayBuffer()), { as: 'bytes' });
 await storage.put(key, sealed);
 
-const original = await files.decryptBytes(await storage.get(key));
+const original = await files.decrypt(await storage.get(key), { as: 'bytes' });
 ```
 
-The whole file is held in memory while it is encrypted. For files of hundreds of megabytes,
-use a streaming tool or your storage provider's encryption instead.
+`decrypt` accepts either form `encrypt` returned, string or bytes. The whole file is held in
+memory while it is encrypted. For files of hundreds of megabytes, use a streaming tool or
+your storage provider's encryption instead.
 
 ### Rotating the secret
 
@@ -59,7 +61,8 @@ Add the new secret as the main one and move the old one to `previousSecrets`. Ne
 encrypted with the new secret; old data still decrypts.
 
 ```ts
-const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, {
+const ssn = sukuCrypto.createEncrypter({
+  secret: env.DATA_KEY,
   purpose: 'user.ssn',
   previousSecrets: [env.OLD_DATA_KEY],
 });
@@ -75,17 +78,23 @@ holds only the public key, so a breach of the server does not expose what it col
 
 ```ts
 // The web server: encrypts only.
-const inbox = sukuCrypto.createPublicKeyEncrypter({ publicKey: env.INBOX_PUBLIC_KEY });
-const sealed = await inbox.encryptBytes(document);
+const inbox = sukuCrypto.createEncrypter({
+  algorithm: 'RSA-OAEP-256',
+  publicKey: env.INBOX_PUBLIC_KEY,
+});
+const sealed = await inbox.encrypt(document, { as: 'bytes' });
 
 // The back office: decrypts.
-const office = sukuCrypto.createPublicKeyEncrypter({ privateKey: env.INBOX_PRIVATE_KEY });
-const document = await office.decryptBytes(sealed);
+const office = sukuCrypto.createEncrypter({
+  algorithm: 'RSA-OAEP-256',
+  privateKey: env.INBOX_PRIVATE_KEY,
+});
+const original = await office.decrypt(sealed, { as: 'bytes' });
 ```
 
 Data of any size works: each message gets a random AES-256-GCM key, and only that key is
-encrypted with RSA. `context` works as above, and `previousPrivateKeys` takes older private
-keys for rotation.
+encrypted with RSA-OAEP using SHA-256. `context` and `as` work as above, and
+`previousPrivateKeys` takes older private keys for rotation.
 
 Keys may be PEM strings, JWK objects or `CryptoKey`s, for RSA-OAEP with SHA-256 and at least
 2048 bits. PEM must be PKCS#8 for the private key and SPKI for the public key.
@@ -95,24 +104,26 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out private.pem
 openssl pkey -in private.pem -pubout -out public.pem
 ```
 
+The name is `RSA-OAEP-256`, as in the JWE standard, where plain `RSA-OAEP` means SHA-1.
+
 ## When decryption fails
 
-`decrypt` and `decryptBytes` throw a `CryptoError` with code `decryption_failed` if the data
-was changed, or was encrypted with another key, purpose or context. Unlike `unseal`, they do
-not return `undefined`: stored data that cannot be read is an error to look into, not a
-missing value. `decrypt` throws with code `malformed` if the plaintext was bytes that are
-not text; read those with `decryptBytes`.
+`decrypt` throws a `CryptoError` with code `decryption_failed` if the data was changed, or
+was encrypted with another key, purpose or context. Unlike `unseal`, it does not return
+`undefined`: stored data that cannot be read is an error to look into, not a missing value.
+It throws with code `malformed` if the plaintext was bytes that are not text; read those with
+`{ as: 'bytes' }`.
 
 ## Format
 
 The output starts with a format byte, so the format can change later without breaking stored
 data. Both formats use standard algorithms and can be decrypted elsewhere:
 
-| Kind | Bytes |
+| `algorithm` | Bytes |
 | --- | --- |
-| Secret | `1`, IV (12), ciphertext, tag (16) |
-| Public key | `2`, wrapped key length (2), wrapped key, IV (12), ciphertext, tag (16) |
+| `AES-256-GCM` | `1`, IV (12), ciphertext, tag (16) |
+| `RSA-OAEP-256` | `2`, wrapped key length (2), wrapped key, IV (12), ciphertext, tag (16) |
 
 With a secret, the AES key is HKDF-SHA-256 of the secret, with salt `suku.encrypt.v1` and
 info `suku.encrypt:<purpose>`. The additional authenticated data is everything before the IV,
-followed by the context.
+followed by the context. The string form is the same bytes in base64url.

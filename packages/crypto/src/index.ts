@@ -9,11 +9,12 @@ export {
 } from './encoding.js';
 export {
   createEncrypter,
-  createPublicKeyEncrypter,
+  type EncryptionAlgorithm,
   type EncryptOptions,
   type Encrypter,
   type EncrypterOptions,
-  type PublicKeyEncrypterOptions,
+  type KeyPairEncrypterOptions,
+  type SecretEncrypterOptions,
 } from './encrypt.js';
 export { CryptoError, type CryptoErrorCode, JwtError } from './errors.js';
 export { digest, type HashAlgorithm, sha256, sha512 } from './hash.js';
@@ -44,7 +45,7 @@ export { createSigner, type Signer, type SignerOptions } from './signer.js';
 
 import { toSeconds } from './duration.js';
 import { base64urlDecode, base64urlEncode, hexEncode, timingSafeEqual } from './encoding.js';
-import { createEncrypter, createPublicKeyEncrypter } from './encrypt.js';
+import { createEncrypter } from './encrypt.js';
 import { CryptoError, JwtError } from './errors.js';
 import { digest, sha256, sha512 } from './hash.js';
 import { bearerToken, createJwt, decodeJwtUnverified } from './jwt.js';
@@ -67,7 +68,6 @@ const sukuCrypto = {
   createSigner,
   createSealer,
   createEncrypter,
-  createPublicKeyEncrypter,
   randomToken,
   randomBytes,
   randomHex,

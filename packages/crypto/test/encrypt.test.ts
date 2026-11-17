@@ -1,19 +1,18 @@
 import { describe, expect, test } from 'bun:test';
-import { createDecipheriv, hkdfSync, privateDecrypt, constants } from 'node:crypto';
+import { constants, createDecipheriv, hkdfSync, privateDecrypt } from 'node:crypto';
 import {
   base64urlDecode,
   base64urlEncode,
   createEncrypter,
-  createPublicKeyEncrypter,
   CryptoError,
   randomBytes,
   randomToken,
 } from '../src/index.js';
 
 const SECRET = 'an-encryption-secret-of-32-bytes-or-more';
-const code = async (p: Promise<unknown>) => {
+const code = async (p: Promise<unknown> | (() => unknown)) => {
   try {
-    await p;
+    await (typeof p === 'function' ? p() : p);
     return 'no error';
   } catch (e) {
     return e instanceof CryptoError ? e.code : `other: ${e}`;
@@ -25,22 +24,40 @@ const flip = (bytes: Uint8Array, at: number) => {
   return copy;
 };
 
-describe('createEncrypter', () => {
-  const enc = createEncrypter(SECRET, { purpose: 'user.ssn' });
+describe('createEncrypter: algorithm', () => {
+  test('AES-256-GCM is the default; unknown algorithms are refused', async () => {
+    expect(createEncrypter({ secret: SECRET }).algorithm).toBe('AES-256-GCM');
+    expect(createEncrypter({ algorithm: 'RSA-OAEP-256' }).algorithm).toBe('RSA-OAEP-256');
+    expect(await code(() => createEncrypter({ algorithm: 'DES', secret: SECRET } as never))).toBe(
+      'invalid_input',
+    );
+    expect(await code(createEncrypter({} as never).encrypt('x'))).toBe('invalid_key');
+  });
+});
 
-  test('text and bytes round trip', async () => {
+describe('createEncrypter: AES-256-GCM', () => {
+  const enc = createEncrypter({ secret: SECRET, purpose: 'user.ssn' });
+
+  test('text round trip, and decrypt takes the string or the bytes form', async () => {
     for (const text of ['123-45-6789', '', 'héllo wörld 🔐', 'x'.repeat(100_000)]) {
       expect(await enc.decrypt(await enc.encrypt(text))).toBe(text);
     }
-    const bytes = randomBytes(1024);
-    expect(await enc.decryptBytes(await enc.encryptBytes(bytes))).toEqual(bytes);
-    // Strings can go in as bytes and come out as text, and the other way round.
-    expect(await enc.decrypt(base64urlEncode(await enc.encryptBytes('as bytes')))).toBe('as bytes');
+    const asBytes = await enc.encrypt('either form', { as: 'bytes' });
+    expect(asBytes).toBeInstanceOf(Uint8Array);
+    expect(await enc.decrypt(asBytes)).toBe('either form');
+    expect(await enc.decrypt(base64urlEncode(asBytes))).toBe('either form');
+  });
+
+  test('bytes round trip with as: bytes', async () => {
+    const file = randomBytes(1024);
+    const sealed = await enc.encrypt(file, { as: 'bytes' });
+    expect(await enc.decrypt(sealed, { as: 'bytes' })).toEqual(file);
+    expect(await enc.decrypt(await enc.encrypt(file), { as: 'bytes' })).toEqual(file);
   });
 
   test('the same input encrypts differently every time, with a fixed overhead', async () => {
-    const a = await enc.encryptBytes('same');
-    const b = await enc.encryptBytes('same');
+    const a = await enc.encrypt('same', { as: 'bytes' });
+    const b = await enc.encrypt('same', { as: 'bytes' });
     expect(a).not.toEqual(b);
     expect(a[0]).toBe(1); // format byte
     expect(a.length).toBe(4 + 1 + 12 + 16); // input + format + IV + tag
@@ -48,11 +65,11 @@ describe('createEncrypter', () => {
   });
 
   test('any changed byte is detected', async () => {
-    const sealed = await enc.encryptBytes('do not touch');
+    const sealed = await enc.encrypt('do not touch', { as: 'bytes' });
     for (let i = 0; i < sealed.length; i++) {
-      expect(await code(enc.decryptBytes(flip(sealed, i)))).toBe('decryption_failed');
+      expect(await code(enc.decrypt(flip(sealed, i)))).toBe('decryption_failed');
     }
-    expect(await code(enc.decryptBytes(sealed.subarray(0, -1)))).toBe('decryption_failed');
+    expect(await code(enc.decrypt(sealed.subarray(0, -1)))).toBe('decryption_failed');
   });
 
   test('secret, purpose and context must all match', async () => {
@@ -60,31 +77,30 @@ describe('createEncrypter', () => {
     expect(await enc.decrypt(sealed, { context: 'user-1' })).toBe('secret');
     expect(await code(enc.decrypt(sealed, { context: 'user-2' }))).toBe('decryption_failed');
     expect(await code(enc.decrypt(sealed))).toBe('decryption_failed');
-    const otherPurpose = createEncrypter(SECRET, { purpose: 'notes' });
+    const otherPurpose = createEncrypter({ secret: SECRET, purpose: 'notes' });
     expect(await code(otherPurpose.decrypt(sealed, { context: 'user-1' }))).toBe(
       'decryption_failed',
     );
-    const otherSecret = createEncrypter(randomToken(32), { purpose: 'user.ssn' });
+    const otherSecret = createEncrypter({ secret: randomToken(32), purpose: 'user.ssn' });
     expect(await code(otherSecret.decrypt(sealed, { context: 'user-1' }))).toBe(
       'decryption_failed',
     );
-    // Bytes work as context too.
     const withBytes = await enc.encrypt('x', { context: new Uint8Array([1, 2]) });
     expect(await enc.decrypt(withBytes, { context: new Uint8Array([1, 2]) })).toBe('x');
   });
 
   test('rotation: previous secrets decrypt, only the current one encrypts', async () => {
-    const old = createEncrypter(SECRET);
-    const rotated = createEncrypter(randomToken(32), { previousSecrets: [SECRET] });
+    const old = createEncrypter({ secret: SECRET });
+    const rotated = createEncrypter({ secret: randomToken(32), previousSecrets: [SECRET] });
     expect(await rotated.decrypt(await old.encrypt('kept'))).toBe('kept');
     expect(await code(old.decrypt(await rotated.encrypt('new')))).toBe('decryption_failed');
   });
 
   test('weak secrets are refused', async () => {
-    expect(await code(createEncrypter('short').encrypt('x'))).toBe('weak_key');
-    expect(await code(createEncrypter(SECRET, { previousSecrets: ['short'] }).encrypt('x'))).toBe(
-      'weak_key',
-    );
+    expect(await code(createEncrypter({ secret: 'short' }).encrypt('x'))).toBe('weak_key');
+    expect(
+      await code(createEncrypter({ secret: SECRET, previousSecrets: ['short'] }).encrypt('x')),
+    ).toBe('weak_key');
   });
 
   test('malformed input is always a CryptoError, never something else', async () => {
@@ -92,11 +108,10 @@ describe('createEncrypter', () => {
       expect(await code(enc.decrypt(bad))).toBe('decryption_failed');
     }
     for (const bad of [new Uint8Array(0), randomBytes(40), Uint8Array.of(9, ...randomBytes(40))]) {
-      expect(await code(enc.decryptBytes(bad))).toBe('decryption_failed');
+      expect(await code(enc.decrypt(bad))).toBe('decryption_failed');
     }
     for (const bad of [undefined, null, 42, {}]) {
       expect(await code(enc.decrypt(bad as never))).toBe('decryption_failed');
-      expect(await code(enc.decryptBytes(bad as never))).toBe('decryption_failed');
     }
     // Binary plaintext read back as text.
     const binary = await enc.encrypt(Uint8Array.of(0xff, 0xfe));
@@ -104,22 +119,19 @@ describe('createEncrypter', () => {
   });
 
   test('matches an independent AES-256-GCM implementation (node:crypto)', async () => {
-    const sealed = await enc.encryptBytes('interop', { context: 'ctx' });
+    const sealed = await enc.encrypt('interop', { context: 'ctx', as: 'bytes' });
     const key = Buffer.from(
       hkdfSync('sha256', SECRET, 'suku.encrypt.v1', 'suku.encrypt:user.ssn', 32),
     );
-    const iv = sealed.subarray(1, 13);
-    const body = sealed.subarray(13, -16);
-    const tag = sealed.subarray(-16);
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    const decipher = createDecipheriv('aes-256-gcm', key, sealed.subarray(1, 13));
     decipher.setAAD(Buffer.concat([Buffer.of(1), Buffer.from('ctx')]));
-    decipher.setAuthTag(tag);
-    const plain = Buffer.concat([decipher.update(body), decipher.final()]).toString();
-    expect(plain).toBe('interop');
+    decipher.setAuthTag(sealed.subarray(-16));
+    const plain = Buffer.concat([decipher.update(sealed.subarray(13, -16)), decipher.final()]);
+    expect(plain.toString()).toBe('interop');
   });
 });
 
-describe('createPublicKeyEncrypter', async () => {
+describe('createEncrypter: RSA-OAEP-256', async () => {
   const generate = (modulusLength = 2048, name = 'RSA-OAEP', hash = 'SHA-256') =>
     crypto.subtle.generateKey(
       { name, hash, modulusLength, publicExponent: new Uint8Array([1, 0, 1]) },
@@ -132,101 +144,83 @@ describe('createPublicKeyEncrypter', async () => {
       .match(/.{1,64}/g)!
       .join('\n')}\n-----END ${label}-----\n`;
   const pair = await generate();
-  const publicPem = await pem('PUBLIC KEY', 'spki', pair.publicKey);
-  const privatePem = await pem('PRIVATE KEY', 'pkcs8', pair.privateKey);
-  const box = createPublicKeyEncrypter({ publicKey: publicPem, privateKey: privatePem });
+  const publicKey = await pem('PUBLIC KEY', 'spki', pair.publicKey);
+  const privateKey = await pem('PRIVATE KEY', 'pkcs8', pair.privateKey);
+  const rsa = (o: object) => createEncrypter({ algorithm: 'RSA-OAEP-256', ...o });
+  const box = rsa({ publicKey, privateKey });
 
-  test('round trip with PEM, JWK and CryptoKey inputs', async () => {
+  test('round trip with PEM, JWK and CryptoKey inputs, as text and as bytes', async () => {
     expect(await box.decrypt(await box.encrypt('hello'))).toBe('hello');
     const big = randomBytes(65536);
-    expect(await box.decryptBytes(await box.encryptBytes(big))).toEqual(big);
-    const jwk = createPublicKeyEncrypter({
+    expect(await box.decrypt(await box.encrypt(big, { as: 'bytes' }), { as: 'bytes' })).toEqual(
+      big,
+    );
+    const jwk = rsa({
       publicKey: await crypto.subtle.exportKey('jwk', pair.publicKey),
       privateKey: await crypto.subtle.exportKey('jwk', pair.privateKey),
     });
     expect(await jwk.decrypt(await box.encrypt('from PEM'))).toBe('from PEM');
-    const keys = createPublicKeyEncrypter({
-      publicKey: pair.publicKey,
-      privateKey: pair.privateKey,
-    });
+    const keys = rsa({ publicKey: pair.publicKey, privateKey: pair.privateKey });
     expect(await box.decrypt(await keys.encrypt('from CryptoKey'))).toBe('from CryptoKey');
   });
 
   test('a service with only the public key can encrypt but not decrypt', async () => {
-    const sender = createPublicKeyEncrypter({ publicKey: publicPem });
+    const sender = rsa({ publicKey });
     const sealed = await sender.encrypt('for the back office');
     expect(await code(sender.decrypt(sealed))).toBe('invalid_key');
-    const reader = createPublicKeyEncrypter({ privateKey: privatePem });
+    const reader = rsa({ privateKey });
     expect(await reader.decrypt(sealed)).toBe('for the back office');
     expect(await code(reader.encrypt('x'))).toBe('invalid_key');
   });
 
   test('wrong key, context or any changed byte fails; previous keys rotate', async () => {
-    const sealed = await box.encryptBytes('private', { context: 'case-7' });
-    expect(await code(box.decryptBytes(sealed, { context: 'case-8' }))).toBe('decryption_failed');
+    const sealed = await box.encrypt('private', { context: 'case-7', as: 'bytes' });
+    expect(await code(box.decrypt(sealed, { context: 'case-8' }))).toBe('decryption_failed');
     for (const at of [0, 1, 2, 3, 200, 259, 260, sealed.length - 1]) {
-      expect(await code(box.decryptBytes(flip(sealed, at), { context: 'case-7' }))).toBe(
+      expect(await code(box.decrypt(flip(sealed, at), { context: 'case-7' }))).toBe(
         'decryption_failed',
       );
     }
     const other = await generate();
-    const stranger = createPublicKeyEncrypter({ privateKey: other.privateKey });
-    expect(await code(stranger.decryptBytes(sealed, { context: 'case-7' }))).toBe(
+    expect(await code(rsa({ privateKey: other.privateKey }).decrypt(sealed))).toBe(
       'decryption_failed',
     );
-    const rotated = createPublicKeyEncrypter({
-      privateKey: other.privateKey,
-      previousPrivateKeys: [privatePem],
-    });
-    expect(await rotated.decryptBytes(sealed, { context: 'case-7' })).toEqual(
-      new TextEncoder().encode('private'),
-    );
+    const rotated = rsa({ privateKey: other.privateKey, previousPrivateKeys: [privateKey] });
+    expect(await rotated.decrypt(sealed, { context: 'case-7' })).toBe('private');
   });
 
   test('a 4096-bit key works (wrapped key longer than 255 bytes)', async () => {
     const large = await generate(4096);
-    const box4096 = createPublicKeyEncrypter({
-      publicKey: large.publicKey,
-      privateKey: large.privateKey,
-    });
-    const sealed = await box4096.encryptBytes('big key');
+    const box4096 = rsa({ publicKey: large.publicKey, privateKey: large.privateKey });
+    const sealed = await box4096.encrypt('big key', { as: 'bytes' });
     expect((sealed[1]! << 8) | sealed[2]!).toBe(512);
-    expect(await box4096.decrypt(base64urlEncode(sealed))).toBe('big key');
+    expect(await box4096.decrypt(sealed)).toBe('big key');
   });
 
   test('keys of the wrong kind or under 2048 bits are refused', async () => {
     const pss = await generate(2048, 'RSA-PSS');
-    expect(await code(createPublicKeyEncrypter({ publicKey: pss.publicKey }).encrypt('x'))).toBe(
-      'invalid_key',
-    );
+    expect(await code(rsa({ publicKey: pss.publicKey }).encrypt('x'))).toBe('invalid_key');
     const sha1 = await generate(2048, 'RSA-OAEP', 'SHA-1');
-    expect(await code(createPublicKeyEncrypter({ publicKey: sha1.publicKey }).encrypt('x'))).toBe(
-      'invalid_key',
-    );
+    expect(await code(rsa({ publicKey: sha1.publicKey }).encrypt('x'))).toBe('invalid_key');
     const small = await generate(1024);
-    expect(await code(createPublicKeyEncrypter({ publicKey: small.publicKey }).encrypt('x'))).toBe(
-      'weak_key',
-    );
-    expect(
-      await code(
-        createPublicKeyEncrypter({
-          privateKey: '-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----',
-        }).decrypt(await box.encrypt('x')),
-      ),
-    ).toBe('invalid_key');
+    expect(await code(rsa({ publicKey: small.publicKey }).encrypt('x'))).toBe('weak_key');
+    const legacy = rsa({
+      privateKey: '-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----',
+    });
+    expect(await code(legacy.decrypt(await box.encrypt('x')))).toBe('invalid_key');
   });
 
-  test('the two kinds of ciphertext are not interchangeable', async () => {
-    const symmetric = createEncrypter(SECRET);
-    expect(await code(box.decrypt(await symmetric.encrypt('x')))).toBe('decryption_failed');
-    expect(await code(symmetric.decrypt(await box.encrypt('x')))).toBe('decryption_failed');
+  test('ciphertexts of the two algorithms are not interchangeable', async () => {
+    const aes = createEncrypter({ secret: SECRET });
+    expect(await code(box.decrypt(await aes.encrypt('x')))).toBe('decryption_failed');
+    expect(await code(aes.decrypt(await box.encrypt('x')))).toBe('decryption_failed');
   });
 
   test('matches independent RSA-OAEP and AES-256-GCM implementations (node:crypto)', async () => {
     const sealed = base64urlDecode(await box.encrypt('interop', { context: 'ctx' }));
     const end = 3 + ((sealed[1]! << 8) | sealed[2]!);
     const raw = privateDecrypt(
-      { key: privatePem, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+      { key: privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
       sealed.subarray(3, end),
     );
     const decipher = createDecipheriv('aes-256-gcm', raw, sealed.subarray(end, end + 12));

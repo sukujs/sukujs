@@ -21,16 +21,15 @@ const signed = await sukuCrypto.createSigner(env.COOKIE_SECRET).pack('user.42');
 const sealed = await sukuCrypto.createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
 ```
 
-| Area                | API                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                                     |
-| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                                       |
-| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`                             |
-| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`                   |
-| Encrypted data      | `createEncrypter` (AES-256-GCM): `encrypt`, `decrypt`, `encryptBytes`, `decryptBytes` |
-| Public-key data     | `createPublicKeyEncrypter` (RSA-OAEP): the same four methods                          |
-| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`                  |
-| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                                       |
+| Area                | API                                                                   | Use for                                                                              |
+| ------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                     | API authentication, and tokens other services verify                                 |
+| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                       | Storing and checking user passwords                                                  |
+| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`             | Values a client may read but not change: cookies, links, webhooks                    |
+| Sealed values       | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`   | Values a client holds but must not read: encrypted cookies, OAuth state, reset links |
+| Encryption          | `createEncrypter` (AES-256-GCM or RSA-OAEP-256): `encrypt`, `decrypt` | Data you store: database fields, files, backups                                      |
+| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`  | Session ids, API keys, reset tokens, nonces                                          |
+| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                       | Fingerprints, cache keys, comparing secrets (not passwords)                          |
 
 ## JWT
 
@@ -203,7 +202,7 @@ const cookie = await signer.pack('user.42'); // "user.42.<sig>"
 const userId = await signer.unpack(cookie); // "user.42" or undefined
 ```
 
-## Encrypted values (`createSealer`)
+## Sealed values (`createSealer`)
 
 Authenticated encryption (AES-256-GCM) for values the client holds but must not read or
 change: encrypted cookies, OAuth state, password-reset payloads. Secret must be ≥ 32 bytes.
@@ -285,31 +284,53 @@ const dice = sukuCrypto.randomInt(1, 7); // 1..6
 const index = sukuCrypto.randomInt(0, items.length);
 ```
 
-## Encrypted data (`createEncrypter`, `createPublicKeyEncrypter`)
+## Encryption (`createEncrypter`)
 
-For data you store: database fields, files, backups. `createSealer` is for values a client holds.
+For data you store: database fields, files, backups. For a value a client holds, such as a
+cookie, use `createSealer`. Like `createJwt`, the algorithm is chosen once, when you create it.
+
+| `algorithm`             | Encrypts with | Decrypts with     | Use when                                         |
+| ----------------------- | ------------- | ----------------- | ------------------------------------------------ |
+| `AES-256-GCM` (default) | `secret`      | the same `secret` | One service writes and reads the data            |
+| `RSA-OAEP-256`          | `publicKey`   | `privateKey`      | The service that writes must not be able to read |
+
+### `createEncrypter`
 
 ```ts
 import sukuCrypto from '@sukujs/crypto';
 
-// With a secret (AES-256-GCM). `purpose` gives each kind of data its own key, and `context`
-// binds a value to its row, so it cannot be copied into another one.
-const ssn = sukuCrypto.createEncrypter(env.DATA_KEY, { purpose: 'user.ssn' });
-const stored = await ssn.encrypt('123-45-6789', { context: user.id });
-await ssn.decrypt(stored, { context: user.id }); // throws CryptoError 'decryption_failed' if changed
+// One secret (≥ 32 bytes). `purpose` gives each kind of data its own key.
+const ssn = sukuCrypto.createEncrypter({
+  secret: env.DATA_KEY,
+  purpose: 'user.ssn',
+  previousSecrets: [env.DATA_KEY_OLD], // decrypt only, for rotation
+});
 
-// Bytes, for files: about 29 bytes of overhead, no base64.
-const sealed = await ssn.encryptBytes(fileBytes);
-await ssn.decryptBytes(sealed);
-
-// With a public key: anyone with it can encrypt, only the private key decrypts.
-const inbox = sukuCrypto.createPublicKeyEncrypter({ publicKey: env.INBOX_PUBLIC_KEY });
-const office = sukuCrypto.createPublicKeyEncrypter({ privateKey: env.INBOX_PRIVATE_KEY });
-await office.decrypt(await inbox.encrypt('for the back office'));
+// A key pair: RSA-OAEP with SHA-256 wraps a random AES-256-GCM key per message.
+const inbox = sukuCrypto.createEncrypter({
+  algorithm: 'RSA-OAEP-256',
+  publicKey: env.INBOX_PUBLIC_KEY, // to encrypt; PEM (SPKI), JWK or CryptoKey, 2048+ bits
+  privateKey: env.INBOX_PRIVATE_KEY, // to decrypt; omit it where data is only written
+});
 ```
 
-Rotation: `previousSecrets` and `previousPrivateKeys` are tried when decrypting, never used to
-encrypt. RSA keys must be RSA-OAEP with SHA-256 and at least 2048 bits.
+### `encrypter.encrypt` / `encrypter.decrypt`
+
+```ts
+// Text: a URL-safe string for a database column.
+const stored = await ssn.encrypt('123-45-6789', { context: user.id });
+const plain = await ssn.decrypt(stored, { context: user.id }); // "123-45-6789"
+
+// Files: raw bytes in and out, 29 bytes of overhead, no base64.
+const sealed = await ssn.encrypt(fileBytes, { as: 'bytes' });
+const original = await ssn.decrypt(sealed, { as: 'bytes' });
+```
+
+- `context` binds a value to the row it belongs to. It is not stored: pass the same value to
+  `decrypt`, so a value copied into another row does not decrypt there.
+- `decrypt` takes either form `encrypt` returned. It throws `CryptoError` with code
+  `decryption_failed` if the data was changed, or encrypted with another key, purpose or
+  context.
 
 ## Hashing and compare
 
