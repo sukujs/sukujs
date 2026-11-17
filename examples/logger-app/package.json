@@ -17,16 +17,16 @@
     "runtime": "bun"
   },
   "dependencies": {
-    "@sukujs/core": "^0.3.0",
-    "@sukujs/platform-bun": "^0.3.0",
-    "@sukujs/security": "^0.3.0",
+    "@sukujs/core": "^0.4.0",
+    "@sukujs/platform-bun": "^0.4.0",
+    "@sukujs/security": "^0.4.0",
     "@opentelemetry/api": "^1.9.0",
     "pino": "^10.0.0",
     "zod": "^4.0.0",
     "pino-pretty": "^13.0.0"
   },
   "devDependencies": {
-    "@sukujs/cli": "^0.3.0",
+    "@sukujs/cli": "^0.4.0",
     "@types/bun": "latest",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.0",

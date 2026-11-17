@@ -20,6 +20,7 @@ jobs:
       - run: bun run version:check
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run test
+      # Build first: standalone examples such as examples/deploy import the built packages.
       - run: bun run build
+      - run: bun run test
       - run: bun run size

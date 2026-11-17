@@ -22,13 +22,19 @@ All publishable packages share a single version number. They are released togeth
   `@sukujs/*` package at one version and know they work together.
 - **Internal dependencies stay as `workspace:*`.** Never write a version range for another
   `@sukujs/*` package by hand. The publish step replaces `workspace:*` with the release version.
+- **Standalone examples are the exception.** An example meant to be copied out of the repo,
+  such as `examples/deploy`, lists `@sukujs/*` as `^<current version>` so it installs from npm
+  on its own. Bun links the workspace only while that range matches, so `version:set` and
+  `version:bump` rewrite these ranges, and `version:check` fails on a stale one. Never use
+  `latest`: Bun then installs the published package instead of the workspace.
 - **A new package starts at the current shared version**, not at `0.0.0` or `0.1.0`.
 - **Docs and READMEs refer to one version.** Write "Suku 0.3.0", never a version per package.
 
 ### Enforced by a script
 
 ```bash
-bun run version:check          # fails if versions differ or an internal dependency is not workspace:*
+bun run version:check          # fails if versions differ, an internal dependency is not workspace:*,
+                               # or an example's @sukujs/* range no longer matches the version
 bun run version:set 0.3.0      # set every package to an exact version
 bun run version:bump patch     # or minor, or major
 ```

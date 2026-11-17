@@ -13,11 +13,11 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@sukujs/core": "^0.1.0",
-    "@sukujs/crypto": "^0.1.0",
-    "@sukujs/platform-bun": "^0.1.0",
-    "@sukujs/platform-node": "^0.1.0",
-    "@sukujs/security": "^0.1.0",
+    "@sukujs/core": "^0.4.0",
+    "@sukujs/crypto": "^0.4.0",
+    "@sukujs/platform-bun": "^0.4.0",
+    "@sukujs/platform-node": "^0.4.0",
+    "@sukujs/security": "^0.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
