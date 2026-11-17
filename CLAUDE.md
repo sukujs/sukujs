@@ -35,8 +35,11 @@ bun run version:bump patch     # or minor, or major
 
 `version:check` runs first in `bun run check` and in CI, so a mismatch cannot be merged.
 Always change versions with `version:set` or `version:bump`, never by editing the files by
-hand. Those commands only edit the `package.json` files; committing and tagging are separate
-steps.
+hand. Those commands edit the `package.json` files and the matching workspace versions in
+`bun.lock`, which belong in the release commit; committing and tagging are separate steps.
+
+`bun.lock` is committed. CI installs with `bun install --frozen-lockfile`, so a change to any
+`package.json` dependency must come with the updated lockfile.
 
 Releasing:
 
