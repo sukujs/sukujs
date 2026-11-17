@@ -290,7 +290,21 @@ export function createJwt<T = Record<string, unknown>>(options: JwtOptions<T>): 
   const hmac = algorithm.startsWith('HS');
   const params = spec(algorithm).sign as AlgorithmIdentifier;
   const tolerance = options.clockTolerance ?? 0;
+  // Checked here because a bad value fails open: NaN makes every time comparison false, so
+  // expired and not-yet-valid tokens would be accepted, and a NaN length would remove the limit.
+  if (!Number.isFinite(tolerance) || tolerance < 0) {
+    throw new JwtError(
+      'invalid_input',
+      `clockTolerance must be a finite number of seconds, 0 or more; got ${String(tolerance)}.`,
+    );
+  }
   const maxLength = options.maxTokenLength ?? 8192;
+  if (!Number.isSafeInteger(maxLength) || maxLength < 1) {
+    throw new JwtError(
+      'invalid_input',
+      `maxTokenLength must be a positive whole number of characters; got ${String(maxLength)}.`,
+    );
+  }
   const now = () => Math.floor((options.now?.() ?? Date.now()) / 1000);
   const defaultExpiry = options.expiresIn === undefined ? '1h' : options.expiresIn;
 

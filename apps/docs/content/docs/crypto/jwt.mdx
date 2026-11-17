@@ -146,11 +146,16 @@ const { role } = await jwt.verify(token);   // 'user' | 'admin', checked
 | `expiresIn` | `1h` | `false` issues tokens that never expire and accepts them. |
 | `issuer` | | Written as `iss`, and required to match on verify. |
 | `audience` | | Written as `aud`. On verify, any one configured value must match. |
-| `clockTolerance` | `0` | Seconds of clock skew allowed between servers. |
+| `clockTolerance` | `0` | Seconds of clock skew allowed between servers. Must be a finite number, 0 or more. |
 | `schema` | | A Standard Schema for the payload. |
 | `keyId` | | Written to the header as `kid`. |
 | `previousSecrets`, `previousPublicKeys` | | Old keys accepted for verifying only. |
-| `maxTokenLength` | `8192` | Longer tokens are rejected before any work is done. |
+| `maxTokenLength` | `8192` | Longer tokens are rejected before any work is done. A positive whole number. |
+
+`createJwt` throws a `JwtError` with code `invalid_input` when `clockTolerance` or
+`maxTokenLength` is not a valid number, so the app stops at startup. A value read from the
+environment is the usual cause: `Number(process.env.JWT_SKEW)` is `NaN` when the variable is
+unset, and `NaN` would otherwise turn off the expiry check.
 
 ## Rotating keys
 

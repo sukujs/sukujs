@@ -111,6 +111,37 @@ describe('HS256', () => {
     clock = 1_700_000_000_000;
   });
 
+  test('clockTolerance and maxTokenLength are checked when the instance is created', async () => {
+    const created = (options: { clockTolerance?: unknown; maxTokenLength?: unknown }) => {
+      try {
+        createJwt({ secret: SECRET, ...(options as object) });
+        return 'no error';
+      } catch (e) {
+        return e instanceof JwtError ? e.code : `other: ${e}`;
+      }
+    };
+    // NaN makes every time comparison false, so an expired token would be accepted.
+    // `Number(process.env.JWT_SKEW)` with the variable unset is the usual way to get one.
+    for (const clockTolerance of [NaN, Number(undefined), -1, Infinity, '30']) {
+      expect(created({ clockTolerance })).toBe('invalid_input');
+    }
+    for (const maxTokenLength of [NaN, 0, -1, 1.5, Infinity, '8192']) {
+      expect(created({ maxTokenLength })).toBe('invalid_input');
+    }
+    expect(created({ clockTolerance: 0, maxTokenLength: 1 })).toBe('no error');
+    expect(created({ clockTolerance: 2.5 })).toBe('no error');
+    // Like undefined, null means "use the default" (0 seconds, 8192 characters).
+    expect(created({ clockTolerance: null, maxTokenLength: null })).toBe('no error');
+
+    // The case that motivated the check: a long-expired token is never accepted.
+    const old = await createJwt({ secret: SECRET, expiresIn: '1s', now: () => 0 }).sign({});
+    expect(
+      await code(
+        createJwt({ secret: SECRET, clockTolerance: 0, now: () => 86_400_000 }).verify(old),
+      ),
+    ).toBe('expired');
+  });
+
   test('issuer and audience must match', async () => {
     const token = await jwt.sign({ role: 'a' });
     expect(
