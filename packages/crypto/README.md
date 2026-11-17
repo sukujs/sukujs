@@ -21,15 +21,16 @@ const signed = await sukuCrypto.createSigner(env.COOKIE_SECRET).pack('user.42');
 const sealed = await sukuCrypto.createSealer(env.COOKIE_SECRET).seal({ id: 42 }); // encrypted
 ```
 
-| Area                | API                                                                    |
-| ------------------- | ---------------------------------------------------------------------- |
-| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                      |
-| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                        |
-| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`              |
-| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`    |
-| Encrypted data      | `createEncrypter` (AES-256-GCM), `createPublicKeyEncrypter` (RSA-OAEP) |
-| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`   |
-| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                        |
+| Area                | API                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| JWT                 | `createJwt`, `bearerToken`, `decodeJwtUnverified`                                     |
+| Passwords           | `hashPassword`, `verifyPassword`, `needsRehash`                                       |
+| Signed values       | `createSigner` (HMAC): `sign`, `verify`, `pack`, `unpack`                             |
+| Encrypted values    | `createSealer` (AES-256-GCM): `seal`, `unseal`, with optional `ttl`                   |
+| Encrypted data      | `createEncrypter` (AES-256-GCM): `encrypt`, `decrypt`, `encryptBytes`, `decryptBytes` |
+| Public-key data     | `createPublicKeyEncrypter` (RSA-OAEP): the same four methods                          |
+| Random              | `randomToken`, `randomBytes`, `randomHex`, `randomUUID`, `randomInt`                  |
+| Hashing and compare | `sha256`, `sha512`, `digest`, `timingSafeEqual`                                       |
 
 ## JWT
 
