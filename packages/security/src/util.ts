@@ -1,3 +1,5 @@
+import { Logger, type RequestContext } from '@sukujs/core';
+
 /** Adds a value to the `Vary` header without duplicating it. */
 export function appendVary(headers: Headers, value: string): void {
   const current = headers.get('vary');
@@ -45,4 +47,21 @@ export function toSeconds(duration: Duration): number {
   if (!match)
     throw new TypeError(`Invalid duration "${duration}". Use seconds or a string like "15m".`);
   return Number(match[1]) * UNITS[match[2]!]!;
+}
+
+/**
+ * Writes a security event to the app's `Logger` at `warn`, with the request's method, path
+ * and route. Never throws: a failing logger must not change the response.
+ */
+export function warn(ctx: RequestContext, message: string, meta: Record<string, unknown>): void {
+  try {
+    ctx.provider.getOptional(Logger)?.warn(message, {
+      method: ctx.method,
+      path: ctx.url.pathname,
+      route: ctx.route?.name,
+      ...meta,
+    });
+  } catch {
+    // Logging is best effort.
+  }
 }

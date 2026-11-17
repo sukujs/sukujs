@@ -49,6 +49,23 @@ network failure.
 Because errors are turned into responses before they travel back through outer middlewares,
 the same holds for a `401` thrown by your own authentication middleware.
 
+## What gets logged
+
+A request refused by `csrf`, and the first request that takes a client over a `rateLimit`,
+are written to the app's [`Logger`](/docs/logging) at `warn`, so an attack in progress leaves
+a trace.
+
+```text
+WARN  CSRF check failed { method: 'POST', path: '/orders', route: 'POST /orders',
+                          reason: 'origin is not allowed', origin: 'https://evil.example', site: 'cross-site' }
+WARN  Rate limit exceeded { method: 'POST', path: '/auth/login', route: 'POST /auth/login',
+                            limiter: 'login', key: '203.0.113.7', limit: 5 }
+```
+
+The rate limiter logs once per key and window, not once per refused request. Its entry
+includes the key, so a limiter keyed by email address or user id writes that value to your
+logs.
+
 ## What this package does not do
 
 Authentication, input validation, account lockout, bot detection and a web application
