@@ -1,6 +1,6 @@
 {
   "name": "@sukujs/core",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Suku HTTP kernel: platform adapter contract, radix router, modules, controllers and request pipeline.",
   "keywords": [
     "suku",
