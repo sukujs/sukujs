@@ -11,7 +11,7 @@
   "scripts": {
     "build": "bun run --filter './packages/*' build",
     "typecheck": "bun run --filter './packages/*' typecheck",
-    "test": "bun test packages examples/hello examples/lifecycle examples/database examples/deploy examples/graphql examples/base && bun run test:node",
+    "test": "bun test packages examples/hello examples/lifecycle examples/database examples/deploy examples/graphql examples/openapi examples/base && bun run test:node",
     "lint": "eslint .",
     "format": "prettier --write .",
     "suku": "bun packages/cli/src/bin.ts",
