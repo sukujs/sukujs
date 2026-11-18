@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
- * What `UsersRoutes` in `samples/hero.mdx` answers. The bodies are the app's real output:
+ * What `UsersRoutes` in `samples/hero-bun.mdx` and `hero-node.mdx` answers. The bodies are the app's real output:
  * change the sample and these together.
  */
 const requests = [

@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { BenchmarkChart } from '@/components/home/benchmark-chart';
 import { CopyCommand } from '@/components/home/copy-command';
 import { ResponsePanel } from '@/components/home/response-panel';
-import HeroSample from '@/components/home/samples/hero.mdx';
+import HeroBunSample from '@/components/home/samples/hero-bun.mdx';
+import HeroNodeSample from '@/components/home/samples/hero-node.mdx';
 import OpenapiSample from '@/components/home/samples/openapi.mdx';
 import RoutesSample from '@/components/home/samples/routes.mdx';
 import ServicesSample from '@/components/home/samples/services.mdx';
@@ -29,7 +30,23 @@ export const Route = createFileRoute('/')({
   }),
 });
 
-const installCommand = 'bun add @sukujs/core @sukujs/platform-bun zod';
+/** The hero shows one runtime at a time. Bun comes first: it is the recommended one. */
+const runtimes = [
+  {
+    id: 'bun',
+    label: 'Bun',
+    recommended: true,
+    install: 'bun add @sukujs/core @sukujs/platform-bun zod',
+    Sample: HeroBunSample,
+  },
+  {
+    id: 'node',
+    label: 'Node',
+    recommended: false,
+    install: 'bun add @sukujs/core @sukujs/platform-node zod',
+    Sample: HeroNodeSample,
+  },
+];
 const createCommand = 'bunx @sukujs/cli new my-api';
 
 const mdxComponents = getMDXComponents();
@@ -79,6 +96,9 @@ function TileBackdrop() {
 }
 
 function Hero() {
+  const [runtimeId, setRuntimeId] = useState('bun');
+  const runtime = runtimes.find((item) => item.id === runtimeId) ?? runtimes[0]!;
+
   return (
     <section className="relative isolate border-b">
       <TileBackdrop />
@@ -100,7 +120,35 @@ function Hero() {
             schemas, and services come from a container with real lifetimes. Zero runtime
             dependencies.
           </p>
-          <CopyCommand command={installCommand} className="mt-8 w-fit" />
+          <div
+            role="tablist"
+            aria-label="Runtime"
+            className="mt-8 inline-flex gap-1 rounded-lg border bg-fd-card p-1 text-sm"
+          >
+            {runtimes.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={item.id === runtime.id}
+                onClick={() => setRuntimeId(item.id)}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-medium transition-colors',
+                  item.id === runtime.id
+                    ? 'bg-fd-background text-fd-foreground shadow-xs'
+                    : 'text-fd-muted-foreground hover:text-fd-foreground',
+                )}
+              >
+                {item.label}
+                {item.recommended && (
+                  <span className="rounded-full border border-fd-primary/40 px-1.5 py-px text-[11px] font-medium text-fd-primary">
+                    Recommended
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <CopyCommand command={runtime.install} className="mt-3 w-fit" />
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               to="/docs/$"
@@ -117,7 +165,7 @@ function Hero() {
         </div>
         <div className="flex min-w-0 flex-col gap-3">
           <Sample>
-            <HeroSample components={mdxComponents} />
+            <runtime.Sample components={mdxComponents} />
           </Sample>
           <ResponsePanel />
         </div>
