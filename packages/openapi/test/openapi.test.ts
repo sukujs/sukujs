@@ -363,6 +363,14 @@ describe('without a server', () => {
     expect(JSON.parse(JSON.stringify(built))).toEqual(served);
   });
 
+  test('the route table is found by another copy of core', async () => {
+    // A linked or duplicated @sukujs/core has its own module instance. The table is
+    // registered under a global symbol, so every copy asks for the same service.
+    const app = await create();
+    expect(ROUTE_TABLE as unknown).toBe(Symbol.for('suku:route-table'));
+    expect(app.get(Symbol.for('suku:route-table') as never)).toBe(app.get(ROUTE_TABLE));
+  });
+
   test('operation ids stay unique', () => {
     const config = { name: 'same', handle: () => null };
     const doc = createOpenApiDocument([

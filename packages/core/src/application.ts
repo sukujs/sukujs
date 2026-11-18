@@ -1,9 +1,9 @@
-import {
+import type {
   InjectionToken,
-  type ServiceCollection,
-  type ServiceProvider,
-  type ServiceProviderOptions,
-  type Token,
+  ServiceCollection,
+  ServiceProvider,
+  ServiceProviderOptions,
+  Token,
 } from '@sukujs/di';
 import type {
   CloseOptions,
@@ -52,7 +52,12 @@ export interface SukuOptions extends KernelOptions {
  * Every route the app serves, with its full path, feature and options. Injectable anywhere,
  * and readable in a handler with `ctx.provider.get(ROUTE_TABLE)`.
  */
-export const ROUTE_TABLE = new InjectionToken<readonly RegisteredRoute[]>('suku:route-table');
+// A global symbol rather than a token instance, like the route and feature markers: a package
+// that ends up with its own copy of core (a linked workspace, a duplicate install) still asks
+// for the same service.
+export const ROUTE_TABLE = Symbol.for('suku:route-table') as unknown as InjectionToken<
+  readonly RegisteredRoute[]
+>;
 
 export class SukuApplication {
   private server: HttpServer | undefined;
