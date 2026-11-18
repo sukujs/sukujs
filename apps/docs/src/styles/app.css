@@ -151,3 +151,67 @@ html > body[data-scroll-locked] {
     inset 0 2px 3px rgba(0, 0, 0, 0.45),
     inset 0 0 0 1px rgba(250, 247, 242, 0.1);
 }
+
+/*
+ * Raised surfaces for the home page's cards, in the same spirit as the buttons: a highlight
+ * on the top edge, a shade on the bottom edge and a short shadow. Links press in when clicked.
+ */
+.suku-raised,
+.suku-sample figure,
+.suku-sample > div {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(23, 20, 15, 0.06),
+    0 1px 2px rgba(23, 20, 15, 0.07);
+}
+
+.dark .suku-raised,
+.dark .suku-sample figure,
+.dark .suku-sample > div {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+a.suku-raised {
+  transition:
+    border-color 120ms,
+    color 120ms,
+    box-shadow 120ms,
+    transform 60ms;
+}
+
+a.suku-raised:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(23, 20, 15, 0.06),
+    0 2px 6px rgba(23, 20, 15, 0.1);
+}
+
+.dark a.suku-raised:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+a.suku-raised:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 3px rgba(23, 20, 15, 0.12);
+}
+
+.dark a.suku-raised:active {
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* A well that raised controls sit in, such as the runtime switcher. */
+.suku-inset {
+  box-shadow: inset 0 1px 2px rgba(23, 20, 15, 0.08);
+}
+
+.dark .suku-inset {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}

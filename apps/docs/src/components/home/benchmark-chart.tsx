@@ -29,7 +29,7 @@ const format = new Intl.NumberFormat('en-US');
 
 export function BenchmarkChart() {
   return (
-    <div className="rounded-xl border bg-fd-card p-5 sm:p-6">
+    <div className="rounded-xl border bg-fd-card suku-raised p-5 sm:p-6">
       <div className="flex flex-col gap-6">
         {groups.map((group) => (
           <div key={group.runtime}>

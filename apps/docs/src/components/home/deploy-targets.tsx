@@ -90,7 +90,7 @@ const proxies = [
 ];
 
 const cardClass =
-  'group flex h-full flex-col rounded-xl border bg-fd-card p-4 transition-colors hover:border-fd-primary/50';
+  'group flex h-full flex-col rounded-xl border bg-fd-card suku-raised p-4 transition-colors hover:border-fd-primary/50';
 
 export function DeployTargets() {
   return (

@@ -57,7 +57,7 @@ function Sample({ children, className }: { children: ReactNode; className?: stri
   return (
     <div
       className={cn(
-        'min-w-0 text-sm [&_figure]:my-0 [&_figure+figure]:mt-3 [&>div+figure]:mt-3 [&>div]:my-0',
+        'suku-sample min-w-0 text-sm [&_figure]:my-0 [&_figure+figure]:mt-3 [&>div+figure]:mt-3 [&>div]:my-0',
         className,
       )}
     >
@@ -107,7 +107,7 @@ function Hero() {
         <div className="min-w-0">
           <a
             href={changelogUrl}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border bg-fd-card px-3 py-1 text-xs font-medium text-fd-muted-foreground transition-colors hover:text-fd-foreground"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border bg-fd-card suku-raised px-3 py-1 text-xs font-medium text-fd-muted-foreground transition-colors hover:text-fd-foreground"
           >
             <span className="size-1.5 rounded-[2px] bg-fd-primary" />
             Suku {version} · Node 22+ and Bun
@@ -124,7 +124,7 @@ function Hero() {
           <div
             role="tablist"
             aria-label="Runtime"
-            className="mt-8 inline-flex gap-1 rounded-lg border bg-fd-card p-1 text-sm"
+            className="suku-inset mt-8 inline-flex gap-1 rounded-lg border bg-fd-muted p-1 text-sm"
           >
             {runtimes.map((item) => (
               <button
@@ -136,7 +136,7 @@ function Hero() {
                 className={cn(
                   'inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-fd-ring',
                   item.id === runtime.id
-                    ? 'bg-fd-background text-fd-foreground shadow-xs'
+                    ? 'suku-raised bg-fd-background text-fd-foreground'
                     : 'text-fd-muted-foreground hover:text-fd-foreground',
                 )}
               >
@@ -316,7 +316,7 @@ function Features() {
         <Sample>
           <OpenapiSample components={mdxComponents} />
         </Sample>
-        <dl className="mt-3 divide-y rounded-xl border bg-fd-card text-sm">
+        <dl className="mt-3 divide-y rounded-xl border bg-fd-card suku-raised text-sm">
           {openapiRoutes.map((item) => (
             <div key={item.path} className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3">
               <dt className="w-40 font-mono text-[13px]">{item.path}</dt>
@@ -426,7 +426,7 @@ function Packages() {
             <Link
               to="/docs/$"
               params={{ _splat: item.docs }}
-              className="group flex h-full flex-col rounded-xl border bg-fd-card p-4 transition-colors hover:border-fd-primary/50"
+              className="group flex h-full flex-col rounded-xl border bg-fd-card suku-raised p-4 transition-colors hover:border-fd-primary/50"
             >
               <span className="flex items-center justify-between gap-2 font-mono text-[13px]">
                 <span className="truncate">

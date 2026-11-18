@@ -15,7 +15,7 @@ export function CopyCommand({ command, className }: { command: string; className
   return (
     <div
       className={cn(
-        'flex max-w-full items-center gap-1 rounded-lg border bg-fd-card py-1 pl-4 pr-1 font-mono text-[13px]',
+        'flex max-w-full items-center gap-1 rounded-lg border bg-fd-card suku-raised py-1 pl-4 pr-1 font-mono text-[13px]',
         className,
       )}
     >
