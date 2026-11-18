@@ -102,7 +102,7 @@ function Hero() {
   return (
     <section className="relative isolate border-b">
       <TileBackdrop />
-      <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 py-14 md:py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-12 px-4 py-14 md:py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <div className="min-w-0">
           <a
             href={changelogUrl}
@@ -133,7 +133,7 @@ function Hero() {
                 aria-selected={item.id === runtime.id}
                 onClick={() => setRuntimeId(item.id)}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-medium transition-colors',
+                  'inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-fd-ring',
                   item.id === runtime.id
                     ? 'bg-fd-background text-fd-foreground shadow-xs'
                     : 'text-fd-muted-foreground hover:text-fd-foreground',

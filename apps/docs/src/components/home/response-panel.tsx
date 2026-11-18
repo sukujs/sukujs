@@ -45,7 +45,7 @@ export function ResponsePanel() {
             aria-selected={index === selected}
             onClick={() => setSelected(index)}
             className={cn(
-              'whitespace-nowrap rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors',
+              'whitespace-nowrap rounded-md px-2.5 py-1.5 font-mono text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-fd-ring',
               index === selected
                 ? 'bg-fd-background text-fd-foreground shadow-xs'
                 : 'text-fd-muted-foreground hover:text-fd-foreground',
