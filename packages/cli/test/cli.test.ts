@@ -165,7 +165,7 @@ describe('prompts', () => {
     const lines: string[] = [];
     const done = run(['new', '--dry-run'], { cwd: tmp, log: (line) => lines.push(line), prompter });
     // name, runtime: Bun, package manager: bun, deploy: Docker + Vercel, observability: yes,
-    // git: no, install: no
+    // API docs: Scalar, git: no, install: no
     await keys(
       'a',
       's',
@@ -183,6 +183,9 @@ describe('prompts', () => {
       DOWN,
       ' ',
       '\r',
+      DOWN,
+      '\r',
+      DOWN,
       DOWN,
       '\r',
       'n',
@@ -668,6 +671,127 @@ describe('observability', () => {
     } finally {
       tracesOnly.stop();
     }
+  }, 120_000);
+});
+
+describe('openapi', () => {
+  test('suku new with the flag and the generator afterwards give the same project', async () => {
+    const flagged = await project('documented', '--openapi', 'scalar');
+    const later = await project('documented-later');
+    // Same name, so the document's title matches.
+    const pkg = JSON.parse(read(later, 'package.json'));
+    writeFileSync(
+      join(later, 'package.json'),
+      `${JSON.stringify({ ...pkg, name: 'documented' }, null, 2)}\n`,
+    );
+    const generated = await cli(later, 'g', 'openapi', 'scalar');
+    expect(generated.code).toBe(0);
+    expect(generated.output).toContain('UPDATE package.json');
+    expect(generated.output).toContain('UPDATE src/app.feature.ts');
+    expect(generated.output).toContain('NOTE   Install the new dependency');
+    // It wires a package. It generates no code of its own.
+    expect(generated.output).not.toContain('CREATE');
+    for (const file of ['src/app.feature.ts', 'src/main.ts', 'package.json']) {
+      expect(read(later, file)).toBe(read(flagged, file));
+    }
+
+    const { dependencies } = JSON.parse(read(flagged, 'package.json'));
+    // The same version as the rest of Suku, and nothing for the UI: it loads from a CDN.
+    expect(dependencies['@sukujs/openapi']).toBe(dependencies['@sukujs/core']);
+    expect(Object.keys(dependencies).join()).not.toMatch(/swagger|scalar|redoc/);
+
+    // In the root feature, so every entry point serves it.
+    const feature = read(flagged, 'src/app.feature.ts');
+    expect(feature).toContain("import { openapi, scalar } from '@sukujs/openapi';");
+    expect(feature).toContain(
+      "routes: [health, openapi({ info: { title: 'documented' }, ui: scalar() })],",
+    );
+    expect(read(flagged, 'src/main.ts')).not.toContain('openapi');
+    expect(read(flagged, 'README.md')).toContain('shows it with Scalar');
+    // A project without it has no trace of it.
+    expect(read(await project('undocumented'), 'package.json')).not.toContain('openapi');
+
+    // Running it again changes nothing, even with another UI.
+    expect((await cli(later, 'g', 'api', 'redoc')).code).toBe(0);
+    expect(read(later, 'src/app.feature.ts')).toBe(feature);
+  });
+
+  test('each UI has a flag value, and Swagger UI is the default of the generator', async () => {
+    const swagger = await project('with-swagger', '--openapi', 'swagger');
+    expect(read(swagger, 'src/app.feature.ts')).toContain(
+      "routes: [health, openapi({ info: { title: 'with-swagger' } })],",
+    );
+    expect(read(swagger, 'src/app.feature.ts')).toContain(
+      "import { openapi } from '@sukujs/openapi';",
+    );
+    const redoc = await project('with-redoc', '--openapi', 'redoc');
+    expect(read(redoc, 'src/app.feature.ts')).toContain('ui: redoc() })');
+
+    const bare = await project('bare');
+    expect((await cli(bare, 'g', 'openapi')).code).toBe(0);
+    expect(read(bare, 'src/app.feature.ts')).toContain("openapi({ info: { title: 'bare' } })");
+
+    expect((await cli(tmp, 'new', 'x', '--openapi', 'postman', '--yes')).output).toContain(
+      'Unknown OpenAPI UI "postman". Use swagger, scalar, redoc, or none.',
+    );
+    expect((await cli(bare, 'g', 'openapi', 'none')).output).toContain(
+      'Usage: suku generate openapi [swagger|scalar|redoc]',
+    );
+  });
+
+  test('without a root feature it goes in the entry file, or becomes a note', async () => {
+    const root = await project('no-root');
+    rmSync(join(root, 'src/app.feature.ts'));
+    writeFileSync(
+      join(root, 'src/main.ts'),
+      read(root, 'src/main.ts').replace('adapter:', 'routes: [],\n  adapter:'),
+    );
+    expect((await cli(root, 'g', 'openapi', 'scalar')).code).toBe(0);
+    expect(read(root, 'src/main.ts')).toContain(
+      "routes: [openapi({ info: { title: 'no-root' }, ui: scalar() })],",
+    );
+
+    const other = await project('no-routes');
+    rmSync(join(other, 'src/app.feature.ts'));
+    const before = read(other, 'src/main.ts');
+    const noted = await cli(other, 'g', 'openapi');
+    expect(noted.output).toContain(
+      "Add `openapi({ info: { title: 'no-routes' } })` to the `routes` of Suku.create() in src/main.ts",
+    );
+    expect(read(other, 'src/main.ts')).toBe(before);
+  });
+
+  test('the generated project typechecks and serves the document and the UI', async () => {
+    const root = await project('api-docs', '--openapi', 'scalar', '--deploy', 'cloudflare,vercel');
+    writeFileSync(
+      join(root, 'src/docs.test.ts'),
+      `import { expect, test } from 'bun:test';
+import { Suku } from '@sukujs/core';
+import { AppFeature } from './app.feature';
+
+const app = await Suku.create({ features: [AppFeature] });
+const get = (path: string) => app.handle(new Request(\`http://test\${path}\`));
+
+test('the document covers the app, not its own routes', async () => {
+  const document = (await (await get('/openapi.json')).json()) as {
+    info: { title: string };
+    paths: Record<string, unknown>;
+  };
+  expect(document.info.title).toBe('api-docs');
+  expect(Object.keys(document.paths).sort()).toEqual(['/health', '/hello/{name}']);
+});
+
+test('the UI is Scalar', async () => {
+  const response = await get('/docs');
+  expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
+  expect(await response.text()).toContain('Scalar.createApiReference');
+});
+`,
+    );
+    const tests = sh(root, 'bun', 'test');
+    expect(tests.output).toContain('4 pass');
+    expect(tests.code).toBe(0);
+    expect(sh(root, 'bunx', 'tsc', '--noEmit', '-p', 'tsconfig.json').output).toBe('');
   }, 120_000);
 });
 

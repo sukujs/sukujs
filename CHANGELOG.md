@@ -31,6 +31,9 @@ there is nothing to migrate. Every `@sukujs/*` package is published at 0.6.0.
   documentation, and `transform` changes the finished document.
 - **`createOpenApiDocument()`** — builds the document without a server, to write it to a file
   or feed a client generator.
+- **API docs in the CLI** — `suku new` asks which UI to serve the docs with: none, Swagger
+  UI, Scalar or Redoc. `--openapi scalar` answers it. `suku generate openapi [ui]` adds the
+  same to an existing project: the dependency, and `openapi()` in the root feature.
 - **`ROUTE_TABLE`** in `@sukujs/core` — an injectable list of every route the app serves, with
   its full path, the feature that declared it and its options. Read it with
   `app.get(ROUTE_TABLE)`. `app.routes` is unchanged.

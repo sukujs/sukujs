@@ -1,5 +1,6 @@
 import { type DeployTarget, deployFiles } from './deploy.js';
 import { addObservability } from './observability.js';
+import { addOpenApi, OPENAPI_UIS, type OpenApiUi } from './openapi';
 import type { Runtime } from './project.js';
 
 export interface StarterOptions {
@@ -14,6 +15,8 @@ export interface StarterOptions {
   deploy?: DeployTarget[];
   /** Send errors, traces, logs and metrics with OpenTelemetry. Default: no. */
   observability?: boolean;
+  /** Serve an OpenAPI document and this UI for it. Default: no. */
+  openapi?: OpenApiUi;
 }
 
 /** The files of a new project, keyed by path. */
@@ -331,6 +334,31 @@ do not load the config, so they send nothing.
 - \`observability()\` in \`src/main.ts\` is the whole setup. It comes from \`@sukujs/observability\`.
 - \`@Traced()\` on a method records a span for it. \`telemetry.captureException(error)\`
   reports an error you handled yourself. Both come from the same package.
+`;
+  }
+  if (options.openapi) {
+    addOpenApi(
+      {
+        sourceRoot: 'src',
+        entry: 'src/main.ts',
+        read: (path) => all[path],
+        update: (path, content) => void (all[path] = content),
+        // Every edit applies to the starter's own files, so there is nothing to report.
+        note: () => undefined,
+      },
+      options.openapi,
+    );
+    all['README.md'] += `
+## API docs
+
+The app describes itself: \`/openapi.json\` is an OpenAPI 3.1 document built from the routes,
+and \`/docs\` shows it with ${OPENAPI_UIS[options.openapi].label}. Both come from \`openapi()\` in
+\`src/app.feature.ts\`, from \`@sukujs/openapi\`.
+
+- Parameters, bodies and responses come from each route's schemas. Give a route a
+  \`response\` schema to document what it returns.
+- \`apiDoc({ summary, tags, responses })\` in a route's \`meta\` adds the rest.
+- To keep the docs out of production, list \`openapi()\` only when you want it served.
 `;
   }
   return all;

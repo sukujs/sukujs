@@ -116,6 +116,8 @@ Suku ships OpenAPI generation and API reference UIs as its own package.
 - **The UI page keeps a strict Content-Security-Policy** (nonce for inline scripts), so it
   works beside `securityHeaders()`. A new built-in UI is checked in a browser under that policy.
 - **Tested against real routes.** Every documented pattern runs in a test.
+- **The CLI offers it.** `suku new --openapi <swagger|scalar|redoc>` and `suku generate openapi`
+  wire the package into a project. A new built-in UI gets a choice there too.
 
 ## Scope: databases are guides, not packages
 

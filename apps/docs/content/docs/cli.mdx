@@ -34,6 +34,7 @@ In a terminal, `suku new` asks for anything you did not pass as a flag:
 | Package manager | bun, npm, pnpm, yarn | bun | `--package-manager bun` |
 | Deployment targets | Docker, PM2, systemd, Cloudflare Workers, Vercel (any number) | none | `--deploy docker,pm2` |
 | Observability | None, OpenTelemetry | none | `--observability otel` |
+| API docs (OpenAPI) | None, Swagger UI, Scalar, Redoc | none | `--openapi scalar` |
 | Initialise a git repository? | yes, no | yes | `--skip-git` |
 | Install dependencies? | yes, no | yes | `--skip-install` |
 
@@ -96,6 +97,7 @@ suku g <schematic> <name>
 | `service` | `s` | `<name>/<name>.service.ts`, a [`@Service`](/docs/dependency-injection) class |
 | `middleware` | `mw` | `middlewares/<name>.middleware.ts` |
 | `observability` | `obs` | Nothing new: it adds [`@sukujs/observability`](/docs/observability) to `package.json`, `src/main.ts` and `src/logger.ts`. Needs no name |
+| `openapi` | `api` | Nothing new: it adds [`@sukujs/openapi`](/docs/openapi) to `package.json` and the `openapi()` route to `src/app.feature.ts`. The name is the UI: `swagger` (default), `scalar` or `redoc` |
 
 Generated code is registered for you:
 

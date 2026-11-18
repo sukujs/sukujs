@@ -14,6 +14,13 @@ bun add @sukujs/openapi
 
 It has no dependencies of its own. An app that does not use it installs nothing.
 
+The [CLI](/docs/cli) sets it up for you, in a new project or an existing one:
+
+```bash
+suku new my-api --openapi scalar     # or swagger, redoc
+suku generate openapi scalar
+```
+
 ## Serve the document and a UI
 
 Add `openapi()` to the app's routes.

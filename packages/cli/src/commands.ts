@@ -3,6 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { DEPLOY_TARGETS, type DeployTarget, parseDeployTargets } from './deploy.js';
 import { CliError } from './errors.js';
 import { parseObservability } from './observability.js';
+import { OPENAPI_UIS, parseOpenApi } from './openapi';
 import { names } from './names.js';
 import { Plan } from './plan.js';
 import { loadProject, type Runtime } from './project.js';
@@ -39,6 +40,8 @@ export interface NewOptions {
   deploy?: string[];
   /** `opentelemetry` (or `otel`), or `none`. */
   observability?: string;
+  /** The UI for the OpenAPI document: `swagger`, `scalar` or `redoc`, or `none`. */
+  openapi?: string;
   skipInstall?: boolean;
   skipGit?: boolean;
   /** Accept the default for every question that a flag did not answer. */
@@ -125,6 +128,20 @@ export async function newProject(
           )
         : false;
 
+  const openapi = parseOpenApi(
+    options.openapi ??
+      (ask
+        ? await ask.select('API docs (OpenAPI)', [
+            { value: 'none', label: 'None', hint: 'default' },
+            ...Object.entries(OPENAPI_UIS).map(([value, { label, hint }]) => ({
+              value,
+              label,
+              hint,
+            })),
+          ])
+        : 'none'),
+  );
+
   const git =
     options.skipGit === undefined && ask
       ? await ask.confirm('Initialise a git repository?')
@@ -142,6 +159,7 @@ export async function newProject(
     packageManager: manager,
     deploy,
     observability,
+    ...(openapi ? { openapi } : {}),
   });
   for (const [path, content] of Object.entries(files)) plan.create(path, content);
   if (ask) io.log('');
