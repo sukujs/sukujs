@@ -3,17 +3,46 @@
 All notable changes to Suku are documented here. Packages under `packages/*` share one
 version and are released together.
 
-## Unreleased
+## 0.6.0 — 2026-11-18
+
+Suku 0.6.0 adds API documentation: a new package that builds an OpenAPI document from the
+routes an app already has and serves it with Swagger UI, Scalar or Redoc. Nothing breaks, and
+there is nothing to migrate. Every `@sukujs/*` package is published at 0.6.0.
 
 ### Features
 
-- **`@sukujs/openapi`** — a new package. `openapi()` serves an OpenAPI 3.1 document built from
-  the app's routes, and a UI for it: Swagger UI, Scalar or Redoc. Parameters, request bodies
-  and responses come from the schemas the routes already validate with. `apiDoc()` adds
-  summaries, tags, extra responses and security in a route's `meta`.
-  `createOpenApiDocument()` builds the document without a server.
+- **`@sukujs/openapi`** — a new package. Add `openapi()` to an app's routes and it serves an
+  OpenAPI 3.1 document at `/openapi.json` and a UI at `/docs`. Path parameters, query,
+  headers, request bodies and responses come from the schemas the routes already validate
+  with, so the documentation cannot drift from the code. A route with input schemas also
+  documents the 400 that validation sends.
+- **`apiDoc()`** — adds what a schema cannot say, in a route's `meta`: summary, description,
+  tags, extra responses, security, deprecation, or `hidden` to leave the route out. It does
+  not change how the route behaves. Without it an operation is tagged with its feature's name.
+- **Three UIs** — `swaggerUi()` (the default), `scalar()` and `redoc()`. Each loads from a CDN
+  at a pinned version, so there is nothing more to install; `cdn` points it at files you host
+  yourself. Any other viewer is an object with a `render` function. The page is sent with a
+  strict Content-Security-Policy of its own, so it works beside `securityHeaders()`.
+- **Any schema library** — schemas are converted through Standard JSON Schema, which Zod 4.2
+  and later, ArkType and Valibot provide. `toJsonSchema` covers the rest. A Zod schema with
+  `.meta({ id: 'User' })` is written once under `components.schemas` and referenced.
+- **Security and hooks** — `securitySchemes` and `security` describe how clients authenticate.
+  `operation` changes each operation, for example to turn your own access rules in `meta` into
+  documentation, and `transform` changes the finished document.
+- **`createOpenApiDocument()`** — builds the document without a server, to write it to a file
+  or feed a client generator.
 - **`ROUTE_TABLE`** in `@sukujs/core` — an injectable list of every route the app serves, with
-  its full path, feature and options. `app.routes` is unchanged.
+  its full path, the feature that declared it and its options. Read it with
+  `app.get(ROUTE_TABLE)`. `app.routes` is unchanged.
+
+### Documentation
+
+- A new page, OpenAPI, covers what is generated from a route, `apiDoc`, authentication, the
+  UIs, every option and schema libraries.
+- Coming from NestJS now points to `@sukujs/graphql` and `@sukujs/openapi` in place of
+  `@nestjs/graphql` and `@nestjs/swagger`.
+
+**Full changelog**: https://github.com/sukujs/sukujs/compare/v0.5.0...v0.6.0
 
 ## 0.5.0 — 2026-11-17
 
