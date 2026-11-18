@@ -73,9 +73,11 @@ await app.listen(3000);
 None of them has a runtime dependency. `@sukujs/core` re-exports the container's decorators and
 registration helpers, so application code usually imports from one place.
 
+Wondering why this exists beside Express, Hono and NestJS? Read [Why Suku](/docs/motivation).
+
 ## Status
 
-<Callout title="Suku 0.1.0">
+<Callout title="Suku 0.6.0">
   All packages are on npm under [`@sukujs`](https://www.npmjs.com/org/sukujs). Install with
   `bun add @sukujs/core` (and the platform adapter you need). The API is still early: lifecycle
   hooks and a typed client are planned and not documented here.

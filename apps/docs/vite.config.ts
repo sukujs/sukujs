@@ -22,6 +22,9 @@ export default defineConfig({
           'react-dom/server',
           '@tanstack/react-router > @tanstack/react-store',
         ],
+        // Avoid prebundling the browser stub of fumadocs-core/server (breaks .md
+        // routes when includeProcessedMarkdown still uses the function form).
+        exclude: ['fumadocs-core/server'],
       },
     },
   },

@@ -1,0 +1,243 @@
+---
+title: Why Suku
+description: Why another backend framework, when Express, Hono and NestJS already exist.
+icon: Lightbulb
+---
+
+Express and Hono are small and fast, and leave the shape of your application to you. NestJS
+gives the application a shape, and asks for a lot in return: more concepts, more
+dependencies, and types written twice. Suku is an attempt at the structure of NestJS at the
+weight of Hono.
+
+## What we wanted
+
+Suku started from a list of things we wanted in one framework:
+
+- **Code organised by feature.** The routes, services and middlewares of one part of the app
+  live together and are wired in one place.
+- **Real dependency injection.** Constructor injection, explicit lifetimes, a scope per
+  request, disposal, and wiring mistakes reported before the server starts.
+- **Types written once.** The schema that validates a request is also the type of the
+  handler's input. No DTO class beside it.
+- **Web standards.** A handler receives a Fetch `Request` and may return a `Response`, so the
+  same app runs on Node, Bun and platforms that call `fetch` themselves.
+- **Nothing to carry.** Zero runtime dependencies, and a size budget checked on every commit.
+
+Each existing framework gave us part of this list. None gave us all of it.
+
+## Where the others stop
+
+These are good frameworks. Each section starts with what it gets right.
+
+### Express
+
+Express is simple, stable and known by almost everyone who writes JavaScript. A route is a
+method, a path and a function, and that idea has not needed to change.
+
+What it does not give you:
+
+- **Types or validation.** `req.params.id` is a string, `req.body` is `any`, and checking
+  them is your job in every handler.
+- **Batteries.** Body parsing, cookies, CORS, security headers, rate limiting, validation and
+  configuration are each another package. [Coming from Express](/docs/from-express) lists
+  about ten that Suku replaces.
+- **A place for services.** A database client is a module-level import. Tests swap it by
+  mocking the module.
+- **A return value.** You write to `res`, so a forgotten `return` sends two responses.
+
+### Hono
+
+Hono is fast, web-standard, and runs nearly everywhere. Its validator middleware types the
+handler from a schema, which is the idea Suku builds its routes on.
+
+What it does not give you is an application structure. Hono is a router with a very good
+context object.
+
+- **No dependency injection.** There are no lifetimes, no per-request scope and no disposal.
+  Services are module-level values or are placed on the context by a middleware.
+- **No feature boundary.** Sub-apps group routes, not the services and middlewares that
+  belong with them.
+- **Every team invents the rest.** A ten-route service does not notice. A two-hundred-route
+  one ends up with a home-made container and its own conventions.
+
+If you need a router at the edge and nothing more, Hono is the better choice.
+
+### NestJS
+
+NestJS solved structure for Node. Modules, constructor injection and declarative
+cross-cutting concerns are why large teams can share a codebase, and Suku keeps all three.
+
+What it costs:
+
+- **Many concepts.** Modules, controllers, providers, middleware, guards, interceptors, pipes
+  and exception filters. Four of those wrap a request, each with its own interface and its
+  own place in the order.
+- **Types written twice.** A DTO class declares the shape, and `class-validator` decorators
+  declare it again. Parameter decorators such as `@Param('id', ParseIntPipe)` are a third
+  place.
+- **Module bookkeeping.** A provider must be exported by one module and imported by another
+  before it can be injected.
+- **Weight.** `reflect-metadata` and `rxjs` are required, and an HTTP framework sits
+  underneath.
+
+## The same endpoint, four ways
+
+`GET /users/:id` with a numeric id, a `404` when the user is missing, and a `UsersService`
+that the handler needs.
+
+<Tabs items={['Express', 'Hono', 'NestJS', 'Suku']}>
+  <Tab value="Express">
+    ```ts
+    import { users } from './users.service';   // a module-level instance
+
+    app.get('/users/:id', async (req, res) => {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ message: 'Invalid id' });
+      const user = await users.find(id);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      res.json(user);
+    });
+    ```
+
+    Validation is by hand, and the service is whatever the import resolves to.
+  </Tab>
+  <Tab value="Hono">
+    ```ts
+    import { users } from './users.service';   // a module-level instance
+
+    app.get(
+      '/users/:id',
+      zValidator('param', z.object({ id: z.coerce.number().int() })),
+      async (c) => {
+        const { id } = c.req.valid('param');   // a number
+        const user = await users.find(id);
+        if (!user) return c.json({ message: 'User not found' }, 404);
+        return c.json(user);
+      },
+    );
+    ```
+
+    The input is typed by its schema. The service is still an import.
+  </Tab>
+  <Tab value="NestJS">
+    ```ts
+    @Controller('users')
+    export class UsersController {
+      constructor(private readonly users: UsersService) {}
+
+      @Get(':id')
+      async findOne(@Param('id', ParseIntPipe) id: number) {
+        const user = await this.users.find(id);
+        if (!user) throw new NotFoundException('User not found');
+        return user;
+      }
+    }
+
+    @Module({ controllers: [UsersController], providers: [UsersService] })
+    export class UsersModule {}
+    ```
+
+    The service is injected. The `id` type is written once for the compiler and once, as a
+    pipe, for the runtime.
+  </Tab>
+  <Tab value="Suku">
+    ```ts
+    @Routes('/users')
+    export class UsersRoutes {
+      constructor(private readonly users: UsersService) {}
+
+      findOne = route.get('/:id', {
+        params: z.object({ id: z.coerce.number().int() }),
+        handle: async ({ params }) => {
+          const user = await this.users.find(params.id);   // a number
+          if (!user) throw new NotFoundException('User not found');
+          return user;
+        },
+      });
+    }
+
+    export const UsersFeature = feature('users', {
+      routes: [UsersRoutes],
+      services: [singleton(UsersService)],
+    });
+    ```
+
+    The service is injected, and the schema is the only place the `id` type is written.
+  </Tab>
+</Tabs>
+
+## What Suku decided
+
+**One route primitive.** A [route](/docs/routes) is a typed object. Its `params`, `query`,
+`body` and `headers` schemas validate the request and type the handler, and the path literal
+is checked against the `params` schema at compile time. Any
+[Standard Schema](/docs/validation) library works, with no adapter.
+
+**Two styles, same primitive.** Routes can be fields of an injected class, or
+[plain values](/docs/handlers#using-services) that declare the services they need. You do not have to like
+classes to get injection.
+
+**Features instead of modules.** A [feature](/docs/features) bundles routes, services and
+middlewares. There is one container, so there is no `exports` list to keep in step.
+
+**One cross-cutting concept.** Everything that wraps a request is a
+[middleware](/docs/middlewares). A guard is a middleware that throws. An interceptor is a
+middleware that changes the response. Errors are mapped by [`onError`](/docs/errors).
+
+**Dependency injection modelled on .NET.** A flat service collection with singleton, scoped
+and transient [lifetimes](/docs/dependency-injection), a scope per request, and disposal in
+reverse order. Missing services, cycles and unresolvable parameters stop the app
+[at startup](/docs/dependency-injection#mistakes-caught-at-startup), not on the first request
+that hits them.
+
+**A Fetch kernel.** The kernel is a function from `Request` to `Response`.
+[Adapters](/docs/platforms) connect it to `node:http` and `Bun.serve`, and platforms such as
+Cloudflare Workers call it directly.
+
+**Zero runtime dependencies.** No `reflect-metadata`, no `rxjs`, no HTTP framework
+underneath. The container and core together stay under 40 KB minified, and the build fails
+if a package grows past its budget.
+
+## Side by side
+
+| | Express | Hono | NestJS | Suku |
+| --- | --- | --- | --- | --- |
+| Application structure | Yours to design | Yours to design | Modules | Features |
+| Dependency injection | No | No | Yes | Yes |
+| Lifetimes and request scope | No | No | Yes | Yes |
+| Handler typed by its schema | No | Yes, with a validator middleware | No, DTO classes | Yes |
+| Validation | A package | A middleware | Pipes and `class-validator` | Built in, Standard Schema |
+| Concepts that wrap a request | Middleware | Middleware | Middleware, guard, interceptor, pipe, filter | Middleware |
+| Request and response | Node `req`, `res` | Fetch | Express or Fastify | Fetch |
+| Runtime dependencies | Several | None | Several | None |
+
+## When not to use Suku
+
+- **You need a mature ecosystem today.** Suku is at 0.6.0. The API is still early, and there
+  are few third-party packages and answers online.
+- **You need what NestJS has and Suku does not.** Lifecycle hooks, WebSocket gateways and
+  microservice transports are [not available yet](/docs/from-nestjs#not-available-yet).
+- **You only need a router.** For a handful of routes at the edge, Hono is smaller and
+  simpler.
+- **Raw Node throughput is the constraint.** On Node, a Suku app reaches about 45% of raw
+  `node:http`, the price of building Fetch objects for each request. On Bun it is about 96%
+  of raw `Bun.serve`. See [Performance](/docs/performance) for how that was measured. We have
+  not published numbers against other frameworks, and make no claim about them.
+- **You cannot use legacy decorators.** Constructor injection without extra code needs
+  `experimentalDecorators` and `emitDecoratorMetadata`. A
+  [`static inject` array](/docs/dependency-injection#without-decorators) and plain routes
+  work without them.
+
+## Next
+
+<Cards>
+  <Card title="Getting started" href="/docs/getting-started">
+    Create a project and write the first route.
+  </Card>
+  <Card title="Coming from Express" href="/docs/from-express">
+    How routes, middlewares and error handlers map across.
+  </Card>
+  <Card title="Coming from NestJS" href="/docs/from-nestjs">
+    Modules, controllers, guards and pipes, translated.
+  </Card>
+</Cards>

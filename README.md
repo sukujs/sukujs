@@ -78,7 +78,7 @@ const findOne = route.get('/users/:id', {
 | `@sukujs/platform-node` | `node:http` adapter                                                                     |
 | `@sukujs/platform-bun`  | `Bun.serve` adapter                                                                     |
 
-Current release: **0.4.0** on npm under [`@sukujs`](https://www.npmjs.com/org/sukujs). See the
+Current release: **0.6.0** on npm under [`@sukujs`](https://www.npmjs.com/org/sukujs). See the
 [changelog](CHANGELOG.md) for what changed.
 
 ## Install

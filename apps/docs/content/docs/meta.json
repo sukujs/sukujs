@@ -2,6 +2,7 @@
   "title": "Suku",
   "pages": [
     "index",
+    "motivation",
     "getting-started",
     "cli",
     "---Fundamentals---",

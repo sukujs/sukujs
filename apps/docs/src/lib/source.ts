@@ -8,7 +8,10 @@ export const docs = defineDocs({
   docs: {
     async: true,
     postprocess: {
-      includeProcessedMarkdown: true,
+      // String form: getText('processed') returns Markdown directly. The default
+      // `function` form needs renderToMarkdown from fumadocs-core/server, which
+      // Cloudflare (and Vite's SSR dep optimizer) resolve to the browser stub.
+      includeProcessedMarkdown: { output: 'string' },
     },
   },
 });

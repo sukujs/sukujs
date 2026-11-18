@@ -3,6 +3,8 @@
   "name": "suku-docs",
   "main": "@tanstack/react-start/server-entry",
   "compatibility_date": "2026-11-14",
+  // renderToMarkdown (fumadocs-core/server) uses AsyncLocalStorage from node:async_hooks.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
   },

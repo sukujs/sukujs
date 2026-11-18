@@ -467,6 +467,7 @@ function Closing() {
         <div className="flex min-w-0 max-w-full flex-col gap-3">
           <CopyCommand command={createCommand} />
           <DocsLink to="getting-started">Read the getting started guide</DocsLink>
+          <DocsLink to="motivation">Why Suku, beside Express, Hono and NestJS</DocsLink>
         </div>
       </div>
     </section>
