@@ -16,17 +16,28 @@ export interface RateLimitStore {
 /**
  * Counters in this process's memory, in fixed windows. Correct for a single instance; with
  * several instances each one counts separately, so the effective limit is multiplied.
+ *
+ * Memory is bounded by `maxKeys`. When the store is full of live counters, new keys share
+ * one overflow counter until room frees up: a flood of new keys can then be limited as a
+ * group, but it cannot push out, and so reset, the counters of clients already being limited.
  */
 export class MemoryRateLimitStore implements RateLimitStore {
   private readonly entries = new Map<string, RateLimitHit>();
+  private overflow: RateLimitHit | undefined;
   private sinceSweep = 0;
+  private sweptAt = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly maxKeys = 100_000) {}
 
   hit(key: string, windowMs: number, now: number): RateLimitHit {
-    if (++this.sinceSweep >= 1000 || this.entries.size > this.maxKeys) this.sweep(now);
+    if (++this.sinceSweep >= SWEEP_EVERY_HITS) this.sweep(now);
     let entry = this.entries.get(key);
     if (!entry || entry.resetAt <= now) {
+      if (!entry && this.entries.size >= this.maxKeys) {
+        // Walking the map is the expensive part, so a full store is swept at most once a second.
+        if (now - this.sweptAt >= SWEEP_INTERVAL_MS) this.sweep(now);
+        if (this.entries.size >= this.maxKeys) return this.hitOverflow(windowMs, now);
+      }
       entry = { count: 0, resetAt: now + windowMs };
       this.entries.set(key, entry);
     }
@@ -38,15 +49,51 @@ export class MemoryRateLimitStore implements RateLimitStore {
     return this.entries.size;
   }
 
+  private hitOverflow(windowMs: number, now: number): RateLimitHit {
+    if (!this.overflow || this.overflow.resetAt <= now) {
+      this.overflow = { count: 0, resetAt: now + windowMs };
+    }
+    this.overflow.count++;
+    return this.overflow;
+  }
+
   private sweep(now: number): void {
     this.sinceSweep = 0;
+    this.sweptAt = now;
     for (const [key, entry] of this.entries) if (entry.resetAt <= now) this.entries.delete(key);
-    // Still over the cap: drop the oldest, so memory stays bounded under a flood of keys.
-    for (const key of this.entries.keys()) {
-      if (this.entries.size <= this.maxKeys) break;
-      this.entries.delete(key);
-    }
   }
+}
+
+const SWEEP_EVERY_HITS = 1000;
+const SWEEP_INTERVAL_MS = 1000;
+
+/**
+ * What the default limiter counts by for an address. IPv4 addresses are used whole. An IPv6
+ * client usually controls a whole /64, so those are grouped by that prefix; otherwise one
+ * client could spread its requests over as many addresses as it liked and never be limited.
+ */
+function addressKey(ip: string): string {
+  if (!ip.includes(':')) return ip;
+  const address = (ip.split('%')[0] as string).toLowerCase();
+  if (address.startsWith('::ffff:') && address.includes('.')) return address.slice(7);
+  const [head = '', tail, extra] = address.split('::');
+  if (extra !== undefined) return ip;
+  const groups = (part: string) => {
+    const out = part === '' ? [] : part.split(':');
+    // A dotted IPv4 tail stands for two groups.
+    return out.at(-1)?.includes('.') ? [...out, ''] : out;
+  };
+  const front = groups(head);
+  let all = front;
+  if (tail !== undefined) {
+    const back = groups(tail);
+    const missing = 8 - front.length - back.length;
+    if (missing < 1) return ip;
+    all = [...front, ...new Array<string>(missing).fill('0'), ...back];
+  }
+  if (all.length !== 8) return ip;
+  const prefix = all.slice(0, 4).map((group) => group.replace(/^0+(?=.)/, ''));
+  return `${prefix.join(':')}::/64`;
 }
 
 /**
@@ -77,7 +124,8 @@ export interface RateLimitOptions {
   /** Window length: seconds, or a string such as `1m`, `15m`, `1h`. */
   window: Duration;
   /**
-   * What is being limited. Default: the client IP. Return a user id to limit per account,
+   * What is being limited. Default: the client IP, with IPv6 addresses grouped by their /64
+   * prefix. Return a user id to limit per account,
    * or `undefined` to let the request through uncounted.
    */
   key?: (ctx: RequestContext) => string | undefined | Promise<string | undefined>;
@@ -116,7 +164,11 @@ export function rateLimit(options: RateLimitOptions): MiddlewareFn {
   const sendHeaders = options.headers ?? true;
   const now = options.now ?? Date.now;
   const keyOf =
-    options.key ?? ((ctx: RequestContext) => clientIp(ctx, options.trustProxy) ?? 'unknown');
+    options.key ??
+    ((ctx: RequestContext) => {
+      const ip = clientIp(ctx, options.trustProxy);
+      return ip === undefined ? 'unknown' : addressKey(ip);
+    });
 
   return async (ctx, next) => {
     if (options.skip?.(ctx)) return next();

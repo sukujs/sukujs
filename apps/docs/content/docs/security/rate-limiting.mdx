@@ -37,8 +37,9 @@ when several routes should count together, as above. Call it again for a separat
 
 ## What is being limited
 
-By default the key is the client's IP address. Return something else to limit per account,
-per API key, or both.
+By default the key is the client's IP address. An IPv6 client usually controls a whole /64,
+so IPv6 addresses are counted by that prefix: `2001:db8:aa:bb::1` and `2001:db8:aa:bb::2` are
+one client. Return something else to limit per account, per API key, or both.
 
 ```ts
 rateLimit({
@@ -137,3 +138,9 @@ restarts.
 Windows are fixed, so a client can make up to twice the limit across a window boundary. A
 rate limiter slows abuse; it does not stop a distributed attack, which needs protection at
 the network edge.
+
+The in-memory store holds at most 100,000 counters; pass another number to
+`new MemoryRateLimitStore(maxKeys)` to change it. When it is full of counters that have not
+expired, requests with new keys share a single overflow counter until room frees up. A flood
+of new keys is then limited as a group, and legitimate new clients are limited with it, but
+the flood cannot reset the counters of clients that are already being limited.
