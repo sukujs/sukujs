@@ -9,7 +9,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -1,5 +1,5 @@
-import { CliError } from './errors.js';
-import { addImport, prependToArray } from './register.js';
+import { CliError } from './errors';
+import { addImport, prependToArray } from './register';
 
 /**
  * Reads `--observability`. There is one kind: the `@sukujs/observability` middleware, which

@@ -5,13 +5,13 @@ import {
   normalizeProvider,
   type Provider,
   type ServiceDescriptor,
-} from './descriptor.js';
+} from './descriptor';
 import {
   buildServiceProvider,
   type ServiceProvider,
   type ServiceProviderOptions,
-} from './provider.js';
-import type { Token } from './types.js';
+} from './provider';
+import type { Token } from './types';
 
 /**
  * Ordered list of registrations, modelled on .NET's `IServiceCollection`.

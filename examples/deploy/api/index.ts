@@ -1,5 +1,5 @@
 // Vercel: one function for the whole API. vercel.json sends every path here.
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/app';
 
 const app = await createApp({ runtime: 'vercel' });
 

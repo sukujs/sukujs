@@ -1,6 +1,6 @@
 import type { Constructor } from '@sukujs/di';
-import type { RequestContext } from './context.js';
-import { ForbiddenException } from './http-errors.js';
+import type { RequestContext } from './context';
+import { ForbiddenException } from './http-errors';
 
 export type Next = () => Promise<Response>;
 

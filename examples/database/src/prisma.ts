@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { type Feature, factory, Service, singleton } from '@sukujs/core';
-import { Prisma, PrismaClient } from './generated/prisma/client.js';
+import { Prisma, PrismaClient } from './generated/prisma/client';
 import {
   DuplicateEmail,
   type NewUser,
@@ -11,7 +11,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 /** Owns the client. The container calls `dispose` when the app closes. */
 export class PrismaConnection {

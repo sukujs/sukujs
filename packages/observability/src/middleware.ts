@@ -1,7 +1,7 @@
 import { HttpException, type Middleware, type Next, type RequestContext } from '@sukujs/core';
-import { start } from './init.js';
-import { telemetry, traceRequest } from './telemetry.js';
-import type { ObservabilityOptions } from './types.js';
+import { start } from './init';
+import { telemetry, traceRequest } from './telemetry';
+import type { ObservabilityOptions } from './types';
 
 /**
  * Sends request traces, logs, errors and runtime metrics to any OpenTelemetry (OTLP)

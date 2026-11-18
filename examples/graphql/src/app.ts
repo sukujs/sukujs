@@ -1,7 +1,7 @@
 import { type MiddlewareFn, middleware, route, Suku, type SukuOptions } from '@sukujs/core';
 import { cors } from '@sukujs/security';
-import { graphql } from './graphql.js';
-import { AuthorLoader, Books, type Viewer } from './services.js';
+import { graphql } from './graphql';
+import { AuthorLoader, Books, type Viewer } from './services';
 
 /** Reads the viewer from a header. A real app would verify a token here. */
 export const authenticate: MiddlewareFn = middleware((ctx, next) => {

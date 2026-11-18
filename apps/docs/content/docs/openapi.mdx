@@ -1,0 +1,398 @@
+---
+title: OpenAPI
+description: An OpenAPI document generated from your routes, with Swagger UI, Scalar or Redoc.
+icon: BookOpenText
+---
+
+`@sukujs/openapi` reads the routes your app serves and builds an OpenAPI 3.1 document from
+them. The schemas you already validate with become the documentation, so the two cannot drift
+apart.
+
+```bash
+bun add @sukujs/openapi
+```
+
+It has no dependencies of its own. An app that does not use it installs nothing.
+
+The [CLI](/docs/cli) sets it up for you, in a new project or an existing one:
+
+```bash
+suku new my-api --openapi scalar     # or swagger, redoc
+suku generate openapi scalar
+```
+
+## Serve the document and a UI
+
+Add `openapi()` to the app's routes.
+
+```ts title="main.ts"
+import { openapi } from '@sukujs/openapi';
+
+const app = await Suku.create({
+  features: [UsersFeature],
+  routes: [openapi({ info: { title: 'Shop', version: '1.0.0' } })],
+});
+```
+
+| URL                 | What it serves                               |
+| ------------------- | -------------------------------------------- |
+| `GET /openapi.json` | The document.                                |
+| `GET /docs`         | A UI that renders it. Swagger UI by default. |
+
+The document is built on the first request and then reused. It covers every route of every
+feature, wherever `openapi()` itself is listed.
+
+To leave the docs out of production, leave the route out:
+
+```ts
+routes: [...(config.NODE_ENV === 'production' ? [] : [openapi()])],
+```
+
+## What is generated from a route
+
+```ts title="users/users.routes.ts"
+const User = z.object({ id: z.number(), name: z.string() }).meta({ id: 'User' });
+
+@Routes('/users')
+export class UsersRoutes {
+  constructor(private readonly users: UsersService) {}
+
+  list = route.get('/', {
+    query: z.object({ limit: z.coerce.number().max(100).default(20).describe('Page size') }),
+    response: z.array(User),
+    handle: ({ query }) => this.users.list(query.limit),
+  });
+
+  create = route.post('/', {
+    body: z.object({ name: z.string().min(2) }),
+    response: User,
+    handle: ({ body }) => this.users.create(body),
+  });
+}
+```
+
+| Route option       | In the document                                                                 |
+| ------------------ | ------------------------------------------------------------------------------- |
+| The path           | `/users/:id` becomes `/users/{id}`, with one path parameter per `:name`.        |
+| `params`           | The type of each path parameter. A string without one.                          |
+| `query`            | One query parameter per property.                                               |
+| `headers`          | One header parameter per property.                                              |
+| `body`             | The JSON request body.                                                          |
+| `response`         | The body of the success response.                                               |
+| `status`           | The success status. `200`, or `201` for `POST`, without one.                    |
+| Any input schema   | A `400` response with the shape of Suku's [validation error](/docs/validation). |
+| The feature's name | The operation's tag, which groups it in the UI.                                 |
+| The route's name   | The `operationId`: `UsersRoutes_list`.                                          |
+
+Routes declared with `route.all` are left out, because they have no single method.
+
+### Named schemas
+
+A Zod schema with an `id` is written once under `components.schemas` and referenced
+everywhere it is used.
+
+```ts
+const User = z.object({ id: z.number(), name: z.string() }).meta({ id: 'User' });
+```
+
+Without an `id` a schema is written inline.
+
+## Describe a route with `apiDoc`
+
+A schema cannot say what a route is for. `apiDoc()` adds that. Put its result in the route's
+`meta`; it does not change how the route behaves.
+
+```ts
+import { apiDoc } from '@sukujs/openapi';
+
+findOne = route.get('/:id', {
+  meta: apiDoc({
+    summary: 'Get a user',
+    description: 'Returns one user by id.',
+    responses: { 404: 'No user with this id' },
+  }),
+  params: z.object({ id: z.coerce.number() }),
+  response: User,
+  handle: ({ params }) => this.users.find(params.id),
+});
+```
+
+| Field                    | Meaning                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `summary`, `description` | Text for the operation.                                                                                                          |
+| `tags`                   | Replaces the default tag (the feature's name).                                                                                   |
+| `responses`              | Further responses by status. A string documents Suku's [error body](/docs/errors). An object takes `description` and a `schema`. |
+| `security`               | Security for this route. `[]` marks it as public.                                                                                |
+| `deprecated`             | Marks the operation as deprecated.                                                                                               |
+| `operationId`            | Replaces the default id.                                                                                                         |
+| `hidden`                 | Leaves the route out of the document.                                                                                            |
+
+A route that has other `meta` keeps it beside `apiDoc`. See [Route meta](#route-meta).
+
+## Route meta
+
+A route's [`meta`](/docs/routes) is a plain object. Your middlewares read their own keys from
+it, and `apiDoc()` adds one more key, `openapi`. The two do not touch each other.
+
+### Your own meta beside `apiDoc`
+
+Spread `apiDoc()` next to your keys.
+
+```ts title="reports/reports.routes.ts"
+remove = route.delete('/:id', {
+  meta: {
+    roles: ['admin'],
+    rateLimit: { max: 5, per: 'minute' },
+    ...apiDoc({ summary: 'Delete a report' }),
+  },
+  status: 204,
+  handle: ({ params }) => this.reports.remove(params.id),
+});
+```
+
+A middleware reads `roles` as it did before. It knows nothing about the documentation.
+
+```ts title="middlewares/require-roles.middleware.ts"
+export const requireRoles = middleware(async (ctx, next) => {
+  const roles = (ctx.route?.meta.roles as string[] | undefined) ?? [];
+  if (roles.length && !roles.includes(ctx.headers.get('x-role') ?? '')) {
+    throw new ForbiddenException('Not allowed');
+  }
+  return next();
+});
+```
+
+Call `apiDoc()` once per route. It always writes the `openapi` key, so a second call in the
+same `meta` replaces the first. For the same reason, do not use `openapi` as a key of your own.
+
+### Share meta between routes
+
+Keep what several routes have in common in a constant. Shared documentation is an `ApiDoc`
+object, spread **inside** the one `apiDoc()` call.
+
+```ts title="admin/admin.meta.ts"
+import type { ApiDoc } from '@sukujs/openapi';
+
+export const adminOnly = { roles: ['admin'] };
+
+export const adminDoc = {
+  tags: ['Admin'],
+  responses: { 403: 'Not an admin' },
+} satisfies ApiDoc;
+```
+
+```ts
+remove = route.delete('/:id', {
+  meta: { ...adminOnly, ...apiDoc({ ...adminDoc, summary: 'Delete a report' }) },
+  // ...
+});
+```
+
+### Document what the meta already says
+
+If `roles` is in the meta, writing "needs the admin role" in every description says it twice,
+and the two drift apart. The `operation` hook of `openapi()` reads the meta and writes the
+documentation for you. It runs once per route, after everything else.
+
+```ts title="app.feature.ts"
+openapi({
+  securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+  operation: (operation, route) => {
+    const meta = route.config.meta ?? {};
+
+    // An access rule becomes a lock and a line of text.
+    const roles = meta.roles as string[] | undefined;
+    if (roles) {
+      operation.security = [{ bearer: [] }];
+      operation.description = `Needs role: ${roles.join(', ')}`;
+    }
+
+    // A rate limit becomes a 429 response and a vendor extension.
+    const limit = meta.rateLimit as { max: number; per: string } | undefined;
+    if (limit) {
+      operation['x-rate-limit'] = limit;
+      operation.responses[429] = { description: `More than ${limit.max} calls per ${limit.per}` };
+    }
+  },
+});
+```
+
+| Meta on the route                      | What the hook adds to the document                      |
+| -------------------------------------- | ------------------------------------------------------- |
+| `roles: ['admin']`                     | `security`, and "Needs role: admin" in the description. |
+| `rateLimit: { max: 5, per: 'minute' }` | A `429` response and `x-rate-limit`.                    |
+| Neither                                | Nothing. The operation is left as generated.            |
+
+`route.config.meta` is the route's whole meta, and `route` also has its `path`, `method`,
+`name` and `feature`. Change `operation` in place, or return a new one.
+
+### Keep a route out of the document
+
+`hidden` removes a route from the document only. The route still works, and its middlewares
+still run.
+
+```ts
+rebuild = route.post('/rebuild', {
+  meta: { ...adminOnly, ...apiDoc({ hidden: true }) },
+  handle: () => this.reports.rebuild(),
+});
+```
+
+## Authentication
+
+Declare how clients authenticate, and what applies by default.
+
+```ts
+openapi({
+  securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+  security: [{ bearer: [] }], // every route, unless it says otherwise
+});
+```
+
+```ts
+login = route.post('/login', {
+  meta: apiDoc({ security: [] }), // public
+  // ...
+});
+```
+
+The options are checked by the compiler. A scheme must be one of the kinds OpenAPI defines
+(`http`, `apiKey`, `oauth2`, `openIdConnect`, `mutualTLS`) with the fields that kind needs,
+and `security` only accepts the names declared in `securitySchemes`:
+
+```ts
+openapi({
+  securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+  security: [{ token: [] }], // error: `token` is not a declared scheme
+});
+```
+
+A route is in another file and cannot see those names by itself. Give them to `apiDoc` to
+have its `security` checked too:
+
+```ts title="auth/schemes.ts"
+import type { SecuritySchemes } from '@sukujs/openapi';
+
+export const schemes = {
+  bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+} satisfies SecuritySchemes;
+
+export type Scheme = keyof typeof schemes;
+```
+
+```ts
+openapi({ securitySchemes: schemes, security: [{ bearer: [] }] });
+
+apiDoc<Scheme>({ security: [{ bearer: [] }] });
+```
+
+If your routes already carry access rules in `meta`, the `operation` hook turns them into
+`security`, so you do not write them twice. See
+[Document what the meta already says](#document-what-the-meta-already-says).
+
+## Choose a UI
+
+```ts
+import { openapi, redoc, scalar, swaggerUi } from '@sukujs/openapi';
+
+openapi({ ui: swaggerUi({ options: { persistAuthorization: true } }) });
+openapi({ ui: scalar({ configuration: { theme: 'purple' } }) });
+openapi({ ui: redoc() });
+```
+
+| UI            | Notes                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| `swaggerUi()` | [Swagger UI](https://swagger.io/tools/swagger-ui/). The default. `options` goes to `SwaggerUIBundle`. |
+| `scalar()`    | [Scalar](https://scalar.com). `configuration` is Scalar's own.                                        |
+| `redoc()`     | [Redoc](https://redocly.com/redoc). Read-only: no request console.                                    |
+
+Each one loads from jsDelivr at a pinned version. Pass `version` to change it, or `cdn` to
+serve the files from your own host.
+
+Any other viewer is an object with a `render` function:
+
+```ts
+import type { DocsUi } from '@sukujs/openapi';
+
+const myUi: DocsUi = {
+  sources: ['https://cdn.example.com'], // origins the page loads from
+  render: ({ specUrl, title, nonce }) => `<!doctype html>...`,
+};
+```
+
+### Content-Security-Policy
+
+The UI page is sent with its own policy: its inline scripts by nonce, the UI's CDN, and calls
+to your API. So it works when [`securityHeaders()`](/docs/security/security-headers) gives
+every other response a strict policy. Pass `csp: '...'` to replace it or `csp: false` to send
+none.
+
+## Options
+
+| Option                        | Default                              | Meaning                                                                          |
+| ----------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- |
+| `info`                        | `{ title: 'API', version: '0.0.0' }` | The document's `info`.                                                           |
+| `path`                        | `/openapi.json`                      | Where the document is served.                                                    |
+| `docs`                        | `/docs`                              | Where the UI is served. `false` serves the document only.                        |
+| `ui`                          | `swaggerUi()`                        | The page that renders the document.                                              |
+| `servers`                     | The origin of the request            | Where the API is reachable.                                                      |
+| `tags`                        |                                      | Descriptions for tags, and their order.                                          |
+| `securitySchemes`, `security` |                                      | See [Authentication](#authentication).                                           |
+| `toJsonSchema`                |                                      | Converts a schema yourself. See below.                                           |
+| `operation`                   |                                      | Changes each operation. See [Route meta](#route-meta).                           |
+| `transform`                   |                                      | Changes the finished document.                                                   |
+| `specUrl`                     | The document's route                 | The document's URL as the browser sees it, behind a proxy that changes the path. |
+| `csp`                         | A strict policy                      | The UI page's Content-Security-Policy.                                           |
+
+The app's `prefix` is applied to both routes and to every documented path.
+
+## Schema libraries
+
+Suku validates through [Standard Schema](https://standardschema.dev) and depends on no schema
+library. The document is built the same way: each schema is asked for its own JSON Schema,
+through the Standard JSON Schema interface. Zod 4.2 and later, ArkType and Valibot provide it.
+
+A schema that cannot be expressed in JSON Schema, such as one with a `Date`, is documented as
+"any value". To decide yourself, pass `toJsonSchema`:
+
+```ts
+openapi({
+  toJsonSchema: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io, unrepresentable: 'any' }),
+});
+```
+
+`io` is `'input'` for what a client sends and `'output'` for what it receives. Return
+`undefined` to use the default for that schema.
+
+## Without a server
+
+`createOpenApiDocument` builds the document from the route table, to write it to a file or
+feed a client generator.
+
+```ts title="scripts/openapi.ts"
+import { ROUTE_TABLE } from '@sukujs/core';
+import { createOpenApiDocument } from '@sukujs/openapi';
+
+const app = await Suku.create({ features: [AppFeature] });
+const document = createOpenApiDocument(app.get(ROUTE_TABLE), {
+  info: { title: 'Shop', version: '1.0.0' },
+});
+await Bun.write('openapi.json', JSON.stringify(document, null, 2));
+await app.close();
+```
+
+`ROUTE_TABLE` is part of `@sukujs/core`: every route with its full path, feature and options.
+It can be injected like any service.
+
+## Example
+
+[`examples/openapi`](https://github.com/sukujs/sukujs/tree/main/examples/openapi) in the repository is a complete app built this way: a
+`books` feature with named schemas, `apiDoc`, a bearer security scheme, and tests that check
+the document against what the app does.
+
+## What it does not do
+
+- Request bodies are documented as JSON. Other content types need the `operation` hook.
+- There are no decorators for properties and no class-based DTOs. The schema is the source.
+- It does not validate responses against the document. A route's
+  [`response` schema](/docs/validation) does that.

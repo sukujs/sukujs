@@ -1,6 +1,6 @@
 // Cloudflare Workers: no port. The platform calls fetch() for every request.
 import type { SukuApplication } from '@sukujs/core';
-import { createApp } from './app.js';
+import { createApp } from './app';
 
 let app: Promise<SukuApplication> | undefined;
 

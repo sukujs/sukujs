@@ -1,4 +1,4 @@
-import { type Bytes, type Data, hexEncode, toBytes } from './encoding.js';
+import { type Bytes, type Data, hexEncode, toBytes } from './encoding';
 
 export type HashAlgorithm = 'SHA-256' | 'SHA-384' | 'SHA-512';
 

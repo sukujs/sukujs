@@ -7,7 +7,7 @@ import {
   CryptoError,
   randomBytes,
   randomToken,
-} from '../src/index.js';
+} from '../src/index';
 
 const SECRET = 'an-encryption-secret-of-32-bytes-or-more';
 const code = async (p: Promise<unknown> | (() => unknown)) => {

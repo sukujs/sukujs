@@ -1,5 +1,5 @@
-import { CliError } from './errors.js';
-import type { Runtime } from './project.js';
+import { CliError } from './errors';
+import type { Runtime } from './project';
 
 export const DEPLOY_TARGETS = {
   docker: { label: 'Docker', hint: 'Dockerfile and docker-compose.yml' },

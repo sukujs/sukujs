@@ -21,12 +21,12 @@ export type {
   PlatformAdapter,
   RequestInfo,
   ServeOptions,
-} from './adapter.js';
-export { Suku, SukuApplication, type SukuOptions } from './application.js';
-export { assertMediaType, type BodyOptions, parseBody } from './body.js';
-export { ConfigError, ConfigToken, defineConfig } from './config.js';
-export { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
-export { type CookieOptions, Cookies, parseCookies, serializeCookie } from './cookies.js';
+} from './adapter';
+export { ROUTE_TABLE, Suku, SukuApplication, type SukuOptions } from './application';
+export { assertMediaType, type BodyOptions, parseBody } from './body';
+export { ConfigError, ConfigToken, defineConfig } from './config';
+export { RequestContext, type RequestSettings, type RouteInfo } from './context';
+export { type CookieOptions, Cookies, parseCookies, serializeCookie } from './cookies';
 export {
   type Feature,
   type FeatureOptions,
@@ -35,17 +35,18 @@ export {
   isFeature,
   type RouteEntry,
   type ServiceEntry,
-} from './feature.js';
-export * from './http-errors.js';
+} from './feature';
+export * from './http-errors';
 export {
   contextOf,
   createKernel,
   joinPaths,
   type Kernel,
   type KernelOptions,
+  type RegisteredRoute,
   type RouteTableEntry,
-} from './kernel.js';
-export { ConsoleLogger, Logger, type LogLevel, SilentLogger } from './logger.js';
+} from './kernel';
+export { ConsoleLogger, Logger, type LogLevel, SilentLogger } from './logger';
 export {
   allow,
   type ErrorHandler,
@@ -54,8 +55,8 @@ export {
   type MiddlewareRef,
   middleware,
   type Next,
-} from './middleware.js';
-export { toResponse } from './response.js';
+} from './middleware';
+export { toResponse } from './response';
 export {
   type GroupOptions,
   type HttpMethod,
@@ -71,16 +72,16 @@ export {
   redirect,
   route,
   type ServiceMap,
-} from './route.js';
-export { ALL_METHODS, RouteConflictError, type RouteMatch, Router } from './router.js';
+} from './route';
+export { ALL_METHODS, RouteConflictError, type RouteMatch, Router } from './router';
 export {
   getRoutesMetadata,
   isRoutesClass,
   Routes,
   type RoutesMetadata,
   type RoutesOptions,
-} from './routes-class.js';
-export { FeatureError, type ScannedEntry, type ScanResult, scanFeatures } from './scanner.js';
+} from './routes-class';
+export { FeatureError, type ScannedEntry, type ScanResult, scanFeatures } from './scanner';
 export {
   flattenIssues,
   type Infer,
@@ -93,5 +94,5 @@ export {
   ValidationException,
   type ValidationIssue,
   validate,
-} from './schema.js';
-export { pathnameOf } from './url.js';
+} from './schema';
+export { pathnameOf } from './url';

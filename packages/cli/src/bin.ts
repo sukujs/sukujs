@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Prompter, run } from './index.js';
+import { Prompter, run } from './index';
 
 // Ask questions only when a person is at a terminal. Piped or scripted runs take defaults.
 const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;

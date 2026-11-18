@@ -1,7 +1,7 @@
 import type { Token } from '@sukujs/di';
-import type { RequestContext } from './context.js';
-import type { ErrorHandler, MiddlewareRef } from './middleware.js';
-import type { InferInput, InferOutput, StandardSchema } from './schema.js';
+import type { RequestContext } from './context';
+import type { ErrorHandler, MiddlewareRef } from './middleware';
+import type { InferInput, InferOutput, StandardSchema } from './schema';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'ALL';
 

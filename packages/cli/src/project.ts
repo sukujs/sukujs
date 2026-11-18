@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { CliError } from './errors.js';
+import { CliError } from './errors';
 
 export type Runtime = 'node' | 'bun';
 

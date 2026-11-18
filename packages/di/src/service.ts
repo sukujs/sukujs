@@ -1,6 +1,6 @@
-import type { ServiceDescriptor } from './descriptor.js';
-import type { ServiceProvider } from './provider.js';
-import { InjectionToken, type Lifetime, type Token } from './types.js';
+import type { ServiceDescriptor } from './descriptor';
+import type { ServiceProvider } from './provider';
+import { InjectionToken, type Lifetime, type Token } from './types';
 
 /** Dependencies a classless service asks for: `{ db: Database }` arrives as `{ db }` in `create`. */
 export type Dependencies = Record<string, Token>;

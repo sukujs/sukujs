@@ -5,24 +5,24 @@ import {
   type ServiceProvider,
   tokenName,
 } from '@sukujs/di';
-import type { FetchHandler } from './adapter.js';
-import { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
-import type { Feature } from './feature.js';
+import type { FetchHandler } from './adapter';
+import { RequestContext, type RequestSettings, type RouteInfo } from './context';
+import type { Feature } from './feature';
 import {
   HttpException,
   InternalServerErrorException,
   MethodNotAllowedException,
   NotFoundException,
-} from './http-errors.js';
-import { Logger } from './logger.js';
-import type { ErrorHandler, Middleware, MiddlewareFn, MiddlewareRef } from './middleware.js';
-import { toResponse } from './response.js';
-import { isRoute, isRouteGroup, type Route, type RouteConfig, type RouteGroup } from './route.js';
-import { Router } from './router.js';
-import { getRoutesMetadata } from './routes-class.js';
-import { FeatureError, type ScanResult } from './scanner.js';
-import { validate } from './schema.js';
-import { pathnameOf } from './url.js';
+} from './http-errors';
+import { Logger } from './logger';
+import type { ErrorHandler, Middleware, MiddlewareFn, MiddlewareRef } from './middleware';
+import { toResponse } from './response';
+import { isRoute, isRouteGroup, type Route, type RouteConfig, type RouteGroup } from './route';
+import { Router } from './router';
+import { getRoutesMetadata } from './routes-class';
+import { FeatureError, type ScanResult } from './scanner';
+import { validate } from './schema';
+import { pathnameOf } from './url';
 
 export interface KernelOptions {
   /** Prepended to every route, e.g. `'/api'`. */
@@ -68,10 +68,23 @@ export interface RouteTableEntry {
   name: string;
 }
 
+/**
+ * A route as the app serves it: its full path, the feature that declared it and its options.
+ * Read the whole list with `ROUTE_TABLE` to build on the routes: documentation, clients, audits.
+ */
+export interface RegisteredRoute extends RouteTableEntry {
+  /** Name of the feature that declared the route. `app` for routes passed to `Suku.create()`. */
+  feature: string;
+  /** The route's options: schemas, status, meta. */
+  config: RouteConfig;
+}
+
 export interface Kernel {
   readonly handle: FetchHandler;
   /** For diagnostics and tests. */
   readonly routes: readonly RouteTableEntry[];
+  /** The same routes with their feature and options. */
+  readonly registered: readonly RegisteredRoute[];
   /** App-level middlewares. Mutable so `app.use()` can add to it. */
   readonly middlewares: MiddlewareRef[];
 }
@@ -80,6 +93,7 @@ const EMPTY_PARAMS: Readonly<Record<string, string>> = Object.freeze({});
 const EMPTY_META: Readonly<Record<string, unknown>> = Object.freeze({});
 
 interface Scope {
+  feature: string;
   prefix: string;
   middlewares: readonly MiddlewareRef[];
   /** Most specific first. */
@@ -93,6 +107,7 @@ export function createKernel(
 ): Kernel {
   const router = new Router<Compiled>();
   const table: RouteTableEntry[] = [];
+  const registered: RegisteredRoute[] = [];
   const globalMiddlewares: MiddlewareRef[] = [...(options.middlewares ?? [])];
   const settings: RequestSettings = {
     body: options.bodyLimit === undefined ? {} : { limit: options.bodyLimit },
@@ -125,10 +140,12 @@ export function createKernel(
     };
     router.add(r.method, path, compiled);
     table.push({ method: r.method, path, name });
+    registered.push({ method: r.method, path, name, feature: scope.feature, config: r.config });
   };
 
   const addGroup = (g: RouteGroup, key: string | undefined, scope: Scope) => {
     const inner: Scope = {
+      feature: scope.feature,
       prefix: joinPaths(scope.prefix, g.prefix),
       middlewares: [...scope.middlewares, ...(g.options.middlewares ?? [])],
       errorHandlers: g.options.onError
@@ -168,6 +185,7 @@ export function createKernel(
       );
     }
     const inner: Scope = {
+      feature: scope.feature,
       prefix: joinPaths(scope.prefix, meta.prefix),
       middlewares: [...scope.middlewares, ...(meta.middlewares ?? [])],
       errorHandlers: meta.onError ? [meta.onError, ...scope.errorHandlers] : scope.errorHandlers,
@@ -196,6 +214,7 @@ export function createKernel(
   };
 
   const featureScope = (f: Feature): Scope => ({
+    feature: f.name,
     prefix: joinPaths(options.prefix, f.prefix),
     middlewares: f.middlewares ?? [],
     errorHandlers: f.onError ? [f.onError] : [],
@@ -388,5 +407,5 @@ export function createKernel(
     }
   };
 
-  return { handle, routes: table, middlewares: globalMiddlewares };
+  return { handle, routes: table, registered, middlewares: globalMiddlewares };
 }

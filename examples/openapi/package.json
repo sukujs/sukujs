@@ -1,0 +1,32 @@
+{
+  "name": "@suku-examples/openapi",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "suku dev",
+    "build": "suku build",
+    "start": "suku start",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "suku": {
+    "runtime": "bun"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@sukujs/core": "workspace:*",
+    "@sukujs/openapi": "workspace:*",
+    "@sukujs/platform-bun": "workspace:*",
+    "@sukujs/security": "workspace:*",
+    "pino": "^10.0.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@sukujs/cli": "workspace:*",
+    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

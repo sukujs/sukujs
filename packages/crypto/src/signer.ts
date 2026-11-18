@@ -1,6 +1,6 @@
-import { base64urlDecode, base64urlEncode, type Data, toBytes } from './encoding.js';
-import { CryptoError } from './errors.js';
-import type { HashAlgorithm } from './hash.js';
+import { base64urlDecode, base64urlEncode, type Data, toBytes } from './encoding';
+import { CryptoError } from './errors';
+import type { HashAlgorithm } from './hash';
 
 export interface SignerOptions {
   hash?: HashAlgorithm;

@@ -1,4 +1,4 @@
-import { telemetry } from './telemetry.js';
+import { telemetry } from './telemetry';
 
 /**
  * Records a span named `Class.method` around a method, inside the trace of the request that

@@ -1,8 +1,8 @@
 // A transaction that spans the whole request, shown in the database overview guide.
 import { describe, expect, test } from 'bun:test';
 import { ConflictException, Logger, route, SilentLogger, Suku, singleton } from '@sukujs/core';
-import { TypeormConnection, typeormFeature, UserEntity } from '../src/typeorm.js';
-import { transaction, transactional } from '../src/unit-of-work.js';
+import { TypeormConnection, typeormFeature, UserEntity } from '../src/typeorm';
+import { transaction, transactional } from '../src/unit-of-work';
 
 describe('request-wide transaction', () => {
   const signup = route.post('/signup', {

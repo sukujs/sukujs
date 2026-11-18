@@ -7,7 +7,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 @Entity('users')
 export class UserEntity {

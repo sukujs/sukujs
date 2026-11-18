@@ -1,13 +1,13 @@
 // The same HTTP behaviour, verified against every database library in the guides.
 import { describe, expect, test } from 'bun:test';
 import { type Feature, Logger, SilentLogger, Suku, singleton } from '@sukujs/core';
-import { drizzleFeature } from '../src/drizzle.js';
-import { kyselyFeature } from '../src/kysely.js';
-import { PrismaConnection, prismaFeature } from '../src/prisma.js';
-import { sequelizeFeature } from '../src/sequelize.js';
-import { UsersRepository } from '../src/shared.js';
-import { sqlkitFeature } from '../src/sqlkit.js';
-import { typeormFeature } from '../src/typeorm.js';
+import { drizzleFeature } from '../src/drizzle';
+import { kyselyFeature } from '../src/kysely';
+import { PrismaConnection, prismaFeature } from '../src/prisma';
+import { sequelizeFeature } from '../src/sequelize';
+import { UsersRepository } from '../src/shared';
+import { sqlkitFeature } from '../src/sqlkit';
+import { typeormFeature } from '../src/typeorm';
 
 const implementations: [string, () => Feature | Promise<Feature>][] = [
   ['Drizzle', drizzleFeature],

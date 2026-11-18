@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { RouteConflictError, Router } from '../src/index.js';
+import { RouteConflictError, Router } from '../src/index';
 
 const r = new Router<string>()
   .add('GET', '/', 'root')

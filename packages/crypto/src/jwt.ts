@@ -1,7 +1,7 @@
-import { type Duration, toSeconds } from './duration.js';
-import { type Bytes, base64urlDecode, base64urlEncode, toBytes, utf8 } from './encoding.js';
-import { JwtError } from './errors.js';
-import { importKey, type KeyInput, type KeyParams } from './keys.js';
+import { type Duration, toSeconds } from './duration';
+import { type Bytes, base64urlDecode, base64urlEncode, toBytes, utf8 } from './encoding';
+import { JwtError } from './errors';
+import { importKey, type KeyInput, type KeyParams } from './keys';
 
 export type JwtAlgorithm =
   | 'HS256'
@@ -18,7 +18,7 @@ export type JwtAlgorithm =
   | 'ES512'
   | 'EdDSA';
 
-export type { KeyInput } from './keys.js';
+export type { KeyInput } from './keys';
 
 /** Registered claims (RFC 7519). Your own claims sit alongside them. */
 export interface JwtClaims {

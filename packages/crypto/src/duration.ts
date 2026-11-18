@@ -1,4 +1,4 @@
-import { CryptoError } from './errors.js';
+import { CryptoError } from './errors';
 
 /** Seconds as a number, or a string such as `30s`, `15m`, `12h`, `7d`, `2w`. */
 export type Duration = number | `${number}${'s' | 'm' | 'h' | 'd' | 'w'}`;

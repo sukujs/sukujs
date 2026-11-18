@@ -1,6 +1,6 @@
 import { bunAdapter } from '@sukujs/platform-bun';
 import { nodeAdapter } from '@sukujs/platform-node';
-import { createApp } from './app.js';
+import { createApp } from './app';
 
 const adapter = typeof Bun !== 'undefined' ? bunAdapter() : nodeAdapter();
 const app = await createApp({ adapter });

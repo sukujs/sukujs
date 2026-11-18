@@ -6,7 +6,7 @@ import {
   Optional,
   Service,
   UnresolvableParameterError,
-} from '../src/index.js';
+} from '../src/index';
 
 describe('metadata shim', () => {
   test('TypeScript emits design:paramtypes through the shim', () => {
@@ -79,7 +79,7 @@ describe('metadata shim', () => {
 describe('metadata shim: the surface reflect-metadata adopts', () => {
   test('keys, inherited keys and deletion', async () => {
     const { defineMetadata, deleteMetadata, getMetadataKeys, getOwnMetadata, getOwnMetadataKeys } =
-      await import('../src/metadata.js');
+      await import('../src/metadata');
     class Base {}
     class Derived extends Base {}
     defineMetadata('a', 1, Base);

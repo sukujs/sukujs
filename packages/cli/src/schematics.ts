@@ -1,9 +1,10 @@
-import { CliError } from './errors.js';
-import { type Names, names, singular, splitPath } from './names.js';
-import { addObservability, parseObservability } from './observability.js';
-import type { Plan } from './plan.js';
-import { importPath, type Project } from './project.js';
-import { addArrayToFeature, addImport, addToArray } from './register.js';
+import { CliError } from './errors';
+import { type Names, names, singular, splitPath } from './names';
+import { addObservability, parseObservability } from './observability';
+import { addOpenApi, parseOpenApi } from './openapi';
+import type { Plan } from './plan';
+import { importPath, type Project } from './project';
+import { addArrayToFeature, addImport, addToArray } from './register';
 
 export interface GenerateOptions {
   /** Functions instead of classes: `route.group` and `service()`. */
@@ -25,6 +26,10 @@ export const SCHEMATICS = {
   observability: {
     alias: 'obs',
     description: 'Add @sukujs/observability: traces, logs and errors over OpenTelemetry',
+  },
+  openapi: {
+    alias: 'api',
+    description: 'Add @sukujs/openapi: API docs with swagger (default), scalar or redoc',
   },
 } as const;
 
@@ -357,6 +362,22 @@ export function generate(
       plan.note(
         'Install the new dependency, then set OTLP_ENDPOINT where the app runs. The app does not start without it.',
       );
+      return;
+    }
+    case 'openapi': {
+      // The name is the UI, and optional: `suku generate openapi scalar`.
+      const ui = parseOpenApi(input);
+      if (!ui) throw new CliError('Usage: suku generate openapi [swagger|scalar|redoc]');
+      addOpenApi(
+        {
+          ...project,
+          read: (path) => plan.read(path),
+          update: (path, content) => plan.update(path, content),
+          note: (message) => plan.note(message),
+        },
+        ui,
+      );
+      plan.note('Install the new dependency. The docs are then served at /docs.');
       return;
     }
     case 'resource': {

@@ -1,13 +1,13 @@
-import type { ServiceDescriptor } from './descriptor.js';
+import type { ServiceDescriptor } from './descriptor';
 import {
   CaptiveDependencyError,
   CircularDependencyError,
   MissingServiceError,
   ProviderDisposedError,
   ScopedFromRootError,
-} from './errors.js';
-import { getConstructorParameters } from './reflection.js';
-import type { Constructor, Lifetime, Token } from './types.js';
+} from './errors';
+import { getConstructorParameters } from './reflection';
+import type { Constructor, Lifetime, Token } from './types';
 
 export interface ServiceProviderOptions {
   /**

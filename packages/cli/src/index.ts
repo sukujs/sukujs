@@ -8,18 +8,18 @@ import {
   info,
   newProject,
   start,
-} from './commands.js';
-import { CliError } from './errors.js';
-import { SCHEMATICS } from './schematics.js';
+} from './commands';
+import { CliError } from './errors';
+import { SCHEMATICS } from './schematics';
 
-export { DEPLOY_TARGETS, type DeployTarget } from './deploy.js';
-export { CliError } from './errors.js';
-export { type Names, names } from './names.js';
-export { type Change, Plan } from './plan.js';
-export { loadProject, type Project, type Runtime } from './project.js';
-export { type Choice, Prompter } from './prompts.js';
-export { type GenerateOptions, generate, SCHEMATICS, type Schematic } from './schematics.js';
-export { starter } from './starter.js';
+export { DEPLOY_TARGETS, type DeployTarget } from './deploy';
+export { CliError } from './errors';
+export { type Names, names } from './names';
+export { type Change, Plan } from './plan';
+export { loadProject, type Project, type Runtime } from './project';
+export { type Choice, Prompter } from './prompts';
+export { type GenerateOptions, generate, SCHEMATICS, type Schematic } from './schematics';
+export { starter } from './starter';
 
 const HELP = `Suku CLI
 
@@ -44,6 +44,7 @@ Options for new (in a terminal, anything you leave out is asked):
   --deploy <targets>            docker, pm2, systemd, cloudflare, vercel or none
                                 (comma-separated or repeated)
   --observability <kind>        opentelemetry (or otel), or none (default: none)
+  --openapi <ui>                API docs with swagger, scalar or redoc, or none (default: none)
   --skip-install                Do not install dependencies
   --skip-git                    Do not run git init
   -y, --yes                     Ask nothing, use the defaults
@@ -76,6 +77,7 @@ const OPTIONS = {
   'skip-git': { type: 'boolean' },
   deploy: { type: 'string', multiple: true },
   observability: { type: 'string' },
+  openapi: { type: 'string' },
   yes: { type: 'boolean', short: 'y' },
   classless: { type: 'boolean' },
   flat: { type: 'boolean' },
@@ -149,6 +151,7 @@ export async function run(argv: string[], io: Partial<Io> = {}): Promise<number>
             packageManager: values['package-manager'],
             deploy: values.deploy,
             observability: values.observability,
+            openapi: values.openapi,
             yes: values.yes,
             skipInstall: values['skip-install'],
             skipGit: values['skip-git'],
@@ -157,8 +160,14 @@ export async function run(argv: string[], io: Partial<Io> = {}): Promise<number>
       }
       case 'generate':
       case 'g': {
-        // Observability has one kind, so it needs no name.
-        const name = second ?? (first === 'observability' || first === 'obs' ? 'otel' : undefined);
+        // Observability has one kind and OpenAPI has a default UI, so they need no name.
+        const name =
+          second ??
+          (first === 'observability' || first === 'obs'
+            ? 'otel'
+            : first === 'openapi' || first === 'api'
+              ? 'swagger'
+              : undefined);
         if (!first || !name) throw new CliError('Usage: suku generate <schematic> <name>');
         return generateCommand(out, first, name, {
           ...write,

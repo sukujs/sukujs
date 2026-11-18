@@ -1,7 +1,7 @@
 // The patterns shown in the documentation's use-cases page, run for real.
 import { expect, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
-import sukuCrypto from '../src/index.js';
+import sukuCrypto from '../src/index';
 
 const SECRET = sukuCrypto.randomToken(32);
 

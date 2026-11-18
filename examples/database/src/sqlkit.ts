@@ -8,7 +8,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 /**
  * Owns the executor. In production this wraps a `pg` Pool:

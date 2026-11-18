@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { ScopedFromRootError, Service, ServiceCollection, ServiceProvider } from '../src/index.js';
+import { ScopedFromRootError, Service, ServiceCollection, ServiceProvider } from '../src/index';
 
 let counter = 0;
 @Service()

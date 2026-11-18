@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/app';
 
 const make = (source: Record<string, unknown> = {}) => createApp({ runtime: 'test', source });
 const url = (path: string) => `http://deploy.test${path}`;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { InvalidDescriptorError, Service, ServiceCollection } from '../src/index.js';
+import { InvalidDescriptorError, Service, ServiceCollection } from '../src/index';
 
 @Service()
 class A {}

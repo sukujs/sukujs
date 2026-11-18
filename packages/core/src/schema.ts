@@ -1,4 +1,4 @@
-import { BadRequestException } from './http-errors.js';
+import { BadRequestException } from './http-errors';
 
 /**
  * The Standard Schema interface (https://standardschema.dev), implemented by Zod, Valibot,

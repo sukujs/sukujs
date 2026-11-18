@@ -13,6 +13,7 @@ const budgets: Record<string, number> = {
   'packages/security/src/index.ts': 8 * 1024,
   'packages/graphql/src/index.ts': 6 * 1024,
   'packages/observability/src/index.ts': 8 * 1024,
+  'packages/openapi/src/index.ts': 8 * 1024,
   'packages/cli/src/index.ts': 48 * 1024,
 };
 

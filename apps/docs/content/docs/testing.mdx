@@ -10,7 +10,7 @@ port is opened, so tests are fast and can run in parallel.
 ```ts title="users.test.ts"
 import { expect, test } from 'bun:test';
 import { Suku } from '@sukujs/core';
-import { UsersFeature } from './users.feature.js';
+import { UsersFeature } from './users.feature';
 
 test('GET /users/:id', async () => {
   const app = await Suku.create({ features: [UsersFeature] });

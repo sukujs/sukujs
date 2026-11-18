@@ -1,7 +1,7 @@
-import { type Duration, toSeconds } from './duration.js';
-import { base64urlDecode, base64urlEncode, toBytes, utf8 } from './encoding.js';
-import { CryptoError } from './errors.js';
-import { randomBytes } from './random.js';
+import { type Duration, toSeconds } from './duration';
+import { base64urlDecode, base64urlEncode, toBytes, utf8 } from './encoding';
+import { CryptoError } from './errors';
+import { randomBytes } from './random';
 
 export interface SealerOptions {
   /** Binds sealed values to a use, so a value sealed as `session` cannot be opened as `reset`. */

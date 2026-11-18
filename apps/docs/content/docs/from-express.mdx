@@ -324,7 +324,7 @@ with a lifetime, which also makes it replaceable in a test.
 
 ```ts
 // Express
-import { db } from './db.js';
+import { db } from './db';
 
 app.get('/orders', async (req, res) => res.json(await db.orders.all()));
 ```

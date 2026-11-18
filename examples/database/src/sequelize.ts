@@ -13,7 +13,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 export class UserModel extends Model<
   InferAttributes<UserModel>,

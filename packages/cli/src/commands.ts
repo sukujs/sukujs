@@ -1,15 +1,16 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import { DEPLOY_TARGETS, type DeployTarget, parseDeployTargets } from './deploy.js';
-import { CliError } from './errors.js';
-import { parseObservability } from './observability.js';
-import { names } from './names.js';
-import { Plan } from './plan.js';
-import { loadProject, type Runtime } from './project.js';
-import type { Prompter } from './prompts.js';
-import { exec, versionOf } from './run.js';
-import { type GenerateOptions, generate, resolveSchematic } from './schematics.js';
-import { starter } from './starter.js';
+import { DEPLOY_TARGETS, type DeployTarget, parseDeployTargets } from './deploy';
+import { CliError } from './errors';
+import { parseObservability } from './observability';
+import { OPENAPI_UIS, parseOpenApi } from './openapi';
+import { names } from './names';
+import { Plan } from './plan';
+import { loadProject, type Runtime } from './project';
+import type { Prompter } from './prompts';
+import { exec, versionOf } from './run';
+import { type GenerateOptions, generate, resolveSchematic } from './schematics';
+import { starter } from './starter';
 
 export interface Io {
   cwd: string;
@@ -39,6 +40,8 @@ export interface NewOptions {
   deploy?: string[];
   /** `opentelemetry` (or `otel`), or `none`. */
   observability?: string;
+  /** The UI for the OpenAPI document: `swagger`, `scalar` or `redoc`, or `none`. */
+  openapi?: string;
   skipInstall?: boolean;
   skipGit?: boolean;
   /** Accept the default for every question that a flag did not answer. */
@@ -125,6 +128,20 @@ export async function newProject(
           )
         : false;
 
+  const openapi = parseOpenApi(
+    options.openapi ??
+      (ask
+        ? await ask.select('API docs (OpenAPI)', [
+            { value: 'none', label: 'None', hint: 'default' },
+            ...Object.entries(OPENAPI_UIS).map(([value, { label, hint }]) => ({
+              value,
+              label,
+              hint,
+            })),
+          ])
+        : 'none'),
+  );
+
   const git =
     options.skipGit === undefined && ask
       ? await ask.confirm('Initialise a git repository?')
@@ -142,6 +159,7 @@ export async function newProject(
     packageManager: manager,
     deploy,
     observability,
+    ...(openapi ? { openapi } : {}),
   });
   for (const [path, content] of Object.entries(files)) plan.create(path, content);
   if (ask) io.log('');

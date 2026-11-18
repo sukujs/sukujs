@@ -1,5 +1,5 @@
 import type { MiddlewareFn, RequestContext } from '@sukujs/core';
-import { appendVary, matchesOrigin, mutable, type OriginRule } from './util.js';
+import { appendVary, matchesOrigin, mutable, type OriginRule } from './util';
 
 export interface CorsOptions {
   /**

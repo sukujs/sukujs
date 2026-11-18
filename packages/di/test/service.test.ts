@@ -10,7 +10,7 @@ import {
   scoped,
   service,
   value,
-} from '../src/index.js';
+} from '../src/index';
 
 const CONFIG = new InjectionToken<{ prefix: string }>('CONFIG');
 

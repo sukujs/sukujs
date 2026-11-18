@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { CliError } from './errors.js';
+import { CliError } from './errors';
 
 export interface Change {
   action: 'CREATE' | 'UPDATE';

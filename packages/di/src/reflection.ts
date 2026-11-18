@@ -1,7 +1,7 @@
-import { INJECT_KEY, type InjectOptions, OPTIONAL_KEY } from './decorators.js';
-import { UnresolvableParameterError } from './errors.js';
-import { DESIGN_PARAMTYPES, hasOwnMetadata, readMetadata, readOwnMetadata } from './metadata.js';
-import type { Token } from './types.js';
+import { INJECT_KEY, type InjectOptions, OPTIONAL_KEY } from './decorators';
+import { UnresolvableParameterError } from './errors';
+import { DESIGN_PARAMTYPES, hasOwnMetadata, readMetadata, readOwnMetadata } from './metadata';
+import type { Token } from './types';
 
 export interface InjectEntryObject {
   token: Token;

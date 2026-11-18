@@ -1,5 +1,5 @@
-import { defineMetadata, getOwnMetadata } from './metadata.js';
-import type { Lifetime, Token } from './types.js';
+import { defineMetadata, getOwnMetadata } from './metadata';
+import type { Lifetime, Token } from './types';
 
 export const SERVICE_KEY = 'suku:service';
 export const INJECT_KEY = 'suku:inject';

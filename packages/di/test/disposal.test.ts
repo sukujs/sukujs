@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { ProviderDisposedError, Service, ServiceCollection } from '../src/index.js';
+import { ProviderDisposedError, Service, ServiceCollection } from '../src/index';
 
 describe('disposal', () => {
   test('owned instances dispose newest-first; sync, async and Symbol forms are supported', async () => {

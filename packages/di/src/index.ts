@@ -1,6 +1,6 @@
 import './metadata.js';
 
-export { ServiceCollection } from './collection.js';
+export { ServiceCollection } from './collection';
 export {
   getServiceOptions,
   Inject,
@@ -9,7 +9,7 @@ export {
   Optional,
   Service,
   type ServiceOptions,
-} from './decorators.js';
+} from './decorators';
 export {
   type ClassProvider,
   type DescriptorKind,
@@ -21,7 +21,7 @@ export {
   type Provider,
   type ServiceDescriptor,
   type ValueProvider,
-} from './descriptor.js';
+} from './descriptor';
 export {
   CaptiveDependencyError,
   CircularDependencyError,
@@ -31,7 +31,7 @@ export {
   ProviderDisposedError,
   ScopedFromRootError,
   UnresolvableParameterError,
-} from './errors.js';
+} from './errors';
 export {
   alias,
   type BindingOptions,
@@ -40,7 +40,7 @@ export {
   singleton,
   transient,
   value,
-} from './helpers.js';
+} from './helpers';
 export {
   defineMetadata,
   getMetadata,
@@ -48,14 +48,14 @@ export {
   hasMetadata,
   hasOwnMetadata,
   installReflectShim,
-} from './metadata.js';
-export { buildServiceProvider, ServiceProvider, type ServiceProviderOptions } from './provider.js';
+} from './metadata';
+export { buildServiceProvider, ServiceProvider, type ServiceProviderOptions } from './provider';
 export {
   getConstructorParameters,
   type InjectEntry,
   type InjectEntryObject,
   type ParameterInfo,
-} from './reflection.js';
+} from './reflection';
 export {
   type Dependencies,
   type ResolvedDependencies,
@@ -63,7 +63,7 @@ export {
   type ServiceDefinitionOptions,
   type ServiceOf,
   service,
-} from './service.js';
+} from './service';
 export {
   type AbstractConstructor,
   type Constructor,
@@ -74,4 +74,4 @@ export {
   type Resolved,
   type Token,
   tokenName,
-} from './types.js';
+} from './types';

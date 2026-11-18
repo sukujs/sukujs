@@ -60,7 +60,7 @@ Generate the client, and keep it out of version control.
 
 ```ts title="db.ts"
 import { PrismaLibSql } from '@prisma/adapter-libsql';
-import { PrismaClient } from './generated/prisma/client.js';
+import { PrismaClient } from './generated/prisma/client';
 
 export class PrismaConnection {
   constructor(readonly client: PrismaClient) {}
@@ -83,7 +83,7 @@ For PostgreSQL, use `@prisma/adapter-pg` in place of the libSQL adapter.
 ## Repository
 
 ```ts title="users.repository.ts"
-import { Prisma } from './generated/prisma/client.js';
+import { Prisma } from './generated/prisma/client';
 
 const isUnique = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
