@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "fumadocs-ui/css/neutral.css";
-@import "fumadocs-ui/css/preset.css";
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
 
 /*
  * Suku brand tokens. See brand/README.md at the repo root.
@@ -57,4 +57,161 @@ html {
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
+}
+
+/*
+ * Bevelled buttons for the home page: a soft highlight on the top edge, a shade on the
+ * bottom edge, and a pressed state. Colours come from the brand tokens above.
+ */
+.suku-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    filter 120ms,
+    box-shadow 120ms,
+    transform 60ms;
+}
+
+.suku-btn:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+.suku-btn:active {
+  transform: translateY(1px);
+}
+
+.suku-btn-primary {
+  color: var(--color-fd-primary-foreground);
+  background-color: var(--color-fd-primary);
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0) 60%,
+    rgba(0, 0, 0, 0.06)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(23, 20, 15, 0.2);
+}
+
+.suku-btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.suku-btn-primary:active {
+  filter: brightness(0.96);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.22);
+}
+
+.suku-btn-secondary {
+  color: var(--color-fd-foreground);
+  background-color: var(--color-fd-card);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(23, 20, 15, 0.08),
+    inset 0 0 0 1px rgba(23, 20, 15, 0.1),
+    0 1px 2px rgba(23, 20, 15, 0.08);
+}
+
+.suku-btn-secondary:hover {
+  filter: brightness(0.98);
+}
+
+.suku-btn-secondary:active {
+  box-shadow:
+    inset 0 2px 3px rgba(23, 20, 15, 0.14),
+    inset 0 0 0 1px rgba(23, 20, 15, 0.1);
+}
+
+.dark .suku-btn-secondary {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(250, 247, 242, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .suku-btn-secondary:hover {
+  filter: brightness(1.12);
+}
+
+.dark .suku-btn-secondary:active {
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(250, 247, 242, 0.1);
+}
+
+/*
+ * Raised surfaces for the home page's cards, in the same spirit as the buttons: a highlight
+ * on the top edge, a shade on the bottom edge and a short shadow. Links press in when clicked.
+ */
+.suku-raised,
+.suku-sample figure,
+.suku-sample > div {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(23, 20, 15, 0.06),
+    0 1px 2px rgba(23, 20, 15, 0.07);
+}
+
+.dark .suku-raised,
+.dark .suku-sample figure,
+.dark .suku-sample > div {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+a.suku-raised {
+  transition:
+    border-color 120ms,
+    color 120ms,
+    box-shadow 120ms,
+    transform 60ms;
+}
+
+a.suku-raised:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(23, 20, 15, 0.06),
+    0 2px 6px rgba(23, 20, 15, 0.1);
+}
+
+.dark a.suku-raised:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+a.suku-raised:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 3px rgba(23, 20, 15, 0.12);
+}
+
+.dark a.suku-raised:active {
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* A well that raised controls sit in, such as the runtime switcher. */
+.suku-inset {
+  box-shadow: inset 0 1px 2px rgba(23, 20, 15, 0.08);
+}
+
+.dark .suku-inset {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }

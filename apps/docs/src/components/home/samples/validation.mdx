@@ -1,0 +1,30 @@
+```ts title="users.routes.ts"
+import { z } from 'zod';
+
+const CreateUser = z.object({
+  name: z.string().min(2),
+  email: z.email(),
+});
+
+route.post('/users', {
+  body: CreateUser,
+  services: { users: UsersService },
+  // body is { name: string; email: string }
+  handle: ({ body, users }) => users.create(body),
+});
+```
+
+```json title="400 Bad Request"
+{
+  "statusCode": 400,
+  "message": "Validation failed for body",
+  "error": "Bad Request",
+  "issues": [
+    {
+      "path": "name",
+      "message": "Too small: expected string to have >=2 characters"
+    },
+    { "path": "email", "message": "Invalid email address" }
+  ]
+}
+```

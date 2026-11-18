@@ -1,0 +1,37 @@
+<Tabs items={['In a class', 'Without a class']}>
+  <Tab value="In a class">
+
+    ```ts
+    @Routes('/users')
+    export class UsersRoutes {
+      constructor(private readonly users: UsersService) {}
+
+      findOne = route.get('/:id', {
+        params: z.object({ id: z.coerce.number() }),
+        handle: ({ params }) => this.users.find(params.id),
+      });
+
+      create = route.post('/', {
+        body: CreateUser,
+        handle: ({ body }) => this.users.create(body),
+      });
+    }
+    ```
+
+  </Tab>
+  <Tab value="Without a class">
+
+    ```ts
+    export const findOne = route.get('/users/:id', {
+      params: z.object({ id: z.coerce.number() }),
+      services: { users: UsersService },
+      handle: ({ params, users }) => users.find(params.id),
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+```ts
+feature('users', { routes: [UsersRoutes, findOne] });
+```
