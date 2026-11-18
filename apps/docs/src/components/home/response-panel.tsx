@@ -10,13 +10,7 @@ const requests = [
     path: '/users/1',
     status: '200 OK',
     note: 'The returned object is sent as JSON.',
-    body: { id: 1, name: 'Ada Lovelace' },
-  },
-  {
-    path: '/users/7',
-    status: '404 Not Found',
-    note: 'A thrown exception becomes its status and body.',
-    body: { statusCode: 404, message: 'User 7 not found', error: 'Not Found' },
+    body: { id: 1, name: 'Ada' },
   },
   {
     path: '/users/abc',

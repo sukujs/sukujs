@@ -105,14 +105,11 @@ function Hero() {
             <Link
               to="/docs/$"
               params={{ _splat: 'getting-started' }}
-              className="rounded-lg bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground transition-opacity hover:opacity-90"
+              className="suku-btn suku-btn-primary"
             >
               Getting started
             </Link>
-            <a
-              href={repoUrl}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-fd-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-fd-accent"
-            >
+            <a href={repoUrl} className="suku-btn suku-btn-secondary">
               GitHub
               <ArrowUpRight className="size-4 text-fd-muted-foreground" />
             </a>

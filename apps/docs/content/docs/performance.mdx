@@ -9,21 +9,26 @@ warms it up, and measures it with autocannon against a raw server on the same ru
 
 ## Numbers
 
-Measured on an Apple Silicon laptop, 64 connections, `GET /users/:id` returning JSON.
+Measured with Suku 0.5.0 on an Apple M3 Pro laptop, with Bun 1.4.4 and Node 22: 64 connections,
+`GET /users/:id` returning JSON, 20 seconds after a 20 second warm-up. Rounded to the nearest
+thousand.
 
-| Target | Requests per second | Against raw |
-| --- | --- | --- |
-| Raw `Bun.serve` | 112,000 | baseline |
-| Suku app on Bun | 113,000 | parity |
-| Raw `node:http` | 77,000 | baseline |
-| Suku app on Node | 47,000 | about 60% |
+| Target           | Requests per second | Against raw |
+| ---------------- | ------------------- | ----------- |
+| Raw `Bun.serve`  | 87,000              | baseline    |
+| Suku app on Bun  | 84,000              | about 96%   |
+| Raw `node:http`  | 73,000              | baseline    |
+| Suku app on Node | 33,000              | about 45%   |
+
+Across four runs the Suku app on Bun landed between 7% below and 8% above raw `Bun.serve`,
+and on Node between 42% and 50% of raw `node:http`.
 
 These are from a single machine with visible run-to-run variation. Treat them as a ratio, not
 as a promise for your hardware.
 
 ## Reading them
 
-**On Bun the framework is free.** Bun's server is already built on Fetch `Request` and
+**On Bun the framework costs a few percent at most.** Bun's server is already built on Fetch `Request` and
 `Response`, so the adapter passes requests straight through.
 
 **On Node the cost is the Fetch objects.** Node's native server uses its own request and

@@ -1,21 +1,33 @@
-```ts title="users.routes.ts"
-import { NotFoundException, Routes, route } from '@sukujs/core';
+```ts title="main.ts"
+import { Routes, Suku, feature, route, singleton } from '@sukujs/core';
+import { nodeAdapter } from '@sukujs/platform-node';
 import { z } from 'zod';
-import { UsersService } from './users.service';
+
+class UsersService {
+  find(id: number) {
+    return { id, name: 'Ada' };
+  }
+}
 
 @Routes('/users')
-export class UsersRoutes {
+class UsersRoutes {
   constructor(private readonly users: UsersService) {}
 
   findOne = route.get('/:id', {
-    params: z.object({ id: z.coerce.number().int() }),
-    handle: ({ params }) => {
-      const user = this.users.find(params.id);
-      if (!user) {
-        throw new NotFoundException(`User ${params.id} not found`);
-      }
-      return user;
-    },
+    params: z.object({ id: z.coerce.number() }),
+    // params.id is a number
+    handle: ({ params }) => this.users.find(params.id),
   });
 }
+
+const UsersFeature = feature('users', {
+  routes: [UsersRoutes],
+  services: [singleton(UsersService)],
+});
+
+const app = await Suku.create({
+  features: [UsersFeature],
+  adapter: nodeAdapter(),
+});
+await app.listen(3000);
 ```

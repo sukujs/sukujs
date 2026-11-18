@@ -8,15 +8,15 @@ const groups = [
   {
     runtime: 'Bun',
     rows: [
-      { label: 'Raw Bun.serve', value: 88_000, suku: false },
-      { label: 'Suku app', value: 87_000, suku: true },
+      { label: 'Raw Bun.serve', value: 87_000, suku: false },
+      { label: 'Suku app', value: 84_000, suku: true },
     ],
   },
   {
     runtime: 'Node',
     rows: [
       { label: 'Raw node:http', value: 73_000, suku: false },
-      { label: 'Suku app', value: 31_000, suku: true },
+      { label: 'Suku app', value: 33_000, suku: true },
     ],
   },
 ];
