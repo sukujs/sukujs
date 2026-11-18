@@ -1,5 +1,5 @@
 import { feature, route } from '@sukujs/core';
-import { openapi } from '@sukujs/openapi';
+import { openapi, scalar } from '@sukujs/openapi';
 import { BooksFeature } from './books/books.feature';
 import { HelloFeature } from './hello/hello.feature';
 
@@ -13,7 +13,7 @@ export const AppFeature = feature('app', {
   routes: [
     health,
     // GET /openapi.json is the document, GET /docs shows it. To try another UI, pass
-    // `ui: scalar()` or `ui: redoc()`, both from '@sukujs/openapi'.
+    // `ui: swaggerUi()` or `ui: redoc()`, both from '@sukujs/openapi'.
     openapi({
       info: {
         title: 'Books API',
@@ -29,6 +29,7 @@ export const AppFeature = feature('app', {
         bearer: { type: 'http', scheme: 'bearer' },
       },
       security: [{ bearer: [] }],
+      ui: scalar(),
     }),
   ],
 });

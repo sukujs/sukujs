@@ -16,6 +16,7 @@ import {
   type Next,
   NotFoundException,
   RequestContext,
+  ROUTE_TABLE,
   Routes,
   route,
   Service,
@@ -435,5 +436,125 @@ describe('ctx.error', () => {
     const res = await app.handle(req('/handled'));
     expect(await res.text()).toBe('recovered');
     expect(seen).toEqual([boom]);
+  });
+});
+
+describe('route meta', () => {
+  interface User {
+    name: string;
+    role: string;
+  }
+
+  /** Everything this app puts in `meta`, in one place. */
+  // A `type`, not an `interface`: only a type alias fits the route's `meta` option.
+  type AppMeta = {
+    /** No token needed. */
+    public?: boolean;
+    /** Only these roles may call the route. */
+    roles?: string[];
+    /** Seconds a successful response may be cached. */
+    cache?: number;
+    /** Written to the audit log when the route succeeds. */
+    audit?: string;
+  };
+
+  /** Checks the keys where a route is declared. */
+  const meta = (value: AppMeta) => value;
+  /** Reads them back, typed. Empty when no route matched. */
+  const metaOf = (ctx: RequestContext) => (ctx.route?.meta ?? {}) as AppMeta;
+
+  const authenticate = middleware(async (ctx, next) => {
+    // No route matched: let the 404 through. A public route needs no token.
+    if (!ctx.route || metaOf(ctx).public) return next();
+    const token = ctx.headers.get('authorization');
+    if (!token) throw new UnauthorizedException('Sign in first');
+    ctx.set<User>('user', { name: 'Ada', role: token === 'Bearer admin' ? 'admin' : 'member' });
+    return next();
+  });
+
+  const requireRoles = allow((ctx) => {
+    const roles = metaOf(ctx).roles ?? [];
+    return roles.length === 0 || roles.includes(ctx.get<User>('user')?.role ?? '');
+  });
+
+  const cacheControl = middleware(async (ctx, next) => {
+    const response = await next();
+    const seconds = metaOf(ctx).cache;
+    if (seconds && response.ok) ctx.setHeader('cache-control', `public, max-age=${seconds}`);
+    return response;
+  });
+
+  const audited: string[] = [];
+  const audit = middleware(async (ctx, next) => {
+    const response = await next();
+    const action = metaOf(ctx).audit;
+    if (action && response.ok) audited.push(`${ctx.get<User>('user')?.name} ${action}`);
+    return response;
+  });
+
+  const appP = Suku.create({
+    middlewares: [authenticate, requireRoles, cacheControl, audit],
+    routes: [
+      route.get('/health', { meta: meta({ public: true }), handle: () => ({ ok: true }) }),
+      route.get('/prices', {
+        meta: meta({ public: true, cache: 60 }),
+        handle: () => [{ plan: 'pro', price: 20 }],
+      }),
+      route.get('/me', { handle: ({ ctx }) => ctx.get<User>('user') }),
+      route.delete('/reports/:id', {
+        meta: meta({ roles: ['admin'], audit: 'report.delete' }),
+        status: 204,
+        handle: () => undefined,
+      }),
+    ],
+  });
+  const as = (path: string, token?: string, method = 'GET') =>
+    req(path, { method, ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}) });
+
+  test('a flag opens a route under an app-wide check', async () => {
+    const app = await appP;
+    expect((await app.handle(req('/health'))).status).toBe(200);
+    expect((await app.handle(req('/me'))).status).toBe(401);
+    expect(await (await app.handle(as('/me', 'member'))).json()).toEqual({
+      name: 'Ada',
+      role: 'member',
+    });
+    // An unmatched path is still a 404, not a 401.
+    expect((await app.handle(req('/nope'))).status).toBe(404);
+  });
+
+  test('a list of roles restricts a route', async () => {
+    const app = await appP;
+    expect((await app.handle(as('/reports/1', 'member', 'DELETE'))).status).toBe(403);
+    expect((await app.handle(as('/reports/1', 'admin', 'DELETE'))).status).toBe(204);
+  });
+
+  test('a number configures a shared middleware for one route', async () => {
+    const app = await appP;
+    expect((await app.handle(req('/prices'))).headers.get('cache-control')).toBe(
+      'public, max-age=60',
+    );
+    expect((await app.handle(req('/health'))).headers.has('cache-control')).toBe(false);
+  });
+
+  test('a label is recorded after the route succeeds, and only then', async () => {
+    const app = await appP;
+    audited.length = 0;
+    await app.handle(as('/reports/1', 'member', 'DELETE'));
+    expect(audited).toEqual([]);
+    await app.handle(as('/reports/1', 'admin', 'DELETE'));
+    expect(audited).toEqual(['Ada report.delete']);
+  });
+
+  test('the route table shows the meta of every route, for a check at startup', async () => {
+    const app = await appP;
+    const unguarded = app
+      .get(ROUTE_TABLE)
+      .filter(({ config }) => {
+        const rules = (config.meta ?? {}) as AppMeta;
+        return !rules.public && !rules.roles;
+      })
+      .map((r) => `${r.method} ${r.path}`);
+    expect(unguarded).toEqual(['GET /me']);
   });
 });

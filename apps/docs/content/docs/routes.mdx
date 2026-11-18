@@ -100,7 +100,7 @@ cookies.
 | `onError` | [Error handler](/docs/errors) for this route only. |
 | `status` | Success status. Default `200`, or `201` for `POST`. |
 | `name` | Identity in logs and the route table. |
-| `meta` | Free-form data for middlewares, read as `ctx.route.meta`. |
+| `meta` | Free-form data for middlewares, read as `ctx.route.meta`. See [Meta](#meta). |
 | `handle` | The handler. May be `async`. |
 
 ## Paths
@@ -162,6 +162,154 @@ app.routes;
 `ROUTE_TABLE` holds the same list with each route's feature and options (its schemas, status
 and `meta`). Read it with `app.get(ROUTE_TABLE)`, or inject it. [`@sukujs/openapi`](/docs/openapi)
 is built on it.
+
+## Meta
+
+`meta` is free-form data attached to a route. The route does nothing with it. A
+[middleware](/docs/middlewares) reads it as `ctx.route.meta` and decides what to do, so one
+middleware can treat each route differently without knowing any of them.
+
+```ts
+route.delete('/reports/:id', {
+  meta: { roles: ['admin'], audit: 'report.delete' },
+  handle,
+});
+```
+
+`ctx.route` is `undefined` when no route matched the request, so read it as `ctx.route?.meta`.
+
+### Give it a type
+
+`meta` accepts any object. Declare what your app puts in it once, with a function that checks
+it where a route is declared and one that reads it back.
+
+```ts title="meta.ts"
+import type { RequestContext } from '@sukujs/core';
+
+// A `type`, not an `interface`: only a type alias fits the route's `meta` option.
+export type AppMeta = {
+  /** No token needed. */
+  public?: boolean;
+  /** Only these roles may call the route. */
+  roles?: string[];
+  /** Seconds a successful response may be cached. */
+  cache?: number;
+  /** Written to the audit log when the route succeeds. */
+  audit?: string;
+};
+
+/** Checks the keys where a route is declared. */
+export const meta = (value: AppMeta) => value;
+
+/** Reads them back, typed. Empty when no route matched. */
+export const metaOf = (ctx: RequestContext) => (ctx.route?.meta ?? {}) as AppMeta;
+```
+
+```ts
+route.get('/health', { meta: meta({ public: true }), handle });
+route.get('/health', { meta: meta({ pubic: true }), handle }); // error: unknown key
+```
+
+The examples below use these two functions.
+
+### Open a route under an app-wide check
+
+Authentication usually runs for every request, with a few routes left open. Mark those
+routes instead of listing their paths in the middleware.
+
+```ts
+const authenticate = middleware(async (ctx, next) => {
+  // No route matched: let the 404 through. A public route needs no token.
+  if (!ctx.route || metaOf(ctx).public) return next();
+  const user = await verify(ctx.headers.get('authorization'));
+  if (!user) throw new UnauthorizedException('Sign in first');
+  ctx.set('user', user);
+  return next();
+});
+
+route.get('/health', { meta: meta({ public: true }), handle });
+route.get('/me', { handle: ({ ctx }) => ctx.get<User>('user') }); // needs a token
+```
+
+### Restrict a route to some roles
+
+```ts
+const requireRoles = allow((ctx) => {
+  const roles = metaOf(ctx).roles ?? [];
+  return roles.length === 0 || roles.includes(ctx.get<User>('user')?.role ?? '');
+});
+
+route.delete('/reports/:id', { meta: meta({ roles: ['admin'] }), handle });
+```
+
+A route without `roles` is open to every signed-in user. A wrong role gets a `403`.
+
+### Configure a shared middleware per route
+
+One middleware, a different setting on each route. Here, how long a response may be cached.
+
+```ts
+const cacheControl = middleware(async (ctx, next) => {
+  const response = await next();
+  const seconds = metaOf(ctx).cache;
+  if (seconds && response.ok) ctx.setHeader('cache-control', `public, max-age=${seconds}`);
+  return response;
+});
+
+route.get('/prices', { meta: meta({ public: true, cache: 60 }), handle });
+```
+
+The same shape works for a rate limit, a request timeout, a feature flag or a body size.
+
+### Record what happened
+
+A label on the route, written to the log once the route has succeeded.
+
+```ts
+const audit = middleware(async (ctx, next) => {
+  const response = await next();
+  const action = metaOf(ctx).audit;
+  if (action && response.ok) {
+    ctx.provider.get(Logger).info('audit', { action, user: ctx.get<User>('user')?.name });
+  }
+  return response;
+});
+
+route.delete('/reports/:id', {
+  meta: meta({ roles: ['admin'], audit: 'report.delete' }),
+  handle,
+});
+```
+
+Register the four once, in this order, and every route is covered:
+
+```ts
+Suku.create({
+  middlewares: [authenticate, requireRoles, cacheControl, audit],
+  features: [AppFeature],
+});
+```
+
+### Check every route at startup
+
+[`ROUTE_TABLE`](#route-names) lists every route with its meta. Use it to catch a route that
+someone forgot to protect, before the app takes requests.
+
+```ts title="main.ts"
+const unguarded = app
+  .get(ROUTE_TABLE)
+  .filter(({ config }) => {
+    const rules = (config.meta ?? {}) as AppMeta;
+    return !rules.public && !rules.roles;
+  })
+  .map((r) => `${r.method} ${r.path}`);
+
+if (unguarded.length > 0) {
+  throw new Error(`Routes with no access rule: ${unguarded.join(', ')}`);
+}
+```
+
+[`@sukujs/openapi`](/docs/openapi#route-meta) reads meta the same way to build its document.
 
 ## Groups
 

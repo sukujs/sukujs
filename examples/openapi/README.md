@@ -1,7 +1,7 @@
 # OpenAPI example
 
 A small API that documents itself with [`@sukujs/openapi`](../../packages/openapi). It was
-created with `suku new openapi --runtime bun --openapi swagger`, then given a `books` feature.
+created with `suku new openapi --runtime bun --openapi scalar`, then given a `books` feature.
 
 ```bash
 bun run dev      # http://localhost:3000
@@ -10,7 +10,7 @@ bun run test
 
 | URL                    | What it is               |
 | ---------------------- | ------------------------ |
-| `/docs`                | Swagger UI               |
+| `/docs`                | Scalar                   |
 | `/openapi.json`        | The OpenAPI 3.1 document |
 | `/books`, `/books/:id` | The API being documented |
 
@@ -26,10 +26,10 @@ bun run test
 - [`src/docs.test.ts`](src/docs.test.ts): checks the document, and that the app behaves the
   way the document says.
 
-In Swagger UI, press **Authorize** and enter any token to call `POST /books` and
+In the UI, open **Authentication** and enter any token to call `POST /books` and
 `DELETE /books/{id}`. The example accepts every bearer token; a real app would verify it.
 
-To try another UI, pass `ui: scalar()` or `ui: redoc()` to `openapi()`.
+To try another UI, pass `ui: swaggerUi()` or `ui: redoc()` to `openapi()`.
 
 ## Logs
 
@@ -62,7 +62,7 @@ bunx suku generate middleware audit
 ## API docs
 
 The app describes itself: `/openapi.json` is an OpenAPI 3.1 document built from the routes,
-and `/docs` shows it with Swagger UI. Both come from `openapi()` in
+and `/docs` shows it with Scalar. Both come from `openapi()` in
 `src/app.feature.ts`, from `@sukujs/openapi`.
 
 - Parameters, bodies and responses come from each route's schemas. Give a route a

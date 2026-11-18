@@ -63,8 +63,8 @@ test('what the document says is what the app does', async () => {
   expect(await created.json()).toEqual({ id: 3, title: 'Persuasion', author: 'Jane Austen' });
 });
 
-test('GET /docs is Swagger UI, under its own Content-Security-Policy', async () => {
+test('GET /docs is Scalar, under its own Content-Security-Policy', async () => {
   const response = await get('/docs');
-  expect(await response.text()).toContain('SwaggerUIBundle');
+  expect(await response.text()).toContain('Scalar.createApiReference');
   expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
 });

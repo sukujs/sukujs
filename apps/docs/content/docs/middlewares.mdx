@@ -81,6 +81,9 @@ const requireRoles = allow((ctx) => {
 route.delete('/reports/:id', { meta: { roles: ['admin'] }, handle });
 ```
 
+[Meta](/docs/routes#meta) has more uses: public routes, cache settings, audit logs and a
+check of every route at startup.
+
 ## Middlewares with services
 
 When a middleware needs injected services, write it as a class. It is constructed through the
