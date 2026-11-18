@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { BenchmarkChart } from '@/components/home/benchmark-chart';
 import { CopyCommand } from '@/components/home/copy-command';
+import { DeployTargets } from '@/components/home/deploy-targets';
 import { ResponsePanel } from '@/components/home/response-panel';
 import HeroBunSample from '@/components/home/samples/hero-bun.mdx';
 import HeroNodeSample from '@/components/home/samples/hero-node.mdx';
@@ -239,7 +240,7 @@ const openapiRoutes = [
 ];
 
 function Mono({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[0.9em]">{children}</code>;
+  return <code className="font-mono text-[0.9em] whitespace-nowrap">{children}</code>;
 }
 
 function Features() {
@@ -381,6 +382,31 @@ const packages = [
   },
 ];
 
+function Deployment() {
+  return (
+    <section className="mx-auto w-full max-w-6xl px-4 py-16 md:py-24">
+      <div className="max-w-2xl">
+        <p className="mb-3 text-sm font-medium text-fd-primary">Deployment</p>
+        <h2 className="text-3xl font-semibold tracking-tight text-balance">
+          Deploy it where you already deploy.
+        </h2>
+        <p className="mt-4 text-fd-muted-foreground">
+          The kernel is a Fetch <Mono>Request</Mono> to <Mono>Response</Mono> function. Run it as a
+          long-lived process with <Mono>app.listen()</Mono>, or hand each request to{' '}
+          <Mono>app.handle</Mono> on a platform that calls you. <Mono>suku new --deploy</Mono>{' '}
+          writes the files for the targets you pick.
+        </p>
+      </div>
+      <div className="mt-10">
+        <DeployTargets />
+      </div>
+      <div className="mt-6">
+        <DocsLink to="deployment">Deployment guide</DocsLink>
+      </div>
+    </section>
+  );
+}
+
 function Packages() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 md:py-24">
@@ -454,6 +480,7 @@ function Home() {
         <Hero />
         <Proof />
         <Features />
+        <Deployment />
         <Packages />
         <Closing />
       </main>
