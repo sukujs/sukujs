@@ -1,7 +1,7 @@
-import { type DeployTarget, deployFiles } from './deploy.js';
-import { addObservability } from './observability.js';
+import { type DeployTarget, deployFiles } from './deploy';
+import { addObservability } from './observability';
 import { addOpenApi, OPENAPI_UIS, type OpenApiUi } from './openapi';
-import type { Runtime } from './project.js';
+import type { Runtime } from './project';
 
 export interface StarterOptions {
   /** The package name, already validated. */

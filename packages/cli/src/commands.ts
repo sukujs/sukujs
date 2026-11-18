@@ -1,16 +1,16 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import { DEPLOY_TARGETS, type DeployTarget, parseDeployTargets } from './deploy.js';
-import { CliError } from './errors.js';
-import { parseObservability } from './observability.js';
+import { DEPLOY_TARGETS, type DeployTarget, parseDeployTargets } from './deploy';
+import { CliError } from './errors';
+import { parseObservability } from './observability';
 import { OPENAPI_UIS, parseOpenApi } from './openapi';
-import { names } from './names.js';
-import { Plan } from './plan.js';
-import { loadProject, type Runtime } from './project.js';
-import type { Prompter } from './prompts.js';
-import { exec, versionOf } from './run.js';
-import { type GenerateOptions, generate, resolveSchematic } from './schematics.js';
-import { starter } from './starter.js';
+import { names } from './names';
+import { Plan } from './plan';
+import { loadProject, type Runtime } from './project';
+import type { Prompter } from './prompts';
+import { exec, versionOf } from './run';
+import { type GenerateOptions, generate, resolveSchematic } from './schematics';
+import { starter } from './starter';
 
 export interface Io {
   cwd: string;

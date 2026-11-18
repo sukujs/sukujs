@@ -1,5 +1,5 @@
 import { emitKeypressEvents } from 'node:readline';
-import { CliError } from './errors.js';
+import { CliError } from './errors';
 
 export interface Choice<T> {
   value: T;

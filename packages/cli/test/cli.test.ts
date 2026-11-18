@@ -2,9 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { names, Prompter, run } from '../src/index.js';
-import { singular } from '../src/names.js';
-import { addArrayToFeature, addImport, addToArray, prependToArray } from '../src/register.js';
+import { names, Prompter, run } from '../src/index';
+import { singular } from '../src/names';
+import { addArrayToFeature, addImport, addToArray, prependToArray } from '../src/register';
 
 const repo = resolve(import.meta.dir, '../../..');
 // Inside the repository, so generated projects resolve zod, pino, pino-pretty, @opentelemetry/api

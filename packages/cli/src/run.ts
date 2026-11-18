@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { CliError } from './errors.js';
+import { CliError } from './errors';
 
 /** Runs a command with the terminal attached and resolves with its exit code. */
 export function exec(

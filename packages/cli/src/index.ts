@@ -8,18 +8,18 @@ import {
   info,
   newProject,
   start,
-} from './commands.js';
-import { CliError } from './errors.js';
-import { SCHEMATICS } from './schematics.js';
+} from './commands';
+import { CliError } from './errors';
+import { SCHEMATICS } from './schematics';
 
-export { DEPLOY_TARGETS, type DeployTarget } from './deploy.js';
-export { CliError } from './errors.js';
-export { type Names, names } from './names.js';
-export { type Change, Plan } from './plan.js';
-export { loadProject, type Project, type Runtime } from './project.js';
-export { type Choice, Prompter } from './prompts.js';
-export { type GenerateOptions, generate, SCHEMATICS, type Schematic } from './schematics.js';
-export { starter } from './starter.js';
+export { DEPLOY_TARGETS, type DeployTarget } from './deploy';
+export { CliError } from './errors';
+export { type Names, names } from './names';
+export { type Change, Plan } from './plan';
+export { loadProject, type Project, type Runtime } from './project';
+export { type Choice, Prompter } from './prompts';
+export { type GenerateOptions, generate, SCHEMATICS, type Schematic } from './schematics';
+export { starter } from './starter';
 
 const HELP = `Suku CLI
 

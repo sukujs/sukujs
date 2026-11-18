@@ -1,10 +1,10 @@
-import { CliError } from './errors.js';
-import { type Names, names, singular, splitPath } from './names.js';
-import { addObservability, parseObservability } from './observability.js';
+import { CliError } from './errors';
+import { type Names, names, singular, splitPath } from './names';
+import { addObservability, parseObservability } from './observability';
 import { addOpenApi, parseOpenApi } from './openapi';
-import type { Plan } from './plan.js';
-import { importPath, type Project } from './project.js';
-import { addArrayToFeature, addImport, addToArray } from './register.js';
+import type { Plan } from './plan';
+import { importPath, type Project } from './project';
+import { addArrayToFeature, addImport, addToArray } from './register';
 
 export interface GenerateOptions {
   /** Functions instead of classes: `route.group` and `service()`. */
