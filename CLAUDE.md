@@ -73,6 +73,17 @@ already exist. `bun publish` rewrites `workspace:*` to the exact release version
   package. Run `bun run release:publish` in your own terminal so the prompts appear; it cannot
   be run unattended.
 
+## Imports: no file extensions
+
+Relative imports are written without an extension: `from './kernel'`, never `from './kernel.js'`.
+
+- `tsconfig.base.json` uses `"module": "Preserve"` and `"moduleResolution": "Bundler"`, so the
+  extension is not needed. Do not switch a package back to `NodeNext`.
+- This holds for packages, examples, tests, CLI templates and code in the docs.
+- One exception: a `*.node-test.ts` file runs under Node without a bundler, so it imports the
+  source it tests with its real extension, `../src/index.ts`.
+- The CLI still reads the style of an existing project and follows it (`importExtension`).
+
 ## Scope: GraphQL lives in `@sukujs/graphql`, never in core
 
 Suku ships first-party GraphQL support as its own package. (This replaces an earlier decision,

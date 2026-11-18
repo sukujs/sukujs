@@ -7,8 +7,8 @@ import {
   trace,
 } from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
-import { FORCE_TRACE, otel } from './init.js';
-import type { Telemetry, TelemetryLevel } from './types.js';
+import { FORCE_TRACE, otel } from './init';
+import type { Telemetry, TelemetryLevel } from './types';
 
 const SEVERITY: Record<TelemetryLevel, SeverityNumber> = {
   debug: SeverityNumber.DEBUG,

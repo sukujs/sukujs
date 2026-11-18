@@ -10,8 +10,8 @@ import {
   Suku,
   singleton,
 } from '@sukujs/core';
-import { observability, Traced, telemetry } from '../src/index.js';
-import { parseHeaders } from '../src/init.js';
+import { observability, Traced, telemetry } from '../src/index';
+import { parseHeaders } from '../src/init';
 
 delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 delete process.env.OTLP_ENDPOINT;

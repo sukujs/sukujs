@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { HttpServer } from '@sukujs/core';
-import { bunAdapter } from '../src/index.js';
+import { bunAdapter } from '../src/index';
 
 let server: HttpServer;
 

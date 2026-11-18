@@ -1,5 +1,5 @@
-import type { ServiceDescriptor } from './descriptor.js';
-import { tokenName } from './types.js';
+import type { ServiceDescriptor } from './descriptor';
+import { tokenName } from './types';
 
 export class DiError extends Error {
   override readonly name: string = 'DiError';

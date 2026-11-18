@@ -7,7 +7,7 @@ import {
   Service,
   ServiceCollection,
   UnresolvableParameterError,
-} from '../src/index.js';
+} from '../src/index';
 
 describe('validateOnBuild', () => {
   test('missing dependency fails at build', () => {

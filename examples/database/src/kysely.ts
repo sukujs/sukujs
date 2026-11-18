@@ -9,7 +9,7 @@ import {
   type User,
   UsersRepository,
   usersFeature,
-} from './shared.js';
+} from './shared';
 
 interface Schema {
   users: { id: Generated<number>; name: string; email: string };

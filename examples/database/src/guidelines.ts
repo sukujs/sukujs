@@ -5,8 +5,8 @@ import { feature, route, ServiceUnavailableException, service } from '@sukujs/co
 import { gt } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { z } from 'zod';
-import { users } from './drizzle.js';
-import { SQLITE_SCHEMA } from './shared.js';
+import { users } from './drizzle';
+import { SQLITE_SCHEMA } from './shared';
 
 export const Db = service('guidelines-db', () => {
   const sqlite = new Sqlite(':memory:');

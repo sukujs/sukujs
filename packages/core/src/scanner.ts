@@ -1,7 +1,7 @@
 import { type Constructor, getServiceOptions, ServiceCollection } from '@sukujs/di';
-import { type Feature, type FeatureRef, isFeature, type RouteEntry } from './feature.js';
-import { isRoute, isRouteGroup } from './route.js';
-import { getRoutesMetadata } from './routes-class.js';
+import { type Feature, type FeatureRef, isFeature, type RouteEntry } from './feature';
+import { isRoute, isRouteGroup } from './route';
+import { getRoutesMetadata } from './routes-class';
 
 export class FeatureError extends Error {
   override readonly name = 'FeatureError';

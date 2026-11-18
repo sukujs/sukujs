@@ -5,10 +5,10 @@ import {
   type Data,
   toBytes,
   utf8,
-} from './encoding.js';
-import { CryptoError } from './errors.js';
-import { importKey, type KeyInput } from './keys.js';
-import { randomBytes } from './random.js';
+} from './encoding';
+import { CryptoError } from './errors';
+import { importKey, type KeyInput } from './keys';
+import { randomBytes } from './random';
 
 /**
  * - `AES-256-GCM`: one secret encrypts and decrypts.

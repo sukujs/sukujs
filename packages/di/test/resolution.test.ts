@@ -7,7 +7,7 @@ import {
   Optional,
   Service,
   ServiceCollection,
-} from '../src/index.js';
+} from '../src/index';
 
 describe('resolution', () => {
   test('constructor injection by class type', () => {

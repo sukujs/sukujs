@@ -1,22 +1,22 @@
-import { cors } from './cors.js';
-import { csrf, csrfToken } from './csrf.js';
-import { buildCsp, securityHeaders } from './headers.js';
-import { clientIp, MemoryRateLimitStore, rateLimit } from './rate-limit.js';
+import { cors } from './cors';
+import { csrf, csrfToken } from './csrf';
+import { buildCsp, securityHeaders } from './headers';
+import { clientIp, MemoryRateLimitStore, rateLimit } from './rate-limit';
 
-export { type CorsOptions, cors } from './cors.js';
+export { type CorsOptions, cors } from './cors';
 export {
   type CsrfOptions,
   type CsrfOriginOptions,
   type CsrfTokenOptions,
   csrf,
   csrfToken,
-} from './csrf.js';
+} from './csrf';
 export {
   buildCsp,
   type CspDirectives,
   type SecurityHeadersOptions,
   securityHeaders,
-} from './headers.js';
+} from './headers';
 export {
   clientIp,
   MemoryRateLimitStore,
@@ -24,8 +24,8 @@ export {
   type RateLimitOptions,
   type RateLimitStore,
   rateLimit,
-} from './rate-limit.js';
-export type { Duration, OriginRule } from './util.js';
+} from './rate-limit';
+export type { Duration, OriginRule } from './util';
 
 /**
  * Everything in one object, for `import sukuSecurity from '@sukujs/security'`.

@@ -1,5 +1,5 @@
-import type { Bytes } from './encoding.js';
-import { CryptoError } from './errors.js';
+import type { Bytes } from './encoding';
+import { CryptoError } from './errors';
 
 /** A PEM string (PKCS#8 private or SPKI public), a JWK, or an imported `CryptoKey`. */
 export type KeyInput = string | JsonWebKey | CryptoKey;

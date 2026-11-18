@@ -1,5 +1,5 @@
-import { type Bytes, base64urlEncode, hexEncode } from './encoding.js';
-import { CryptoError } from './errors.js';
+import { type Bytes, base64urlEncode, hexEncode } from './encoding';
+import { CryptoError } from './errors';
 
 /** Cryptographically secure random bytes. */
 export function randomBytes(length: number): Bytes {

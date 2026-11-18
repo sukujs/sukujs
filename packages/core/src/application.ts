@@ -11,8 +11,8 @@ import type {
   HttpServer,
   PlatformAdapter,
   ServeOptions,
-} from './adapter.js';
-import { RequestContext } from './context.js';
+} from './adapter';
+import { RequestContext } from './context';
 import {
   type Feature,
   type FeatureRef,
@@ -20,7 +20,7 @@ import {
   isFeature,
   type RouteEntry,
   type ServiceEntry,
-} from './feature.js';
+} from './feature';
 import {
   contextOf,
   createKernel,
@@ -28,10 +28,10 @@ import {
   type KernelOptions,
   type RegisteredRoute,
   type RouteTableEntry,
-} from './kernel.js';
-import { ConsoleLogger, Logger } from './logger.js';
-import type { MiddlewareRef } from './middleware.js';
-import { scanFeatures } from './scanner.js';
+} from './kernel';
+import { ConsoleLogger, Logger } from './logger';
+import type { MiddlewareRef } from './middleware';
+import { scanFeatures } from './scanner';
 
 export interface SukuOptions extends KernelOptions {
   /** Required for `listen()`. `handle()` works without one, which is how tests run. */

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import sukuCrypto, * as named from '../src/index.js';
+import sukuCrypto, * as named from '../src/index';
 
 test('the default export carries every function, identical to the named exports', async () => {
   const { default: _default, ...rest } = named;

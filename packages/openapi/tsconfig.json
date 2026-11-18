@@ -1,10 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "Preserve",
-    "moduleResolution": "Bundler",
-    "types": ["node", "bun"],
-    "lib": ["ES2023", "ESNext.Disposable", "DOM"]
-  },
+  "compilerOptions": { "types": ["node", "bun"], "lib": ["ES2023", "ESNext.Disposable", "DOM"] },
   "include": ["src", "test"]
 }

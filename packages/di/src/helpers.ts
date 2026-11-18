@@ -1,5 +1,5 @@
-import { describe, type ServiceDescriptor } from './descriptor.js';
-import type { Constructor, Factory, Lifetime, Token } from './types.js';
+import { describe, type ServiceDescriptor } from './descriptor';
+import type { Constructor, Factory, Lifetime, Token } from './types';
 
 export interface BindingOptions {
   /** Registers a keyed service, resolved with `getKeyed(token, key)` or `@Inject(token, key)`. */

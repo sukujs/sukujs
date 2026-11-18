@@ -1,6 +1,6 @@
 import { ForbiddenException, type MiddlewareFn, type RequestContext } from '@sukujs/core';
 import { createSigner, randomToken, timingSafeEqual } from '@sukujs/crypto';
-import { matchesOrigin, mutable, type OriginRule } from './util.js';
+import { matchesOrigin, mutable, type OriginRule } from './util';
 
 interface CsrfCommon {
   /** Methods that never change state and are not checked. Default: GET, HEAD, OPTIONS. */

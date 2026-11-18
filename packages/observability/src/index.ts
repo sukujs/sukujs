@@ -1,4 +1,4 @@
-export { observability } from './middleware.js';
-export { telemetry } from './telemetry.js';
-export { Traced } from './traced.js';
-export type { ObservabilityOptions, SpanOptions, Telemetry, TelemetryLevel } from './types.js';
+export { observability } from './middleware';
+export { telemetry } from './telemetry';
+export { Traced } from './traced';
+export type { ObservabilityOptions, SpanOptions, Telemetry, TelemetryLevel } from './types';

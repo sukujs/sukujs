@@ -2,7 +2,7 @@
 // Used by PM2, systemd and Docker.
 import { bunAdapter } from '@sukujs/platform-bun';
 import { nodeAdapter } from '@sukujs/platform-node';
-import { createApp, Env } from './app.js';
+import { createApp, Env } from './app';
 
 const onBun = typeof Bun !== 'undefined';
 const app = await createApp({

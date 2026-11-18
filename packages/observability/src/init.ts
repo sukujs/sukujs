@@ -17,7 +17,7 @@ import {
   TraceIdRatioBasedSampler,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
-import type { ObservabilityOptions } from './types.js';
+import type { ObservabilityOptions } from './types';
 
 /** Set on a request's span when its force-trace header asks for a trace. */
 export const FORCE_TRACE = 'app.force_trace';

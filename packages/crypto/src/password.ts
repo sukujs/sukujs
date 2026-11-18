@@ -1,6 +1,6 @@
-import { base64urlDecode, base64urlEncode, toBytes } from './encoding.js';
-import { CryptoError } from './errors.js';
-import { randomBytes } from './random.js';
+import { base64urlDecode, base64urlEncode, toBytes } from './encoding';
+import { CryptoError } from './errors';
+import { randomBytes } from './random';
 
 /** OWASP's 2023 minimum for PBKDF2-HMAC-SHA256. */
 export const DEFAULT_PASSWORD_ITERATIONS = 600_000;

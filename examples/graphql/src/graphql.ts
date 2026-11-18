@@ -1,7 +1,7 @@
 import { type RequestContext, route, type ServiceOf } from '@sukujs/core';
 import { GraphQLError } from 'graphql';
 import { createSchema, createYoga } from 'graphql-yoga';
-import { AuthorLoader, type Book, Books, type Viewer } from './services.js';
+import { AuthorLoader, type Book, Books, type Viewer } from './services';
 
 /** What Suku passes in for each request. */
 interface ServerContext {

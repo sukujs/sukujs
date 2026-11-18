@@ -5,24 +5,24 @@ import {
   type ServiceProvider,
   tokenName,
 } from '@sukujs/di';
-import type { FetchHandler } from './adapter.js';
-import { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
-import type { Feature } from './feature.js';
+import type { FetchHandler } from './adapter';
+import { RequestContext, type RequestSettings, type RouteInfo } from './context';
+import type { Feature } from './feature';
 import {
   HttpException,
   InternalServerErrorException,
   MethodNotAllowedException,
   NotFoundException,
-} from './http-errors.js';
-import { Logger } from './logger.js';
-import type { ErrorHandler, Middleware, MiddlewareFn, MiddlewareRef } from './middleware.js';
-import { toResponse } from './response.js';
-import { isRoute, isRouteGroup, type Route, type RouteConfig, type RouteGroup } from './route.js';
-import { Router } from './router.js';
-import { getRoutesMetadata } from './routes-class.js';
-import { FeatureError, type ScanResult } from './scanner.js';
-import { validate } from './schema.js';
-import { pathnameOf } from './url.js';
+} from './http-errors';
+import { Logger } from './logger';
+import type { ErrorHandler, Middleware, MiddlewareFn, MiddlewareRef } from './middleware';
+import { toResponse } from './response';
+import { isRoute, isRouteGroup, type Route, type RouteConfig, type RouteGroup } from './route';
+import { Router } from './router';
+import { getRoutesMetadata } from './routes-class';
+import { FeatureError, type ScanResult } from './scanner';
+import { validate } from './schema';
+import { pathnameOf } from './url';
 
 export interface KernelOptions {
   /** Prepended to every route, e.g. `'/api'`. */

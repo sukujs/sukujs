@@ -15,7 +15,7 @@ import {
   serializeCookie,
   singleton,
   TooManyRequestsException,
-} from '../src/index.js';
+} from '../src/index';
 
 const req = (path: string, init?: RequestInit) => new Request(`http://t.local${path}`, init);
 

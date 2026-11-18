@@ -2,7 +2,7 @@ import {
   BadRequestException,
   PayloadTooLargeException,
   UnsupportedMediaTypeException,
-} from './http-errors.js';
+} from './http-errors';
 
 export interface BodyOptions {
   /** Reject bodies larger than this many bytes with 413. Default 1 MiB. */

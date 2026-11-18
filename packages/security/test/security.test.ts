@@ -9,7 +9,7 @@ import sukuSecurity, {
   MemoryRateLimitStore,
   rateLimit,
   securityHeaders,
-} from '../src/index.js';
+} from '../src/index';
 
 const req = (path: string, init?: RequestInit) => new Request(`http://api.test${path}`, init);
 const routes = [

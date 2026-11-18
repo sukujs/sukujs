@@ -1,11 +1,11 @@
 import { InjectionToken, value } from '@sukujs/di';
-import { type Feature, feature } from './feature.js';
+import { type Feature, feature } from './feature';
 import {
   flattenIssues,
   type InferOutput,
   type SchemaIssue,
   type StandardSchema,
-} from './schema.js';
+} from './schema';
 
 export class ConfigError extends Error {
   override readonly name = 'ConfigError';

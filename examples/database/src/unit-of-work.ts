@@ -1,6 +1,6 @@
 import { type MiddlewareFn, middleware, type RequestContext } from '@sukujs/core';
 import type { EntityManager } from 'typeorm';
-import { TypeormConnection } from './typeorm.js';
+import { TypeormConnection } from './typeorm';
 
 const MANAGER = Symbol('transaction');
 

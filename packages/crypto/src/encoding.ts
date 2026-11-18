@@ -1,4 +1,4 @@
-import { CryptoError } from './errors.js';
+import { CryptoError } from './errors';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });

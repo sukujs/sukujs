@@ -8,7 +8,7 @@ import {
   type JwtAlgorithm,
   JwtError,
   randomToken,
-} from '../src/index.js';
+} from '../src/index';
 
 const SECRET = 'a-secret-that-is-at-least-32-bytes-long!';
 const b64 = (v: unknown) => base64urlEncode(JSON.stringify(v));

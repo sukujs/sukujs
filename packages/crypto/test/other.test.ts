@@ -18,7 +18,7 @@ import {
   timingSafeEqual,
   toSeconds,
   verifyPassword,
-} from '../src/index.js';
+} from '../src/index';
 
 const SECRET = 'a-secret-that-is-at-least-32-bytes-long!';
 const FAST = { iterations: 1000 };

@@ -1,6 +1,6 @@
 import type { Constructor, Provider, ServiceDescriptor } from '@sukujs/di';
-import type { ErrorHandler, MiddlewareRef } from './middleware.js';
-import type { Route, RouteGroup } from './route.js';
+import type { ErrorHandler, MiddlewareRef } from './middleware';
+import type { Route, RouteGroup } from './route';
 
 export type ServiceEntry = Provider | ServiceDescriptor;
 /** A standalone route, a `route.group(...)`, or a class decorated with `@Routes`. */

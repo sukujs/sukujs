@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { pathnameOf } from '../src/index.js';
+import { pathnameOf } from '../src/index';
 
 test('pathnameOf', () => {
   expect(pathnameOf('http://h/a/b?x=1#f')).toBe('/a/b');

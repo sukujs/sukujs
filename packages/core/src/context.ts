@@ -1,6 +1,6 @@
 import type { ServiceProvider } from '@sukujs/di';
-import { type BodyOptions, parseBody } from './body.js';
-import { Cookies } from './cookies.js';
+import { type BodyOptions, parseBody } from './body';
+import { Cookies } from './cookies';
 
 export interface RouteInfo {
   readonly method: string;

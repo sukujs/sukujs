@@ -1,6 +1,6 @@
-import { getServiceOptions } from './decorators.js';
-import { InvalidDescriptorError } from './errors.js';
-import { ServiceDefinition } from './service.js';
+import { getServiceOptions } from './decorators';
+import { InvalidDescriptorError } from './errors';
+import { ServiceDefinition } from './service';
 import {
   type Constructor,
   type Factory,
@@ -9,7 +9,7 @@ import {
   type Lifetime,
   type Token,
   tokenName,
-} from './types.js';
+} from './types';
 
 export type DescriptorKind = 'class' | 'factory' | 'value' | 'existing';
 

@@ -21,7 +21,7 @@ import sukuGraphql, {
   objectType,
   query,
   subscription,
-} from '../src/index.js';
+} from '../src/index';
 
 interface Book {
   id: string;

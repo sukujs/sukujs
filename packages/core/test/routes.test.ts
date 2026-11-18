@@ -16,7 +16,7 @@ import {
   service,
   singleton,
   value,
-} from '../src/index.js';
+} from '../src/index';
 
 const req = (path: string, init?: RequestInit) => new Request(`http://t.local${path}`, init);
 const json = (path: string, body: unknown, method = 'POST') =>

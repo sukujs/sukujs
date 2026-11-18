@@ -1,8 +1,8 @@
 // The readiness check and pagination shown on the Database page.
 import { expect, test } from 'bun:test';
 import { Logger, SilentLogger, Suku, singleton } from '@sukujs/core';
-import { users } from '../src/drizzle.js';
-import { Db, guidelinesFeature } from '../src/guidelines.js';
+import { users } from '../src/drizzle';
+import { Db, guidelinesFeature } from '../src/guidelines';
 
 const create = () =>
   Suku.create({ features: [guidelinesFeature], services: [singleton(Logger, SilentLogger)] });

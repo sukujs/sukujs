@@ -9,7 +9,7 @@ import {
   singleton,
   transient,
   value,
-} from '../src/index.js';
+} from '../src/index';
 
 abstract class Logger {
   abstract log(m: string): void;
