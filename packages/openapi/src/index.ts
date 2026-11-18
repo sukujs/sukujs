@@ -17,6 +17,7 @@ export {
   type OpenApiDocument,
   type OpenApiDocumentOptions,
   type OpenApiInfo,
+  type OpenApiOperation,
   type OpenApiServer,
   type OpenApiTag,
   type OAuthFlows,

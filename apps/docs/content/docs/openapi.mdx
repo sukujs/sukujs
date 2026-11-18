@@ -127,10 +127,115 @@ findOne = route.get('/:id', {
 | `operationId`            | Replaces the default id.                                                                                                         |
 | `hidden`                 | Leaves the route out of the document.                                                                                            |
 
-A route that has other `meta` spreads both:
+A route that has other `meta` keeps it beside `apiDoc`. See [Route meta](#route-meta).
+
+## Route meta
+
+A route's [`meta`](/docs/routes) is a plain object. Your middlewares read their own keys from
+it, and `apiDoc()` adds one more key, `openapi`. The two do not touch each other.
+
+### Your own meta beside `apiDoc`
+
+Spread `apiDoc()` next to your keys.
+
+```ts title="reports/reports.routes.ts"
+remove = route.delete('/:id', {
+  meta: {
+    roles: ['admin'],
+    rateLimit: { max: 5, per: 'minute' },
+    ...apiDoc({ summary: 'Delete a report' }),
+  },
+  status: 204,
+  handle: ({ params }) => this.reports.remove(params.id),
+});
+```
+
+A middleware reads `roles` as it did before. It knows nothing about the documentation.
+
+```ts title="middlewares/require-roles.middleware.ts"
+export const requireRoles = middleware(async (ctx, next) => {
+  const roles = (ctx.route?.meta.roles as string[] | undefined) ?? [];
+  if (roles.length && !roles.includes(ctx.headers.get('x-role') ?? '')) {
+    throw new ForbiddenException('Not allowed');
+  }
+  return next();
+});
+```
+
+Call `apiDoc()` once per route. It always writes the `openapi` key, so a second call in the
+same `meta` replaces the first. For the same reason, do not use `openapi` as a key of your own.
+
+### Share meta between routes
+
+Keep what several routes have in common in a constant. Shared documentation is an `ApiDoc`
+object, spread **inside** the one `apiDoc()` call.
+
+```ts title="admin/admin.meta.ts"
+import type { ApiDoc } from '@sukujs/openapi';
+
+export const adminOnly = { roles: ['admin'] };
+
+export const adminDoc = {
+  tags: ['Admin'],
+  responses: { 403: 'Not an admin' },
+} satisfies ApiDoc;
+```
 
 ```ts
-meta: { roles: ['admin'], ...apiDoc({ summary: 'Delete a user' }) },
+remove = route.delete('/:id', {
+  meta: { ...adminOnly, ...apiDoc({ ...adminDoc, summary: 'Delete a report' }) },
+  // ...
+});
+```
+
+### Document what the meta already says
+
+If `roles` is in the meta, writing "needs the admin role" in every description says it twice,
+and the two drift apart. The `operation` hook of `openapi()` reads the meta and writes the
+documentation for you. It runs once per route, after everything else.
+
+```ts title="app.feature.ts"
+openapi({
+  securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+  operation: (operation, route) => {
+    const meta = route.config.meta ?? {};
+
+    // An access rule becomes a lock and a line of text.
+    const roles = meta.roles as string[] | undefined;
+    if (roles) {
+      operation.security = [{ bearer: [] }];
+      operation.description = `Needs role: ${roles.join(', ')}`;
+    }
+
+    // A rate limit becomes a 429 response and a vendor extension.
+    const limit = meta.rateLimit as { max: number; per: string } | undefined;
+    if (limit) {
+      operation['x-rate-limit'] = limit;
+      operation.responses[429] = { description: `More than ${limit.max} calls per ${limit.per}` };
+    }
+  },
+});
+```
+
+| Meta on the route                      | What the hook adds to the document                      |
+| -------------------------------------- | ------------------------------------------------------- |
+| `roles: ['admin']`                     | `security`, and "Needs role: admin" in the description. |
+| `rateLimit: { max: 5, per: 'minute' }` | A `429` response and `x-rate-limit`.                    |
+| Neither                                | Nothing. The operation is left as generated.            |
+
+`route.config.meta` is the route's whole meta, and `route` also has its `path`, `method`,
+`name` and `feature`. Change `operation` in place, or return a new one.
+
+### Keep a route out of the document
+
+`hidden` removes a route from the document only. The route still works, and its middlewares
+still run.
+
+```ts
+rebuild = route.post('/rebuild', {
+  meta: { ...adminOnly, ...apiDoc({ hidden: true }) },
+  handle: () => this.reports.rebuild(),
+});
 ```
 
 ## Authentication
@@ -158,7 +263,7 @@ and `security` only accepts the names declared in `securitySchemes`:
 ```ts
 openapi({
   securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
-  security: [{ token: [] }],              // error: `token` is not a declared scheme
+  security: [{ token: [] }], // error: `token` is not a declared scheme
 });
 ```
 
@@ -182,16 +287,8 @@ apiDoc<Scheme>({ security: [{ bearer: [] }] });
 ```
 
 If your routes already carry access rules in `meta`, the `operation` hook turns them into
-documentation, so you do not write them twice. It runs for each operation, last.
-
-```ts
-openapi({
-  operation: (operation, route) => {
-    const roles = route.config.meta?.roles as string[] | undefined;
-    if (roles) operation.description = `Needs role: ${roles.join(', ')}`;
-  },
-});
-```
+`security`, so you do not write them twice. See
+[Document what the meta already says](#document-what-the-meta-already-says).
 
 ## Choose a UI
 
@@ -242,7 +339,7 @@ none.
 | `tags`                        |                                      | Descriptions for tags, and their order.                                          |
 | `securitySchemes`, `security` |                                      | See [Authentication](#authentication).                                           |
 | `toJsonSchema`                |                                      | Converts a schema yourself. See below.                                           |
-| `operation`                   |                                      | Changes each operation.                                                          |
+| `operation`                   |                                      | Changes each operation. See [Route meta](#route-meta).                           |
 | `transform`                   |                                      | Changes the finished document.                                                   |
 | `specUrl`                     | The document's route                 | The document's URL as the browser sees it, behind a proxy that changes the path. |
 | `csp`                         | A strict policy                      | The UI page's Content-Security-Policy.                                           |

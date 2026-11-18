@@ -1,7 +1,18 @@
 import { describe, expect, test } from 'bun:test';
-import { feature, ROUTE_TABLE, Routes, route, Service, Suku, type SukuOptions } from '@sukujs/core';
+import {
+  feature,
+  ForbiddenException,
+  middleware,
+  ROUTE_TABLE,
+  Routes,
+  route,
+  Service,
+  Suku,
+  type SukuOptions,
+} from '@sukujs/core';
 import { z } from 'zod';
 import sukuOpenapi, {
+  type ApiDoc,
   apiDoc,
   createOpenApiDocument,
   type DocsUi,
@@ -241,6 +252,112 @@ describe('the document', () => {
     expect(removed.deprecated).toBe(true);
     expect(removed.operationId).toBe('deleteUser');
     expect(doc.paths['/health']!.get!.tags).toEqual(['app']);
+  });
+});
+
+describe('route meta', () => {
+  // A guard that reads the route's own meta. It knows nothing about the documentation.
+  const requireRoles = middleware(async (ctx, next) => {
+    const roles = (ctx.route?.meta.roles as string[] | undefined) ?? [];
+    if (roles.length && !roles.includes(ctx.headers.get('x-role') ?? '')) {
+      throw new ForbiddenException('Not allowed');
+    }
+    return next();
+  });
+
+  // Meta and documentation shared by several routes.
+  const adminOnly = { roles: ['admin'] };
+  const adminDoc = { tags: ['Admin'], responses: { 403: 'Not an admin' } } satisfies ApiDoc;
+
+  const reports = route.group(
+    '/reports',
+    { middlewares: [requireRoles] },
+    {
+      list: route.get('/', {
+        meta: apiDoc({ summary: 'List reports' }),
+        handle: () => [],
+      }),
+      remove: route.delete('/:id', {
+        meta: {
+          ...adminOnly,
+          rateLimit: { max: 5, per: 'minute' },
+          ...apiDoc({ ...adminDoc, summary: 'Delete a report' }),
+        },
+        status: 204,
+        handle: () => undefined,
+      }),
+      rebuild: route.post('/rebuild', {
+        meta: { ...adminOnly, ...apiDoc({ hidden: true }) },
+        handle: () => ({ started: true }),
+      }),
+    },
+  );
+
+  const appP = Suku.create({
+    routes: [
+      reports,
+      openapi({
+        securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+        operation: (operation, route) => {
+          const meta = route.config.meta ?? {};
+          const roles = meta.roles as string[] | undefined;
+          if (roles) {
+            operation.security = [{ bearer: [] }];
+            operation.description = `Needs role: ${roles.join(', ')}`;
+          }
+          const limit = meta.rateLimit as { max: number; per: string } | undefined;
+          if (limit) {
+            operation['x-rate-limit'] = limit;
+            operation.responses[429] = {
+              description: `More than ${limit.max} calls per ${limit.per}`,
+            };
+          }
+        },
+      }),
+    ],
+  });
+
+  test('a route keeps its own meta beside apiDoc, and middlewares still read it', async () => {
+    const app = await appP;
+    const remove = (role?: string) =>
+      app.handle(
+        new Request('http://api.test/reports/1', {
+          method: 'DELETE',
+          ...(role ? { headers: { 'x-role': role } } : {}),
+        }),
+      );
+    expect((await remove()).status).toBe(403);
+    expect((await remove('admin')).status).toBe(204);
+    expect((await get(app, '/reports')).status).toBe(200);
+  });
+
+  test('shared documentation is spread into one apiDoc call', async () => {
+    const remove = (await documentOf(await appP)).paths['/reports/{id}']!.delete!;
+    expect(remove.summary).toBe('Delete a report');
+    expect(remove.tags).toEqual(['Admin']);
+    expect(remove.responses[403]!.description).toBe('Not an admin');
+  });
+
+  test('the operation hook documents what the meta already says', async () => {
+    const doc = await documentOf(await appP);
+    const remove = doc.paths['/reports/{id}']!.delete!;
+    expect(remove.security).toEqual([{ bearer: [] }]);
+    expect(remove.description).toBe('Needs role: admin');
+    expect(remove['x-rate-limit']).toEqual({ max: 5, per: 'minute' });
+    expect(remove.responses[429]).toEqual({ description: 'More than 5 calls per minute' });
+    // A route without that meta is left alone.
+    const list = doc.paths['/reports']!.get!;
+    expect(list.security).toBeUndefined();
+    expect(list.responses[429]).toBeUndefined();
+  });
+
+  test('a hidden route still runs its guard, and is not in the document', async () => {
+    const app = await appP;
+    expect(Object.keys((await documentOf(app)).paths)).toEqual(['/reports', '/reports/{id}']);
+    const rebuild = await app.handle(
+      new Request('http://api.test/reports/rebuild', { method: 'POST' }),
+    );
+    expect(rebuild.status).toBe(403);
   });
 });
 

@@ -120,13 +120,29 @@ export interface OpenApiTag extends Extensions {
   externalDocs?: { url: string; description?: string };
 }
 
+/** One operation of the document, as the `operation` hook receives it. */
+export interface OpenApiOperation {
+  operationId: string;
+  summary?: string;
+  description?: string;
+  tags: string[];
+  deprecated?: boolean;
+  parameters?: JsonObject[];
+  requestBody?: JsonObject;
+  /** By status code. */
+  responses: Record<string, JsonObject>;
+  security?: SecurityRequirement[];
+  /** Anything else OpenAPI allows on an operation, such as `x-` extensions. */
+  [key: string]: unknown;
+}
+
 export interface OpenApiDocument {
   openapi: string;
   info: OpenApiInfo;
   servers?: OpenApiServer[];
   tags?: OpenApiTag[];
   security?: SecurityRequirement[];
-  paths: Record<string, Record<string, JsonObject>>;
+  paths: Record<string, Record<string, OpenApiOperation>>;
   components?: Record<string, Record<string, unknown>>;
   [key: string]: unknown;
 }
@@ -159,7 +175,7 @@ export interface OpenApiDocumentOptions<S extends SecuritySchemes = {}> {
    * Called for each operation, last. Change it in place or return a replacement. This is the
    * place to turn your own route `meta` (an access level, a scope) into `security` or text.
    */
-  operation?: (operation: JsonObject, route: RegisteredRoute) => JsonObject | void;
+  operation?: (operation: OpenApiOperation, route: RegisteredRoute) => OpenApiOperation | void;
   /** Called once with the finished document. */
   transform?: (document: OpenApiDocument) => OpenApiDocument | void;
 }
@@ -266,7 +282,7 @@ export function createOpenApiDocument<const S extends SecuritySchemes = {}>(
     );
   };
 
-  const operationOf = (route: RegisteredRoute, pathParams: string[]): JsonObject => {
+  const operationOf = (route: RegisteredRoute, pathParams: string[]): OpenApiOperation => {
     const { config } = route;
     const doc = ((config.meta?.openapi as ApiDoc | undefined) ?? {}) as ApiDoc;
 
@@ -282,7 +298,7 @@ export function createOpenApiDocument<const S extends SecuritySchemes = {}>(
     ];
 
     const status = config.status ?? (route.method === 'POST' ? 201 : 200);
-    const out: Record<string, unknown> = {
+    const out: Record<string, JsonObject> = {
       [status]: config.response
         ? { description: 'Success', content: json(convert(config.response, 'output')) }
         : { description: 'Success' },
@@ -312,7 +328,7 @@ export function createOpenApiDocument<const S extends SecuritySchemes = {}>(
     for (let n = 2; operationIds.has(operationId); n++) operationId = `${operationId}_${n}`;
     operationIds.add(operationId);
 
-    const operation: JsonObject = {
+    const operation: OpenApiOperation = {
       operationId,
       ...(doc.summary ? { summary: doc.summary } : {}),
       ...(doc.description ? { description: doc.description } : {}),
