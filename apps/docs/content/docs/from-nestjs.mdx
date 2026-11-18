@@ -83,5 +83,9 @@ middleware that changes the response. There is no RxJS.
 
 ## Not available yet
 
-Lifecycle hooks, WebSocket gateways, microservice transports, GraphQL and OpenAPI generation
-are not part of Suku today.
+Lifecycle hooks, WebSocket gateways and microservice transports are not part of Suku today.
+
+GraphQL and OpenAPI are separate packages: [`@sukujs/graphql`](/docs/graphql) in place of
+`@nestjs/graphql`, and [`@sukujs/openapi`](/docs/openapi) in place of `@nestjs/swagger`. With
+the second one there are no `@ApiProperty` decorators: the document comes from the schemas
+your routes validate with.

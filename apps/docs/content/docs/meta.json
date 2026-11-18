@@ -29,6 +29,7 @@
     "deployment",
     "---Guides---",
     "graphql",
+    "openapi",
     "from-express",
     "from-nestjs",
     "from-dotnet",

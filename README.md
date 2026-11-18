@@ -66,16 +66,17 @@ const findOne = route.get('/users/:id', {
 
 ## Packages
 
-| Package                 | What it is                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `@sukujs/core`          | Routes, features, middlewares, validation, config, logger                           |
-| `@sukujs/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation       |
-| `@sukujs/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own |
-| `@sukujs/security`      | CORS, security headers, CSRF protection and rate limiting, as middlewares           |
-| `@sukujs/graphql`       | Class-based GraphQL resolvers with injection and typed arguments. Optional          |
-| `@sukujs/observability` | Traces, logs, errors and metrics over OpenTelemetry, to any OTLP endpoint. Optional |
-| `@sukujs/platform-node` | `node:http` adapter                                                                 |
-| `@sukujs/platform-bun`  | `Bun.serve` adapter                                                                 |
+| Package                 | What it is                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `@sukujs/core`          | Routes, features, middlewares, validation, config, logger                               |
+| `@sukujs/di`            | Container: lifetimes, scopes, keyed services, disposal, build-time validation           |
+| `@sukujs/crypto`        | JWT, password hashing, signed and encrypted values, random tokens. Works on its own     |
+| `@sukujs/security`      | CORS, security headers, CSRF protection and rate limiting, as middlewares               |
+| `@sukujs/graphql`       | Class-based GraphQL resolvers with injection and typed arguments. Optional              |
+| `@sukujs/openapi`       | OpenAPI document generated from your routes, with Swagger UI, Scalar or Redoc. Optional |
+| `@sukujs/observability` | Traces, logs, errors and metrics over OpenTelemetry, to any OTLP endpoint. Optional     |
+| `@sukujs/platform-node` | `node:http` adapter                                                                     |
+| `@sukujs/platform-bun`  | `Bun.serve` adapter                                                                     |
 
 Current release: **0.4.0** on npm under [`@sukujs`](https://www.npmjs.com/org/sukujs). See the
 [changelog](CHANGELOG.md) for what changed.

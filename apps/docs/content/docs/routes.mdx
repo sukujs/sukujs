@@ -159,6 +159,10 @@ app.routes;
 // [{ method: 'GET', path: '/users/:id', name: 'UsersRoutes.findOne' }, ...]
 ```
 
+`ROUTE_TABLE` holds the same list with each route's feature and options (its schemas, status
+and `meta`). Read it with `app.get(ROUTE_TABLE)`, or inject it. [`@sukujs/openapi`](/docs/openapi)
+is built on it.
+
 ## Groups
 
 `route.group` shares a prefix, middlewares and an error handler without a class.

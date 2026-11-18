@@ -5,7 +5,7 @@
 All publishable packages share a single version number. They are released together, always.
 
 - **Scope.** Every package under `packages/*`: `@sukujs/core`, `@sukujs/di`, `@sukujs/crypto`,
-  `@sukujs/security`, `@sukujs/graphql`, `@sukujs/cli`, `@sukujs/platform-node`, `@sukujs/platform-bun`,
+  `@sukujs/security`, `@sukujs/graphql`, `@sukujs/openapi`, `@sukujs/cli`, `@sukujs/platform-node`, `@sukujs/platform-bun`,
   and any package added later.
   Private workspaces (`apps/*`, `examples/*`, `benchmarks`, the repo root) carry no version.
 - **Always identical.** The `version` field in every `packages/*/package.json` must be the same
@@ -94,6 +94,28 @@ made the same day, to offer guides only.)
 - **Tested against the real library.** Every documented pattern runs in a test.
 - **Other API styles stay as guides.** tRPC, oRPC and similar get documentation, not packages,
   unless that is decided separately.
+
+## Scope: OpenAPI lives in `@sukujs/openapi`, never in core
+
+Suku ships OpenAPI generation and API reference UIs as its own package.
+
+- **One package.** `@sukujs/openapi` provides `openapi()` (the document and UI routes),
+  `apiDoc()`, `createOpenApiDocument()` and the UIs `swaggerUi()`, `scalar()` and `redoc()`. It
+  follows the unified version rule like every other package.
+- **Core stays neutral.** Nothing OpenAPI-specific goes into `@sukujs/core`. The package reads
+  the generic `ROUTE_TABLE` and a route's `meta`; a change in core made for its benefit must be
+  generally useful.
+- **Zero dependencies besides `@sukujs/core`.** No schema library, no `swagger-ui-dist`, no
+  `@scalar/*`. UIs are HTML pages that load from a CDN at a pinned version. Schemas are
+  converted through Standard JSON Schema, or the user's `toJsonSchema`.
+- **The schema is the source.** The document comes from a route's `params`, `query`, `headers`,
+  `body`, `response` and `status`. Do not add property decorators or class-based DTOs.
+  `apiDoc()` only adds what a schema cannot say, and never changes behaviour.
+- **Document what core really does.** Defaults such as the success status and the validation
+  error body must match the kernel. When one changes, change both, with a test.
+- **The UI page keeps a strict Content-Security-Policy** (nonce for inline scripts), so it
+  works beside `securityHeaders()`. A new built-in UI is checked in a browser under that policy.
+- **Tested against real routes.** Every documented pattern runs in a test.
 
 ## Scope: databases are guides, not packages
 

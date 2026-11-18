@@ -22,7 +22,7 @@ export type {
   RequestInfo,
   ServeOptions,
 } from './adapter.js';
-export { Suku, SukuApplication, type SukuOptions } from './application.js';
+export { ROUTE_TABLE, Suku, SukuApplication, type SukuOptions } from './application.js';
 export { assertMediaType, type BodyOptions, parseBody } from './body.js';
 export { ConfigError, ConfigToken, defineConfig } from './config.js';
 export { RequestContext, type RequestSettings, type RouteInfo } from './context.js';
@@ -43,6 +43,7 @@ export {
   joinPaths,
   type Kernel,
   type KernelOptions,
+  type RegisteredRoute,
   type RouteTableEntry,
 } from './kernel.js';
 export { ConsoleLogger, Logger, type LogLevel, SilentLogger } from './logger.js';

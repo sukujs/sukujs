@@ -1,4 +1,10 @@
-import type { ServiceCollection, ServiceProvider, ServiceProviderOptions, Token } from '@sukujs/di';
+import {
+  InjectionToken,
+  type ServiceCollection,
+  type ServiceProvider,
+  type ServiceProviderOptions,
+  type Token,
+} from '@sukujs/di';
 import type {
   CloseOptions,
   FetchHandler,
@@ -20,6 +26,7 @@ import {
   createKernel,
   type Kernel,
   type KernelOptions,
+  type RegisteredRoute,
   type RouteTableEntry,
 } from './kernel.js';
 import { ConsoleLogger, Logger } from './logger.js';
@@ -40,6 +47,12 @@ export interface SukuOptions extends KernelOptions {
   /** Last chance to add or replace services before the container is built. */
   configureServices?: (services: ServiceCollection) => void;
 }
+
+/**
+ * Every route the app serves, with its full path, feature and options. Injectable anywhere,
+ * and readable in a handler with `ctx.provider.get(ROUTE_TABLE)`.
+ */
+export const ROUTE_TABLE = new InjectionToken<readonly RegisteredRoute[]>('suku:route-table');
 
 export class SukuApplication {
   private server: HttpServer | undefined;
@@ -91,9 +104,13 @@ export class SukuApplication {
       return ctx;
     });
     scan.collection.tryAddSingleton(Logger, ConsoleLogger);
+    // Registered before the container is built, filled once the kernel has compiled the routes.
+    const routeTable: RegisteredRoute[] = [];
+    scan.collection.add({ provide: ROUTE_TABLE, useValue: routeTable });
     options.configureServices?.(scan.collection);
     const provider = scan.collection.build({ validateOnBuild: true, ...options.di });
     const kernel = createKernel(scan, provider, options);
+    routeTable.push(...kernel.registered);
     return new SukuApplication(provider, kernel, options);
   }
 

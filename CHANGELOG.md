@@ -3,6 +3,18 @@
 All notable changes to Suku are documented here. Packages under `packages/*` share one
 version and are released together.
 
+## Unreleased
+
+### Features
+
+- **`@sukujs/openapi`** — a new package. `openapi()` serves an OpenAPI 3.1 document built from
+  the app's routes, and a UI for it: Swagger UI, Scalar or Redoc. Parameters, request bodies
+  and responses come from the schemas the routes already validate with. `apiDoc()` adds
+  summaries, tags, extra responses and security in a route's `meta`.
+  `createOpenApiDocument()` builds the document without a server.
+- **`ROUTE_TABLE`** in `@sukujs/core` — an injectable list of every route the app serves, with
+  its full path, feature and options. `app.routes` is unchanged.
+
 ## 0.5.0 — 2026-11-17
 
 Suku 0.5.0 adds encryption for stored data to `@sukujs/crypto`, and makes JWT configuration
