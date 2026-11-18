@@ -4,6 +4,7 @@ import {
   createOpenApiDocument,
   type OpenApiDocument,
   type OpenApiDocumentOptions,
+  type SecuritySchemes,
 } from './document';
 import { type DocsUi, docsCsp, redoc, scalar, swaggerUi } from './ui';
 
@@ -16,7 +17,12 @@ export {
   type OpenApiDocument,
   type OpenApiDocumentOptions,
   type OpenApiInfo,
+  type OpenApiServer,
+  type OpenApiTag,
+  type OAuthFlows,
   type SecurityRequirement,
+  type SecurityScheme,
+  type SecuritySchemes,
 } from './document';
 export {
   type CdnOptions,
@@ -31,7 +37,7 @@ export {
   swaggerUi,
 } from './ui';
 
-export interface OpenApiOptions extends OpenApiDocumentOptions {
+export interface OpenApiOptions<S extends SecuritySchemes = {}> extends OpenApiDocumentOptions<S> {
   /** Where the document is served. Default `/openapi.json`. */
   path?: string;
   /** Where the UI is served. Default `/docs`. `false` serves the document only. */
@@ -61,7 +67,9 @@ export interface OpenApiOptions extends OpenApiDocumentOptions {
  * });
  * ```
  */
-export function openapi(options: OpenApiOptions = {}): RouteGroup {
+export function openapi<const S extends SecuritySchemes = {}>(
+  options: OpenApiOptions<S> = {},
+): RouteGroup {
   const path = options.path ?? '/openapi.json';
   const docs = options.docs ?? '/docs';
   const ui = options.ui ?? swaggerUi();

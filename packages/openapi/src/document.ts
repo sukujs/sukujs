@@ -1,8 +1,51 @@
 import { isStandardSchema, type RegisteredRoute, type StandardSchema } from '@sukujs/core';
 
 export type JsonObject = Record<string, unknown>;
-/** `[{ bearer: [] }]`. An empty array means "no authentication". */
-export type SecurityRequirement = Record<string, string[]>;
+
+/** Vendor extensions: any key that starts with `x-`. */
+type Extensions = { [extension: `x-${string}`]: unknown };
+
+/**
+ * Which schemes a request must satisfy: `{ bearer: [] }`. The array lists OAuth scopes and is
+ * empty for other schemes. `Name` is the union of declared scheme names.
+ */
+export type SecurityRequirement<Name extends string = string> = [Name] extends [never]
+  ? // No scheme is declared, so none can be required.
+    Record<string, never>
+  : { [K in Name]?: string[] };
+
+interface OAuthFlow {
+  /** Scope name to a short description. */
+  scopes: Record<string, string>;
+  refreshUrl?: string;
+}
+
+export interface OAuthFlows {
+  implicit?: OAuthFlow & { authorizationUrl: string };
+  password?: OAuthFlow & { tokenUrl: string };
+  clientCredentials?: OAuthFlow & { tokenUrl: string };
+  authorizationCode?: OAuthFlow & { authorizationUrl: string; tokenUrl: string };
+}
+
+/** How clients authenticate. One of the kinds OpenAPI 3.1 defines. */
+export type SecurityScheme = (
+  | {
+      type: 'http';
+      scheme: 'bearer';
+      /** A hint for readers, such as `JWT`. */ bearerFormat?: string;
+    }
+  | { type: 'http'; scheme: 'basic' | 'digest'; bearerFormat?: never }
+  | {
+      type: 'apiKey';
+      in: 'header' | 'query' | 'cookie';
+      /** The header, query or cookie name. */ name: string;
+    }
+  | { type: 'oauth2'; flows: OAuthFlows }
+  | { type: 'openIdConnect'; openIdConnectUrl: string }
+  | { type: 'mutualTLS' }
+) & { description?: string } & Extensions;
+
+export type SecuritySchemes = Record<string, SecurityScheme>;
 
 /** A documented response other than the success one. */
 export interface ApiResponse {
@@ -14,7 +57,7 @@ export interface ApiResponse {
 }
 
 /** What a route says about itself, beyond what its schemas already tell. */
-export interface ApiDoc {
+export interface ApiDoc<Scheme extends string = string> {
   summary?: string;
   description?: string;
   /** Groups the operation in the UI. Default: the name of the feature that declares the route. */
@@ -25,7 +68,7 @@ export interface ApiDoc {
   /** Leave the route out of the document. */
   hidden?: boolean;
   /** Replaces the document's default `security` for this route. `[]` marks it as public. */
-  security?: SecurityRequirement[];
+  security?: SecurityRequirement<Scheme>[];
   /**
    * Extra responses by status. A string is a description and documents Suku's error body,
    * `{ statusCode, message, error }`.
@@ -45,40 +88,64 @@ export interface ApiDoc {
  *   handle: ({ params }) => this.users.find(params.id),
  * });
  * ```
+ *
+ * To have scheme names in `security` checked, pass them: `apiDoc<'bearer'>({ ... })`.
  */
-export function apiDoc(doc: ApiDoc): { openapi: ApiDoc } {
+export function apiDoc<Scheme extends string = string>(
+  doc: ApiDoc<Scheme>,
+): { openapi: ApiDoc<Scheme> } {
   return { openapi: doc };
 }
 
-export interface OpenApiInfo {
+export interface OpenApiInfo extends Extensions {
   title: string;
   version: string;
+  summary?: string;
   description?: string;
-  [key: string]: unknown;
+  termsOfService?: string;
+  contact?: { name?: string; url?: string; email?: string };
+  license?: { name: string; identifier?: string; url?: string };
+}
+
+export interface OpenApiServer extends Extensions {
+  url: string;
+  description?: string;
+  /** Values for `{placeholders}` in `url`. */
+  variables?: Record<string, { default: string; enum?: string[]; description?: string }>;
+}
+
+export interface OpenApiTag extends Extensions {
+  name: string;
+  description?: string;
+  externalDocs?: { url: string; description?: string };
 }
 
 export interface OpenApiDocument {
   openapi: string;
   info: OpenApiInfo;
-  servers?: { url: string; description?: string }[];
-  tags?: { name: string; description?: string }[];
+  servers?: OpenApiServer[];
+  tags?: OpenApiTag[];
   security?: SecurityRequirement[];
   paths: Record<string, Record<string, JsonObject>>;
   components?: Record<string, Record<string, unknown>>;
   [key: string]: unknown;
 }
 
-export interface OpenApiDocumentOptions {
+/**
+ * `S` is the type of `securitySchemes`. It is inferred, and `security` then only accepts the
+ * names declared there.
+ */
+export interface OpenApiDocumentOptions<S extends SecuritySchemes = {}> {
   /** Default `{ title: 'API', version: '0.0.0' }`. */
   info?: Partial<OpenApiInfo>;
   /** Where the API is reachable. The served document defaults to the origin of the request. */
-  servers?: { url: string; description?: string }[];
+  servers?: OpenApiServer[];
   /** Descriptions for tags, and their order in the UI. */
-  tags?: { name: string; description?: string }[];
+  tags?: OpenApiTag[];
   /** `components.securitySchemes`, e.g. `{ bearer: { type: 'http', scheme: 'bearer' } }`. */
-  securitySchemes?: Record<string, JsonObject>;
-  /** Security applied to every route that does not set its own. */
-  security?: SecurityRequirement[];
+  securitySchemes?: S;
+  /** Security applied to every route that does not set its own. Keys are scheme names. */
+  security?: SecurityRequirement<keyof NoInfer<S> & string>[];
   /**
    * Turns a route's schema into JSON Schema. The default asks the schema itself, through the
    * Standard JSON Schema interface (Zod 4.2+, ArkType, Valibot with its converter). Return
@@ -153,9 +220,9 @@ function standardJsonSchema(schema: unknown, io: 'input' | 'output'): JsonObject
  * const document = createOpenApiDocument(app.get(ROUTE_TABLE), { info: { title: 'Shop' } });
  * ```
  */
-export function createOpenApiDocument(
+export function createOpenApiDocument<const S extends SecuritySchemes = {}>(
   routes: readonly RegisteredRoute[],
-  options: OpenApiDocumentOptions = {},
+  options: OpenApiDocumentOptions<S> = {},
 ): OpenApiDocument {
   const schemas: Record<string, unknown> = {};
   const responses: Record<string, unknown> = {};

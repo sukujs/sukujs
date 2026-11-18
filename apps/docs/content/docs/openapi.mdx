@@ -151,6 +151,36 @@ login = route.post('/login', {
 });
 ```
 
+The options are checked by the compiler. A scheme must be one of the kinds OpenAPI defines
+(`http`, `apiKey`, `oauth2`, `openIdConnect`, `mutualTLS`) with the fields that kind needs,
+and `security` only accepts the names declared in `securitySchemes`:
+
+```ts
+openapi({
+  securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+  security: [{ token: [] }],              // error: `token` is not a declared scheme
+});
+```
+
+A route is in another file and cannot see those names by itself. Give them to `apiDoc` to
+have its `security` checked too:
+
+```ts title="auth/schemes.ts"
+import type { SecuritySchemes } from '@sukujs/openapi';
+
+export const schemes = {
+  bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+} satisfies SecuritySchemes;
+
+export type Scheme = keyof typeof schemes;
+```
+
+```ts
+openapi({ securitySchemes: schemes, security: [{ bearer: [] }] });
+
+apiDoc<Scheme>({ security: [{ bearer: [] }] });
+```
+
 If your routes already carry access rules in `meta`, the `operation` hook turns them into
 documentation, so you do not write them twice. It runs for each operation, last.
 

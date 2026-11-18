@@ -27,6 +27,8 @@ there is nothing to migrate. Every `@sukujs/*` package is published at 0.6.0.
   and later, ArkType and Valibot provide. `toJsonSchema` covers the rest. A Zod schema with
   `.meta({ id: 'User' })` is written once under `components.schemas` and referenced.
 - **Security and hooks** — `securitySchemes` and `security` describe how clients authenticate.
+  Both are checked by the compiler: a scheme must be a kind OpenAPI defines, and `security`
+  only accepts the names you declared.
   `operation` changes each operation, for example to turn your own access rules in `meta` into
   documentation, and `transform` changes the finished document.
 - **`createOpenApiDocument()`** — builds the document without a server, to write it to a file

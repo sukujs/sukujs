@@ -25,7 +25,7 @@ export const AppFeature = feature('app', {
         { name: 'hello', description: 'A greeting' },
       ],
       // "Authorize" in the UI asks for this token and sends it with each request.
-      securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+      securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
       security: [{ bearer: [] }],
     }),
   ],
