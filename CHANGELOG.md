@@ -40,10 +40,20 @@ there is nothing to migrate. Every `@sukujs/*` package is published at 0.6.0.
   its full path, the feature that declared it and its options. Read it with
   `app.get(ROUTE_TABLE)`. `app.routes` is unchanged.
 
+### Fixes
+
+- **`ROUTE_TABLE` is a global symbol** — so a second copy of `@sukujs/core` (for example a
+  linked workspace) still sees the same table. Without that, `/openapi.json` could answer 500.
+
 ### Documentation
 
 - A new page, OpenAPI, covers what is generated from a route, `apiDoc`, authentication, the
-  UIs, every option and schema libraries.
+  UIs, every option and schema libraries. An OpenAPI example app exercises named schemas,
+  `apiDoc`, bearer security and document tests.
+- Routes gains a Meta section: typed meta, public routes under an app-wide check, roles and
+  startup checks over `ROUTE_TABLE`.
+- The docs home page is redesigned: Bun/Node hero switcher, deployment grid and fresh
+  benchmarks.
 - Coming from NestJS now points to `@sukujs/graphql` and `@sukujs/openapi` in place of
   `@nestjs/graphql` and `@nestjs/swagger`.
 
