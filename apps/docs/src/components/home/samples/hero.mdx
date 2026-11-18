@@ -1,0 +1,21 @@
+```ts title="users.routes.ts"
+import { NotFoundException, Routes, route } from '@sukujs/core';
+import { z } from 'zod';
+import { UsersService } from './users.service';
+
+@Routes('/users')
+export class UsersRoutes {
+  constructor(private readonly users: UsersService) {}
+
+  findOne = route.get('/:id', {
+    params: z.object({ id: z.coerce.number().int() }),
+    handle: ({ params }) => {
+      const user = this.users.find(params.id);
+      if (!user) {
+        throw new NotFoundException(`User ${params.id} not found`);
+      }
+      return user;
+    },
+  });
+}
+```

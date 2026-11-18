@@ -1,0 +1,20 @@
+```ts title="orders.feature.ts"
+@Service()
+class UnitOfWork {
+  constructor(private readonly db: Database) {}
+
+  // Called for you when the request ends.
+  async dispose() {
+    await this.db.release();
+  }
+}
+
+export const OrdersFeature = feature('orders', {
+  routes: [OrdersRoutes],
+  services: [
+    singleton(Database), // one for the whole app
+    scoped(UnitOfWork), // one for each request
+    transient(Ticket), // a new one every time
+  ],
+});
+```

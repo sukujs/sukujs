@@ -1,0 +1,13 @@
+```ts title="main.ts"
+import { openapi, scalar } from '@sukujs/openapi';
+
+const app = await Suku.create({
+  features: [UsersFeature],
+  routes: [
+    openapi({
+      info: { title: 'Shop', version: '1.0.0' },
+      ui: scalar(),
+    }),
+  ],
+});
+```
