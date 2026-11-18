@@ -5,5 +5,8 @@
   "compatibility_date": "2026-11-14",
   "observability": {
     "enabled": true
-  }
+  },
+  // Pull-request builds deploy with `wrangler preview`, which needs this block. It can stay
+  // empty: assets and compatibility settings are read from the top level.
+  "previews": {}
 }
